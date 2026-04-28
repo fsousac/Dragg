@@ -185,3 +185,93 @@ export const mobileNavItems = [
   { name: "Reports", icon: "BarChart3", href: "/reports" },
   { name: "More", icon: "MoreHorizontal", href: "/more" }
 ]
+
+// Categories data
+export interface Category {
+  id: string
+  name: string
+  icon: string
+  color: string
+  group: TransactionGroup
+  budget: number
+  spent: number
+}
+
+export const categories: Category[] = [
+  { id: "1", name: "Housing", icon: "🏠", color: "#F97316", group: "needs", budget: 2000, spent: 1800 },
+  { id: "2", name: "Groceries", icon: "🛒", color: "#22C55E", group: "needs", budget: 400, spent: 156.43 },
+  { id: "3", name: "Transportation", icon: "🚗", color: "#8B5CF6", group: "needs", budget: 300, spent: 52.30 },
+  { id: "4", name: "Utilities", icon: "💡", color: "#FACC15", group: "needs", budget: 200, spent: 145 },
+  { id: "5", name: "Entertainment", icon: "📺", color: "#EC4899", group: "wants", budget: 150, spent: 15.99 },
+  { id: "6", name: "Dining", icon: "🍽️", color: "#FB7185", group: "wants", budget: 200, spent: 87.50 },
+  { id: "7", name: "Shopping", icon: "🛍️", color: "#14B8A6", group: "wants", budget: 300, spent: 45 },
+  { id: "8", name: "Health", icon: "🏋️", color: "#6366F1", group: "needs", budget: 100, spent: 45 },
+  { id: "9", name: "Investments", icon: "📈", color: "#22C55E", group: "savings", budget: 500, spent: 500 },
+  { id: "10", name: "Emergency Fund", icon: "🏦", color: "#F59E0B", group: "savings", budget: 300, spent: 300 },
+  { id: "11", name: "Salary", icon: "💼", color: "#22C55E", group: "needs", budget: 0, spent: 0 },
+  { id: "12", name: "Freelance", icon: "💻", color: "#8B5CF6", group: "needs", budget: 0, spent: 0 }
+]
+
+// Goals data
+export interface Goal {
+  id: string
+  name: string
+  icon: string
+  targetAmount: number
+  currentAmount: number
+  deadline: string
+  color: string
+}
+
+export const goals: Goal[] = [
+  { id: "1", name: "Emergency Fund", icon: "🏦", targetAmount: 10000, currentAmount: 6500, deadline: "2024-12-31", color: "#22C55E" },
+  { id: "2", name: "Vacation Trip", icon: "✈️", targetAmount: 3000, currentAmount: 1200, deadline: "2024-08-01", color: "#8B5CF6" },
+  { id: "3", name: "New Car", icon: "🚗", targetAmount: 25000, currentAmount: 8500, deadline: "2025-06-01", color: "#F97316" },
+  { id: "4", name: "Home Down Payment", icon: "🏠", targetAmount: 50000, currentAmount: 12000, deadline: "2026-01-01", color: "#EC4899" }
+]
+
+// Payments/Subscriptions data
+export interface Payment {
+  id: string
+  name: string
+  icon: string
+  amount: number
+  frequency: "monthly" | "yearly" | "weekly"
+  nextDate: string
+  category: string
+  status: "active" | "paused" | "cancelled"
+}
+
+export const payments: Payment[] = [
+  { id: "1", name: "Netflix", icon: "📺", amount: 15.99, frequency: "monthly", nextDate: "2024-02-13", category: "Entertainment", status: "active" },
+  { id: "2", name: "Spotify", icon: "🎵", amount: 9.99, frequency: "monthly", nextDate: "2024-02-15", category: "Entertainment", status: "active" },
+  { id: "3", name: "Gym Membership", icon: "🏋️", amount: 45, frequency: "monthly", nextDate: "2024-02-06", category: "Health", status: "active" },
+  { id: "4", name: "Amazon Prime", icon: "📦", amount: 139, frequency: "yearly", nextDate: "2024-06-20", category: "Shopping", status: "active" },
+  { id: "5", name: "iCloud Storage", icon: "☁️", amount: 2.99, frequency: "monthly", nextDate: "2024-02-01", category: "Technology", status: "active" },
+  { id: "6", name: "Adobe Creative", icon: "🎨", amount: 54.99, frequency: "monthly", nextDate: "2024-02-10", category: "Work", status: "paused" }
+]
+
+// Reports data
+export const monthlyReports = [
+  { month: "Jan 2024", income: 6050, expenses: 2156.22, savings: 800, netWorth: 45000 },
+  { month: "Dec 2023", income: 5800, expenses: 2340, savings: 600, netWorth: 41356 },
+  { month: "Nov 2023", income: 5950, expenses: 2680, savings: 500, netWorth: 37296 },
+  { month: "Oct 2023", income: 5700, expenses: 1980, savings: 700, netWorth: 33526 },
+  { month: "Sep 2023", income: 5650, expenses: 2450, savings: 550, netWorth: 30106 },
+  { month: "Aug 2023", income: 5500, expenses: 2100, savings: 600, netWorth: 26506 }
+]
+
+// Format date helper
+export function formatDate(dateString: string): string {
+  const date = new Date(dateString + "T00:00:00")
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+  return `${months[date.getMonth()]} ${date.getDate()}`
+}
+
+export function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2
+  }).format(amount)
+}
