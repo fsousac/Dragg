@@ -1,30 +1,27 @@
-"use client"
+"use client";
 
-import { ChevronDown, Wallet } from "lucide-react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
+import { ChevronDown, Wallet } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { ThemeToggle } from "@/components/theme-toggle"
-import { useI18n } from "@/lib/i18n"
-import { months } from "@/lib/data"
+} from "@/components/ui/select";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { useI18n } from "@/lib/i18n";
+import { months } from "@/lib/data";
 
 interface HeaderProps {
-  greeting?: string
-  initials?: string
-  userName?: string
+  greeting?: string;
+  initials?: string;
+  userName?: string;
 }
 
-export function Header({
-  initials = "JD",
-  userName = "John",
-}: HeaderProps) {
-  const { t } = useI18n()
+export function Header({ initials = "JD", userName = "John" }: HeaderProps) {
+  const { t } = useI18n();
 
   return (
     <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border">
@@ -53,7 +50,7 @@ export function Header({
           </Select>
           <ThemeToggle />
           <Avatar className="w-10 h-10 border-2 border-primary">
-            <AvatarFallback className="bg-gradient-to-br from-primary to-emerald-400 text-primary-foreground font-bold">
+            <AvatarFallback className="bg-linear-to-br from-primary to-emerald-400 text-primary-foreground font-bold">
               {initials}
             </AvatarFallback>
           </Avatar>
@@ -77,5 +74,5 @@ export function Header({
         </div>
       </div>
     </header>
-  )
+  );
 }
