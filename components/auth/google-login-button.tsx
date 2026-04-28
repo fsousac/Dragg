@@ -5,8 +5,10 @@ import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
+import { useI18n } from "@/lib/i18n"
 
 export function GoogleLoginButton() {
+  const { t } = useI18n()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -42,7 +44,7 @@ export function GoogleLoginButton() {
         ) : (
           <Chrome className="size-4" aria-hidden="true" />
         )}
-        Continue with Google
+        {t("auth.continueWithGoogle")}
       </Button>
 
       {error ? (

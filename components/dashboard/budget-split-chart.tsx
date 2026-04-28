@@ -3,16 +3,23 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts"
 import { budgetSplitData } from "@/lib/data"
+import { useI18n } from "@/lib/i18n"
 
 export function BudgetSplitChart() {
+  const { formatCurrency, t } = useI18n()
+  const chartData = budgetSplitData.map((item) => ({
+    ...item,
+    name: t(item.nameKey),
+  }))
+
   return (
     <Card className="bg-card border-border card-shadow">
       <CardHeader className="pb-2">
         <CardTitle className="text-base lg:text-lg font-semibold text-foreground">
-          50/30/20 Budget Split
+          {t("dashboard.budgetSplit.title")}
         </CardTitle>
         <p className="text-xs lg:text-sm text-muted-foreground">
-          Monthly allocation by category
+          {t("dashboard.budgetSplit.description")}
         </p>
       </CardHeader>
       <CardContent>
@@ -20,7 +27,7 @@ export function BudgetSplitChart() {
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                data={budgetSplitData}
+                data={chartData}
                 cx="50%"
                 cy="50%"
                 innerRadius={50}
@@ -28,7 +35,7 @@ export function BudgetSplitChart() {
                 paddingAngle={4}
                 dataKey="value"
               >
-                {budgetSplitData.map((entry, index) => (
+                {chartData.map((entry, index) => (
                   <Cell 
                     key={`cell-${index}`} 
                     fill={entry.color}
@@ -44,10 +51,10 @@ export function BudgetSplitChart() {
                       <div className="bg-card border border-border rounded-lg p-3 shadow-xl">
                         <p className="text-sm font-medium text-foreground">{data.name}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          ${data.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          {formatCurrency(data.amount)}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {data.value}% of budget
+                          {data.value}% {t("common.ofBudget")}
                         </p>
                       </div>
                     )

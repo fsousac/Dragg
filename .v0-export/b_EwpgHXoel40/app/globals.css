@@ -1,0 +1,189 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* Light Mode (default) */
+:root {
+  --background: #F8FAF9;
+  --foreground: #0A0D0B;
+  --card: #FFFFFF;
+  --card-foreground: #0A0D0B;
+  --popover: #FFFFFF;
+  --popover-foreground: #0A0D0B;
+  --primary: #16A34A;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F1F5F2;
+  --secondary-foreground: #0A0D0B;
+  --muted: #F1F5F2;
+  --muted-foreground: #6B7280;
+  --accent: #F1F5F2;
+  --accent-foreground: #0A0D0B;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --border: #E2E8E4;
+  --input: #E2E8E4;
+  --ring: #16A34A;
+  --radius: 0.75rem;
+  
+  /* Custom Dragg colors - adjusted for light mode */
+  --needs: #EA580C;
+  --wants: #DB2777;
+  --savings: #7C3AED;
+  --income: #16A34A;
+  --expense: #F43F5E;
+  --yellow: #EAB308;
+  
+  /* Chart colors */
+  --chart-1: #16A34A;
+  --chart-2: #EA580C;
+  --chart-3: #DB2777;
+  --chart-4: #7C3AED;
+  --chart-5: #EAB308;
+  
+  /* Sidebar */
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #0A0D0B;
+  --sidebar-primary: #16A34A;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F1F5F2;
+  --sidebar-accent-foreground: #0A0D0B;
+  --sidebar-border: #E2E8E4;
+  --sidebar-ring: #16A34A;
+  
+  /* Card shadow for light mode */
+  --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+
+/* Dark Mode */
+.dark {
+  --background: #050505;
+  --foreground: #FFFFFF;
+  --card: #0B0F0C;
+  --card-foreground: #FFFFFF;
+  --popover: #0B0F0C;
+  --popover-foreground: #FFFFFF;
+  --primary: #22C55E;
+  --primary-foreground: #050505;
+  --secondary: #1a1f1b;
+  --secondary-foreground: #FFFFFF;
+  --muted: #1a1f1b;
+  --muted-foreground: #A1A1AA;
+  --accent: #1a1f1b;
+  --accent-foreground: #FFFFFF;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --border: #1f2520;
+  --input: #1f2520;
+  --ring: #22C55E;
+  
+  /* Custom Dragg colors */
+  --needs: #F97316;
+  --wants: #EC4899;
+  --savings: #8B5CF6;
+  --income: #22C55E;
+  --expense: #FB7185;
+  --yellow: #FACC15;
+  
+  /* Chart colors */
+  --chart-1: #22C55E;
+  --chart-2: #F97316;
+  --chart-3: #EC4899;
+  --chart-4: #8B5CF6;
+  --chart-5: #FACC15;
+  
+  /* Sidebar */
+  --sidebar: #0B0F0C;
+  --sidebar-foreground: #FFFFFF;
+  --sidebar-primary: #22C55E;
+  --sidebar-primary-foreground: #050505;
+  --sidebar-accent: #1a1f1b;
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: #1f2520;
+  --sidebar-ring: #22C55E;
+  
+  /* No shadow in dark mode, use borders */
+  --card-shadow: none;
+}
+
+@theme inline {
+  --font-sans: 'Geist', 'Geist Fallback';
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  
+  /* Custom Dragg colors */
+  --color-needs: var(--needs);
+  --color-wants: var(--wants);
+  --color-savings: var(--savings);
+  --color-income: var(--income);
+  --color-expense: var(--expense);
+  --color-yellow: var(--yellow);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom scrollbar - adapts to theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* Card shadow utility */
+.card-shadow {
+  box-shadow: var(--card-shadow);
+}

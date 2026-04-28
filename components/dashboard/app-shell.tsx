@@ -7,7 +7,7 @@ import { Sidebar } from "@/components/dashboard/sidebar"
 import { createClient } from "@/lib/supabase/server"
 
 function getDisplayName(email: string) {
-  return email.split("@")[0] || "User"
+  return email.split("@")[0] || "Dragg"
 }
 
 function getInitials(name: string) {
@@ -17,7 +17,7 @@ function getInitials(name: string) {
       .filter(Boolean)
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase())
-      .join("") || "DU"
+      .join("") || "D"
   )
 }
 
@@ -34,7 +34,7 @@ export async function AppShell({ children }: AppShellProps) {
     redirect("/")
   }
 
-  const userEmail = claims.email ?? "No email available"
+  const userEmail = claims.email ?? ""
   const userName = getDisplayName(userEmail)
   const initials = getInitials(userName)
 

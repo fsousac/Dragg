@@ -9,18 +9,20 @@ import {
   BarChart3,
   MoreHorizontal
 } from "lucide-react"
+import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 const mobileNavItems = [
-  { name: "Overview", icon: LayoutDashboard, href: "/dashboard" },
-  { name: "Transactions", icon: ArrowLeftRight, href: "/transactions" },
-  { name: "Budgets", icon: PieChart, href: "/budgets" },
-  { name: "Reports", icon: BarChart3, href: "/reports" },
-  { name: "More", icon: MoreHorizontal, href: "/more" }
+  { nameKey: "nav.overview", icon: LayoutDashboard, href: "/dashboard" },
+  { nameKey: "nav.transactions", icon: ArrowLeftRight, href: "/transactions" },
+  { nameKey: "nav.budgets", icon: PieChart, href: "/budgets" },
+  { nameKey: "nav.reports", icon: BarChart3, href: "/reports" },
+  { nameKey: "nav.more", icon: MoreHorizontal, href: "/more" }
 ]
 
 export function MobileNav() {
   const pathname = usePathname()
+  const { t } = useI18n()
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-xl border-t border-border safe-area-pb">
@@ -30,7 +32,7 @@ export function MobileNav() {
           const isActive = pathname === item.href
           return (
             <Link
-              key={item.name}
+              key={item.nameKey}
               href={item.href}
               className={cn(
                 "flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-200 min-w-[60px]",
@@ -40,7 +42,7 @@ export function MobileNav() {
               )}
             >
               <Icon className={cn("w-5 h-5", isActive && "text-primary")} />
-              <span className="text-[10px] font-medium">{item.name}</span>
+              <span className="text-[10px] font-medium">{t(item.nameKey)}</span>
             </Link>
           )
         })}

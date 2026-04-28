@@ -3,10 +3,11 @@
 import { TrendingUp, TrendingDown, PiggyBank, Wallet } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { summaryData } from "@/lib/data"
+import { useI18n } from "@/lib/i18n"
 
 const cards = [
   {
-    title: "Total Income",
+    titleKey: "dashboard.summary.totalIncome",
     value: summaryData.totalIncome,
     icon: TrendingUp,
     trend: "+12.5%",
@@ -16,7 +17,7 @@ const cards = [
     iconBgClass: "bg-[#22C55E]/20"
   },
   {
-    title: "Total Expenses",
+    titleKey: "dashboard.summary.totalExpenses",
     value: summaryData.totalExpenses,
     icon: TrendingDown,
     trend: "-8.2%",
@@ -26,7 +27,7 @@ const cards = [
     iconBgClass: "bg-[#FB7185]/20"
   },
   {
-    title: "Total Saved",
+    titleKey: "dashboard.summary.totalSaved",
     value: summaryData.totalSaved,
     icon: PiggyBank,
     trend: "+24.3%",
@@ -36,7 +37,7 @@ const cards = [
     iconBgClass: "bg-[#8B5CF6]/20"
   },
   {
-    title: "Current Balance",
+    titleKey: "dashboard.summary.currentBalance",
     value: summaryData.currentBalance,
     icon: Wallet,
     trend: "+5.1%",
@@ -48,12 +49,14 @@ const cards = [
 ]
 
 export function SummaryCards() {
+  const { formatCurrency, t } = useI18n()
+
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
       {cards.map((card) => {
         const Icon = card.icon
         return (
-          <Card key={card.title} className="bg-card border-border overflow-hidden card-shadow">
+          <Card key={card.titleKey} className="bg-card border-border overflow-hidden card-shadow">
             <CardContent className="p-4 lg:p-6">
               <div className="flex items-start justify-between">
                 <div className={`p-2 lg:p-3 rounded-xl ${card.iconBgClass}`}>
@@ -64,9 +67,9 @@ export function SummaryCards() {
                 </span>
               </div>
               <div className="mt-3 lg:mt-4">
-                <p className="text-xs lg:text-sm text-muted-foreground">{card.title}</p>
+                <p className="text-xs lg:text-sm text-muted-foreground">{t(card.titleKey)}</p>
                 <p className={`text-xl lg:text-2xl font-bold mt-1 ${card.colorClass}`}>
-                  ${card.value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(card.value)}
                 </p>
               </div>
             </CardContent>

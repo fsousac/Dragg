@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { useI18n } from "@/lib/i18n"
 import { months } from "@/lib/data"
 
 interface HeaderProps {
@@ -20,31 +21,32 @@ interface HeaderProps {
 }
 
 export function Header({
-  greeting = "Good evening",
   initials = "JD",
   userName = "John",
 }: HeaderProps) {
+  const { t } = useI18n()
+
   return (
     <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border">
       {/* Desktop Header */}
       <div className="hidden lg:flex items-center justify-between px-8 py-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            {greeting}, {userName} 👋
+            {t("dashboard.greeting")}, {userName} 👋
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {"Here's"} what&apos;s happening with your finances
+            {t("dashboard.headerDescription")}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Select defaultValue="January 2024">
+          <Select defaultValue="2024-01">
             <SelectTrigger className="w-44 bg-card border-border card-shadow">
-              <SelectValue placeholder="Select month" />
+              <SelectValue placeholder={t("common.selectMonth")} />
             </SelectTrigger>
             <SelectContent>
               {months.map((month) => (
-                <SelectItem key={month} value={month}>
-                  {month}
+                <SelectItem key={month.value} value={month.value}>
+                  {t(month.key)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -69,7 +71,7 @@ export function Header({
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <Button variant="outline" size="sm" className="gap-1 text-sm">
-            Jan 2024
+            {t("data.month.jan")} 2024
             <ChevronDown className="w-4 h-4" />
           </Button>
         </div>

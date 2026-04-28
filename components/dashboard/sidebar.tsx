@@ -15,17 +15,18 @@ import {
   LogOut,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 const navigationItems = [
-  { name: "Overview", icon: LayoutDashboard, href: "/dashboard" },
-  { name: "Transactions", icon: ArrowLeftRight, href: "/transactions" },
-  { name: "Categories", icon: Folder, href: "/categories" },
-  { name: "Budgets", icon: PieChart, href: "/budgets" },
-  { name: "Payments", icon: CreditCard, href: "/payments" },
-  { name: "Reports", icon: BarChart3, href: "/reports" },
-  { name: "Goals", icon: Target, href: "/goals" },
-  { name: "Settings", icon: Settings, href: "/settings" }
+  { nameKey: "nav.overview", icon: LayoutDashboard, href: "/dashboard" },
+  { nameKey: "nav.transactions", icon: ArrowLeftRight, href: "/transactions" },
+  { nameKey: "nav.categories", icon: Folder, href: "/categories" },
+  { nameKey: "nav.budgets", icon: PieChart, href: "/budgets" },
+  { nameKey: "nav.payments", icon: CreditCard, href: "/payments" },
+  { nameKey: "nav.reports", icon: BarChart3, href: "/reports" },
+  { nameKey: "nav.goals", icon: Target, href: "/goals" },
+  { nameKey: "nav.settings", icon: Settings, href: "/settings" }
 ]
 
 interface SidebarProps {
@@ -42,6 +43,7 @@ export function Sidebar({
   userName,
 }: SidebarProps) {
   const pathname = usePathname()
+  const { t } = useI18n()
 
   return (
     <aside className="hidden lg:flex flex-col w-64 bg-card border-r border-border h-screen sticky top-0 card-shadow">
@@ -60,7 +62,7 @@ export function Sidebar({
             const Icon = item.icon
             const isActive = pathname === item.href
             return (
-              <li key={item.name}>
+              <li key={item.nameKey}>
                 <Link
                   href={item.href}
                   className={cn(
@@ -71,7 +73,7 @@ export function Sidebar({
                   )}
                 >
                   <Icon className="w-5 h-5" />
-                  {item.name}
+                  {t(item.nameKey)}
                 </Link>
               </li>
             )
@@ -98,7 +100,7 @@ export function Sidebar({
             variant="ghost"
           >
             <LogOut className="w-4 h-4" />
-            Logout
+            {t("user.logout")}
           </Button>
         </form>
       </div>

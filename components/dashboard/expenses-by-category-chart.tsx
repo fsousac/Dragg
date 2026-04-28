@@ -3,18 +3,24 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
 import { expensesByCategory } from "@/lib/data"
+import { useI18n } from "@/lib/i18n"
 
 export function ExpensesByCategoryChart() {
+  const { formatCurrency, t } = useI18n()
+  const chartData = expensesByCategory.map((item) => ({
+    ...item,
+    name: t(item.nameKey),
+  }))
   const total = expensesByCategory.reduce((sum, item) => sum + item.value, 0)
 
   return (
     <Card className="bg-card border-border card-shadow">
       <CardHeader className="pb-2">
         <CardTitle className="text-base lg:text-lg font-semibold text-foreground">
-          Expenses by Category
+          {t("dashboard.expensesByCategory.title")}
         </CardTitle>
         <p className="text-xs lg:text-sm text-muted-foreground">
-          Where your money goes
+          {t("dashboard.expensesByCategory.description")}
         </p>
       </CardHeader>
       <CardContent>
@@ -23,7 +29,7 @@ export function ExpensesByCategoryChart() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={expensesByCategory}
+                  data={chartData}
                   cx="50%"
                   cy="50%"
                   innerRadius={40}
@@ -31,7 +37,7 @@ export function ExpensesByCategoryChart() {
                   paddingAngle={2}
                   dataKey="value"
                 >
-                  {expensesByCategory.map((entry, index) => (
+                  {chartData.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
                       fill={entry.color}
@@ -48,10 +54,10 @@ export function ExpensesByCategoryChart() {
                         <div className="bg-card border border-border rounded-lg p-3 shadow-xl">
                           <p className="text-sm font-medium text-foreground">{data.name}</p>
                           <p className="text-lg font-bold text-foreground mt-1">
-                            ${data.value.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                            {formatCurrency(data.value)}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {percentage}% of total
+                            {percentage}% {t("common.ofTotal")}
                           </p>
                         </div>
                       )
@@ -63,8 +69,8 @@ export function ExpensesByCategoryChart() {
             </ResponsiveContainer>
           </div>
           <div className="grid grid-cols-2 gap-2 w-full lg:w-1/2">
-            {expensesByCategory.map((category) => (
-              <div key={category.name} className="flex items-center gap-2">
+            {chartData.map((category) => (
+              <div key={category.nameKey} className="flex items-center gap-2">
                 <div
                   className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: category.color }}
@@ -72,7 +78,7 @@ export function ExpensesByCategoryChart() {
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground truncate">{category.name}</p>
                   <p className="text-sm font-medium text-foreground">
-                    ${category.value.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    {formatCurrency(category.value)}
                   </p>
                 </div>
               </div>
