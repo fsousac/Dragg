@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 
-export type Locale = "en" | "pt-BR"
+export type Locale = "en" | "pt-BR";
 
-type Messages = typeof messages.en
+type Messages = typeof messages.en;
 
-const localeStorageKey = "dragg-locale"
+const localeStorageKey = "dragg-locale";
 
 const messages = {
   en: {
@@ -16,7 +16,8 @@ const messages = {
     "auth.title": "Simple money tracking for everyday decisions.",
     "auth.description":
       "Track your money, budgets, and goals with a simple open-source finance dashboard.",
-    "auth.footer": "Open source. Free to run. Built for personal finance clarity.",
+    "auth.footer":
+      "Open source. Free to run. Built for personal finance clarity.",
     "auth.continueWithGoogle": "Continue with Google",
     "common.comingSoon": "Coming soon",
     "common.selectMonth": "Select month",
@@ -63,6 +64,13 @@ const messages = {
     "data.category.dining": "Dining",
     "data.category.entertainment": "Entertainment",
     "data.category.freelance": "Freelance",
+    "data.category.food": "Food",
+    "data.category.subscriptions": "Subscriptions",
+    "data.category.leisure": "Leisure",
+    "data.category.education": "Education",
+    "data.category.important": "Important",
+    "data.category.debts": "Debts",
+    "data.category.other": "Other",
     "data.category.groceries": "Groceries",
     "data.category.health": "Health",
     "data.category.housing": "Housing",
@@ -70,7 +78,9 @@ const messages = {
     "data.category.salary": "Salary",
     "data.category.savings": "Savings",
     "data.category.transportation": "Transportation",
+    "data.category.receipts": "Receipts",
     "data.group.needs": "Needs",
+    "data.group.income": "Receipts",
     "data.group.savings": "Savings",
     "data.group.wants": "Wants",
     "data.month.apr": "Apr",
@@ -155,10 +165,14 @@ const messages = {
       "Create spending categories and keep your money organized by purpose.",
     "page.goals.description":
       "Set savings goals and follow progress toward your next milestone.",
-    "page.more.description": "Access the remaining Dragg tools from the mobile navigation.",
-    "page.payments.description": "Track upcoming bills, recurring payments, and due dates.",
-    "page.reports.description": "Explore trends, monthly summaries, and finance insights.",
-    "page.settings.description": "Manage preferences, account details, and dashboard settings.",
+    "page.more.description":
+      "Access the remaining Dragg tools from the mobile navigation.",
+    "page.payments.description":
+      "Track upcoming bills, recurring payments, and due dates.",
+    "page.reports.description":
+      "Explore trends, monthly summaries, and finance insights.",
+    "page.settings.description":
+      "Manage preferences, account details, and dashboard settings.",
     "page.transactions.description":
       "Review, search, and organize every income and expense entry in one place.",
     "screen.budgets.categoryBudgets": "Category Budgets",
@@ -172,7 +186,7 @@ const messages = {
     "screen.budgets.totalSpent": "Total Spent",
     "screen.budgets.track": "Track your 50/30/20 budget allocation",
     "screen.categories.description": "Organize your spending with categories",
-    "screen.categories.incomeNoBudget": "Income category - no budget set",
+    "screen.categories.incomeNoBudget": "Receipts category - no budget set",
     "screen.categories.newCategory": "New Category",
     "screen.categories.title": "Categories",
     "screen.goals.activeGoals": "Active goals",
@@ -239,14 +253,17 @@ const messages = {
     "screen.settings.profile": "Profile",
     "screen.settings.profileDescription": "Manage your personal information",
     "screen.settings.regional": "Regional Settings",
-    "screen.settings.regionalDescription": "Configure currency and locale preferences",
+    "screen.settings.regionalDescription":
+      "Configure currency and locale preferences",
     "screen.settings.saveChanges": "Save Changes",
     "screen.settings.security": "Security",
     "screen.settings.securityDescription": "Manage your security settings",
     "screen.settings.appearanceDescription": "Customize how Dragg looks",
-    "screen.settings.compactDescription": "Show more content with smaller spacing",
+    "screen.settings.compactDescription":
+      "Show more content with smaller spacing",
     "screen.settings.helpDescription": "Get help with Dragg",
-    "screen.settings.notificationsDescription": "Configure your notification preferences",
+    "screen.settings.notificationsDescription":
+      "Configure your notification preferences",
     "screen.settings.themeDescription": "Switch between light and dark mode",
     "screen.settings.terms": "Terms of Service",
     "screen.settings.theme": "Theme",
@@ -257,6 +274,45 @@ const messages = {
     "screen.transactions.description": "View and manage all your transactions",
     "screen.transactions.search": "Search transactions...",
     "screen.transactions.title": "Transactions",
+    "transaction.add.title": "Quick Add",
+    "transaction.add.subtitle": "Record a new transaction",
+    "transaction.type": "Type",
+    "transaction.typeIncome": "Income",
+    "transaction.typeExpense": "Expense",
+    "transaction.date": "Date",
+    "transaction.amount": "Amount",
+    "transaction.category": "Category",
+    "transaction.needs": "Needs (50%)",
+    "transaction.wants": "Wants (30%)",
+    "transaction.savings": "Savings (20%)",
+    "transaction.paymentMethod": "Payment",
+    "transaction.paymentMethods.creditCard": "Credit Card",
+    "transaction.paymentMethods.debitCard": "Debit Card",
+    "transaction.paymentMethods.cash": "Cash",
+    "transaction.paymentMethods.transfer": "Transfer",
+    "transaction.paymentMethods.pix": "PIX",
+    "transaction.installmentFrequency": "Installment",
+    "transaction.installmentOption.full": "Lump sum",
+    "transaction.installmentOption.2x": "2x",
+    "transaction.installmentOption.3x": "3x",
+    "transaction.installmentOption.4x": "4x",
+    "transaction.installmentOption.5x": "5x",
+    "transaction.installmentOption.6x": "6x",
+    "transaction.installmentOption.6x": "7x",
+    "transaction.installmentOption.6x": "8x",
+    "transaction.installmentOption.6x": "9x",
+    "transaction.installmentOption.6x": "10x",
+    "transaction.installmentOption.6x": "6x",
+    "transaction.installmentOption.12x": "12x",
+    "transaction.installmentOption.24x": "24x",
+    "transaction.installments": "Installments",
+    "transaction.installmentsLabel": "Split in installments",
+    "transaction.installmentCount": "Number of installments",
+    "transaction.notes": "Notes",
+    "transaction.save": "Record",
+    "transaction.saving": "Recording...",
+    "transaction.summary": "Summary",
+    "transaction.perInstallment": "/installment",
     "theme.toggle": "Toggle theme",
     "user.fallback": "User",
     "user.initialsFallback": "DU",
@@ -269,7 +325,8 @@ const messages = {
     "auth.title": "Controle simples do dinheiro para decisões do dia a dia.",
     "auth.description":
       "Acompanhe seu dinheiro, orçamentos e metas com um painel financeiro simples e open-source.",
-    "auth.footer": "Open source. Gratuito para usar. Feito para dar clareza às suas finanças.",
+    "auth.footer":
+      "Open source. Gratuito para usar. Feito para dar clareza às suas finanças.",
     "auth.continueWithGoogle": "Continuar com Google",
     "common.comingSoon": "Em breve",
     "common.selectMonth": "Selecionar mês",
@@ -316,6 +373,13 @@ const messages = {
     "data.category.dining": "Restaurantes",
     "data.category.entertainment": "Entretenimento",
     "data.category.freelance": "Freelance",
+    "data.category.food": "Alimentação",
+    "data.category.subscriptions": "Assinaturas",
+    "data.category.leisure": "Lazer",
+    "data.category.education": "Educação",
+    "data.category.important": "Importante",
+    "data.category.debts": "Dívidas",
+    "data.category.other": "Outros",
     "data.category.groceries": "Mercado",
     "data.category.health": "Saúde",
     "data.category.housing": "Moradia",
@@ -323,7 +387,9 @@ const messages = {
     "data.category.salary": "Salário",
     "data.category.savings": "Economias",
     "data.category.transportation": "Transporte",
+    "data.category.receipts": "Recebimentos",
     "data.group.needs": "Necessidades",
+    "data.group.income": "Recebimentos",
     "data.group.savings": "Economias",
     "data.group.wants": "Desejos",
     "data.month.apr": "Abr",
@@ -376,7 +442,8 @@ const messages = {
     "dashboard.expensesOverTime.description": "Tendência mensal de gastos",
     "dashboard.expensesOverTime.title": "Gastos ao longo do tempo",
     "dashboard.greeting": "Boa noite",
-    "dashboard.headerDescription": "Veja o que está acontecendo com suas finanças",
+    "dashboard.headerDescription":
+      "Veja o que está acontecendo com suas finanças",
     "dashboard.latestTransactions.description": "Sua atividade recente",
     "dashboard.latestTransactions.title": "Últimas transações",
     "dashboard.newTransaction": "Nova transação",
@@ -406,10 +473,14 @@ const messages = {
       "Planeje limites mensais, compare gastos e mantenha seus orçamentos visíveis.",
     "page.categories.description":
       "Crie categorias de gastos e organize seu dinheiro por finalidade.",
-    "page.goals.description": "Defina metas de economia e acompanhe o progresso.",
-    "page.more.description": "Acesse as demais ferramentas do Dragg pela navegação mobile.",
-    "page.payments.description": "Acompanhe contas futuras, pagamentos recorrentes e vencimentos.",
-    "page.reports.description": "Explore tendências, resumos mensais e insights financeiros.",
+    "page.goals.description":
+      "Defina metas de economia e acompanhe o progresso.",
+    "page.more.description":
+      "Acesse as demais ferramentas do Dragg pela navegação mobile.",
+    "page.payments.description":
+      "Acompanhe contas futuras, pagamentos recorrentes e vencimentos.",
+    "page.reports.description":
+      "Explore tendências, resumos mensais e insights financeiros.",
     "page.settings.description":
       "Gerencie preferências, detalhes da conta e configurações do painel.",
     "page.transactions.description":
@@ -425,12 +496,14 @@ const messages = {
     "screen.budgets.totalSpent": "Total gasto",
     "screen.budgets.track": "Acompanhe sua alocação 50/30/20",
     "screen.categories.description": "Organize seus gastos com categorias",
-    "screen.categories.incomeNoBudget": "Categoria de renda - sem orçamento definido",
+    "screen.categories.incomeNoBudget":
+      "Categoria de recebimentos - sem orçamento definido",
     "screen.categories.newCategory": "Nova categoria",
     "screen.categories.title": "Categorias",
     "screen.goals.activeGoals": "Metas ativas",
     "screen.goals.deadline": "Prazo",
-    "screen.goals.description": "Acompanhe o progresso das suas metas de economia",
+    "screen.goals.description":
+      "Acompanhe o progresso das suas metas de economia",
     "screen.goals.editGoal": "Editar meta",
     "screen.goals.monthlyNeeded": "Necessário por mês",
     "screen.goals.newGoal": "Nova meta",
@@ -492,14 +565,18 @@ const messages = {
     "screen.settings.profile": "Perfil",
     "screen.settings.profileDescription": "Gerencie suas informações pessoais",
     "screen.settings.regional": "Configurações regionais",
-    "screen.settings.regionalDescription": "Configure moeda e preferências de localidade",
+    "screen.settings.regionalDescription":
+      "Configure moeda e preferências de localidade",
     "screen.settings.saveChanges": "Salvar alterações",
     "screen.settings.security": "Segurança",
-    "screen.settings.securityDescription": "Gerencie suas configurações de segurança",
+    "screen.settings.securityDescription":
+      "Gerencie suas configurações de segurança",
     "screen.settings.appearanceDescription": "Personalize a aparência do Dragg",
-    "screen.settings.compactDescription": "Mostre mais conteúdo com espaçamento menor",
+    "screen.settings.compactDescription":
+      "Mostre mais conteúdo com espaçamento menor",
     "screen.settings.helpDescription": "Obtenha ajuda com o Dragg",
-    "screen.settings.notificationsDescription": "Configure suas preferências de notificação",
+    "screen.settings.notificationsDescription":
+      "Configure suas preferências de notificação",
     "screen.settings.themeDescription": "Alterne entre modo claro e escuro",
     "screen.settings.terms": "Termos de serviço",
     "screen.settings.theme": "Tema",
@@ -507,45 +584,82 @@ const messages = {
     "screen.settings.twoFactor": "Autenticação em dois fatores",
     "screen.transactions.add": "Adicionar transação",
     "screen.transactions.count": "Transações",
-    "screen.transactions.description": "Veja e gerencie todas as suas transações",
+    "screen.transactions.description":
+      "Veja e gerencie todas as suas transações",
     "screen.transactions.search": "Buscar transações...",
     "screen.transactions.title": "Transações",
+    "transaction.add.title": "Adicionar rápido",
+    "transaction.add.subtitle": "Registre uma nova transação",
+    "transaction.type": "Tipo",
+    "transaction.typeIncome": "Entrada",
+    "transaction.typeExpense": "Saída",
+    "transaction.date": "Data",
+    "transaction.amount": "Valor",
+    "transaction.category": "Categoria",
+    "transaction.needs": "Necessidades (50%)",
+    "transaction.wants": "Desejos (30%)",
+    "transaction.savings": "Economias (20%)",
+    "transaction.paymentMethod": "Forma de pagamento",
+    "transaction.paymentMethods.creditCard": "Cartão de crédito",
+    "transaction.paymentMethods.debitCard": "Cartão de débito",
+    "transaction.paymentMethods.cash": "Dinheiro",
+    "transaction.paymentMethods.transfer": "Transferência",
+    "transaction.paymentMethods.pix": "PIX",
+    "transaction.installmentFrequency": "Parcelamento",
+    "transaction.installmentOption.full": "À vista",
+    "transaction.installmentOption.2x": "2x",
+    "transaction.installmentOption.3x": "3x",
+    "transaction.installmentOption.4x": "4x",
+    "transaction.installmentOption.6x": "6x",
+    "transaction.installmentOption.12x": "12x",
+    "transaction.installmentOption.24x": "24x",
+    "transaction.installments": "Parcelado",
+    "transaction.installmentsLabel": "Parcelar em parcelas",
+    "transaction.installmentCount": "Número de parcelas",
+    "transaction.notes": "Observações",
+    "transaction.save": "Registrar",
+    "transaction.saving": "Registrando...",
+    "transaction.summary": "Resumo",
+    "transaction.perInstallment": "/parcela",
     "theme.toggle": "Alternar tema",
     "user.fallback": "Usuário",
     "user.initialsFallback": "DU",
     "user.logout": "Sair",
   },
-} as const
+} as const;
 
 const LocaleContext = React.createContext<{
-  formatCurrency: (value: number) => string
-  formatDate: (date: string | Date, options?: Intl.DateTimeFormatOptions) => string
-  formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string
-  locale: Locale
-  setLocale: (locale: Locale) => void
-  t: (key: string) => string
-} | null>(null)
+  formatCurrency: (value: number) => string;
+  formatDate: (
+    date: string | Date,
+    options?: Intl.DateTimeFormatOptions,
+  ) => string;
+  formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string;
+  locale: Locale;
+  setLocale: (locale: Locale) => void;
+  t: (key: string) => string;
+} | null>(null);
 
 function resolveLocale(value?: string | null): Locale {
-  return value?.toLowerCase().startsWith("pt") ? "pt-BR" : "en"
+  return value?.toLowerCase().startsWith("pt") ? "pt-BR" : "en";
 }
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = React.useState<Locale>("en")
+  const [locale, setLocaleState] = React.useState<Locale>("en");
 
   React.useEffect(() => {
-    const storedLocale = window.localStorage.getItem(localeStorageKey)
+    const storedLocale = window.localStorage.getItem(localeStorageKey);
     const nextLocale = storedLocale
       ? resolveLocale(storedLocale)
-      : resolveLocale(window.navigator.language)
+      : resolveLocale(window.navigator.language);
 
-    setLocaleState(nextLocale)
-  }, [])
+    setLocaleState(nextLocale);
+  }, []);
 
   React.useEffect(() => {
-    document.documentElement.lang = locale
-    window.localStorage.setItem(localeStorageKey, locale)
-  }, [locale])
+    document.documentElement.lang = locale;
+    window.localStorage.setItem(localeStorageKey, locale);
+  }, [locale]);
 
   const value = React.useMemo(
     () => ({
@@ -555,34 +669,36 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
           maximumFractionDigits: 2,
           minimumFractionDigits: 2,
           style: "currency",
-        }).format(value)
+        }).format(value);
       },
       formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions) {
-        return new Intl.DateTimeFormat(locale, options).format(new Date(date))
+        return new Intl.DateTimeFormat(locale, options).format(new Date(date));
       },
       formatNumber(value: number, options?: Intl.NumberFormatOptions) {
-        return new Intl.NumberFormat(locale, options).format(value)
+        return new Intl.NumberFormat(locale, options).format(value);
       },
       locale,
       setLocale(nextLocale: Locale) {
-        setLocaleState(nextLocale)
+        setLocaleState(nextLocale);
       },
       t(key: string) {
-        return messages[locale][key as keyof Messages] ?? key
+        return messages[locale][key as keyof Messages] ?? key;
       },
     }),
     [locale],
-  )
+  );
 
-  return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>
+  return (
+    <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>
+  );
 }
 
 export function useI18n() {
-  const context = React.useContext(LocaleContext)
+  const context = React.useContext(LocaleContext);
 
   if (!context) {
-    throw new Error("useI18n must be used within LanguageProvider.")
+    throw new Error("useI18n must be used within LanguageProvider.");
   }
 
-  return context
+  return context;
 }

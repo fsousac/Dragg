@@ -27,15 +27,23 @@ interface AppShellProps {
 
 export async function AppShell({ children }: AppShellProps) {
   const supabase = await createClient()
-  const { data } = await supabase.auth.getClaims()
-  const claims = data?.claims
+  const [{ data: claimsData }, { data: userData }] = await Promise.all([
+    supabase.auth.getClaims(),
+    supabase.auth.getUser(),
+  ])
 
-  if (!claims) {
+  const claims = claimsData?.claims
+  const user = userData?.user
+
+  if (!claims || !user) {
     redirect("/")
   }
 
-  const userEmail = claims.email ?? ""
-  const userName = getDisplayName(userEmail)
+  const userEmail = user.email ?? claims.email ?? ""
+  const userName =
+    user.user_metadata?.full_name ??
+    user.user_metadata?.name ??
+    getDisplayName(userEmail)
   const initials = getInitials(userName)
 
   async function signOut() {
