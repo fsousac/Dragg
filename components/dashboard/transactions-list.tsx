@@ -3,14 +3,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
-import { transactions } from "@/lib/data"
+import { type Transaction, type TransactionGroup } from "@/lib/data"
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
-const groupColors = {
+const groupColors: Record<TransactionGroup, string> = {
   needs: "bg-[#F97316]/10 text-[#F97316]",
   wants: "bg-[#EC4899]/10 text-[#EC4899]",
-  savings: "bg-[#8B5CF6]/10 text-[#8B5CF6]"
+  savings: "bg-[#8B5CF6]/10 text-[#8B5CF6]",
+  income: "bg-[#22C55E]/10 text-[#22C55E]"
 }
 
 const amountColors = {
@@ -19,7 +20,11 @@ const amountColors = {
   saving: "text-[#8B5CF6]"
 }
 
-export function TransactionsList() {
+type TransactionsListProps = {
+  transactions: Transaction[]
+}
+
+export function TransactionsList({ transactions }: TransactionsListProps) {
   const { formatCurrency, formatDate, t } = useI18n()
   const latestTransactions = transactions.slice(0, 5)
 

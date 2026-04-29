@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/lib/i18n";
-import { categories } from "@/lib/data";
+import {
+  type TransactionFormCategory,
+  type TransactionFormPaymentMethod,
+} from "@/lib/finance/transactions";
 import { CompactInput } from "@/components/dashboard/form-inputs/compact-input";
 import { CompactSelect } from "@/components/dashboard/form-inputs/compact-select";
 import { CompactTextarea } from "@/components/dashboard/form-inputs/compact-textarea";
@@ -16,7 +19,6 @@ import {
   CreditCard,
   FileText,
   Zap,
-  ArrowRight,
   Plus,
 } from "lucide-react";
 import { format, isValid, parse } from "date-fns";
@@ -35,12 +37,16 @@ interface NewTransactionFormProps {
   onSubmit?: (data: NewTransactionFormData) => void | Promise<void>;
   isLoading?: boolean;
   compact?: boolean;
+  categories: TransactionFormCategory[];
+  paymentMethods: TransactionFormPaymentMethod[];
 }
 
 export function NewTransactionForm({
   onSubmit,
   isLoading = false,
   compact = false,
+  categories,
+  paymentMethods,
 }: NewTransactionFormProps) {
   const { t } = useI18n();
   const today = format(new Date(), "dd/MM/yyyy");
@@ -52,8 +58,8 @@ export function NewTransactionForm({
     type: "expense",
     date: today,
     amount: 0,
-    category: "data.category.housing",
-    paymentMethod: "credit-card",
+    category: categories[0]?.id ?? "none",
+    paymentMethod: paymentMethods[0]?.id ?? "none",
     installmentCount: 1,
     description: "",
   });
@@ -66,6 +72,20 @@ export function NewTransactionForm({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    setFormData((currentFormData) => ({
+      ...currentFormData,
+      category:
+        currentFormData.category !== "none"
+          ? currentFormData.category
+          : (categories[0]?.id ?? "none"),
+      paymentMethod:
+        currentFormData.paymentMethod !== "none"
+          ? currentFormData.paymentMethod
+          : (paymentMethods[0]?.id ?? "none"),
+    }));
+  }, [categories, paymentMethods]);
 
   const validateForm = () => {
     const newErrors: typeof errors = {};
@@ -89,8 +109,8 @@ export function NewTransactionForm({
           type: "expense",
           date: today,
           amount: 0,
-          category: "data.category.housing",
-          paymentMethod: "credit-card",
+          category: categories[0]?.id ?? "none",
+          paymentMethod: paymentMethods[0]?.id ?? "none",
           installmentCount: 1,
           description: "",
         });
@@ -108,25 +128,21 @@ export function NewTransactionForm({
           return order[left.group] - order[right.group];
         })
         .map((category) => ({
-          value: category.nameKey,
-          label: t(category.nameKey),
-          icon: category.icon,
+          value: category.id,
+          label: t(category.label),
           group: category.group,
         })),
-    [t],
+    [categories, t],
   );
 
   const selectedCategory = categoryOptions.find(
     (category) => category.value === formData.category,
   );
 
-  const paymentMethods = [
-    { value: "credit-card", label: t("transaction.paymentMethods.creditCard") },
-    { value: "debit-card", label: t("transaction.paymentMethods.debitCard") },
-    { value: "cash", label: t("transaction.paymentMethods.cash") },
-    { value: "bank-transfer", label: t("transaction.paymentMethods.transfer") },
-    { value: "pix", label: t("transaction.paymentMethods.pix") },
-  ];
+  const paymentMethodOptions = paymentMethods.map((paymentMethod) => ({
+    value: paymentMethod.id,
+    label: t(paymentMethod.label),
+  }));
 
   const installmentOptions = [
     { value: "1", label: t("transaction.installmentOption.full") },
@@ -268,7 +284,7 @@ export function NewTransactionForm({
                   onChange={(value) =>
                     setFormData({ ...formData, paymentMethod: value })
                   }
-                  options={paymentMethods}
+                  options={paymentMethodOptions}
                   error={errors.paymentMethod}
                   icon={<CreditCard className="w-4 h-4" />}
                 />
@@ -392,14 +408,14 @@ export function NewTransactionForm({
 
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-foreground/60">
-                      {selectedCategory?.icon} {selectedCategory?.label}
+                      {selectedCategory?.label}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-foreground/60">
                       {
-                        paymentMethods.find(
+                        paymentMethodOptions.find(
                           (m) => m.value === formData.paymentMethod,
                         )?.label
                       }

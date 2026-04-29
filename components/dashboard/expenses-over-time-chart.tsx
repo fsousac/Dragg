@@ -1,16 +1,30 @@
-"use client"
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, Area, AreaChart } from "recharts"
-import { expensesOverTime } from "@/lib/data"
-import { useI18n } from "@/lib/i18n"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  XAxis,
+  YAxis,
+  ResponsiveContainer,
+  Tooltip,
+  CartesianGrid,
+  Area,
+  AreaChart,
+} from "recharts";
+import { type ExpensesOverTimeItem } from "@/lib/finance/transactions";
+import { useI18n } from "@/lib/i18n";
 
-export function ExpensesOverTimeChart() {
-  const { formatCurrency, t } = useI18n()
+type ExpensesOverTimeChartProps = {
+  expensesOverTime: ExpensesOverTimeItem[];
+};
+
+export function ExpensesOverTimeChart({
+  expensesOverTime,
+}: ExpensesOverTimeChartProps) {
+  const { formatCurrency, t } = useI18n();
   const chartData = expensesOverTime.map((item) => ({
     ...item,
     month: t(item.monthKey),
-  }))
+  }));
 
   return (
     <Card className="bg-card border-border card-shadow">
@@ -27,27 +41,35 @@ export function ExpensesOverTimeChart() {
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData}>
               <defs>
-                <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#22C55E" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#22C55E" stopOpacity={0}/>
+                <linearGradient
+                  id="expenseGradient"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop offset="5%" stopColor="#22C55E" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#22C55E" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid 
-                strokeDasharray="3 3" 
+              <CartesianGrid
+                strokeDasharray="3 3"
                 vertical={false}
                 stroke="rgba(255,255,255,0.05)"
               />
-              <XAxis 
-                dataKey="month" 
+              <XAxis
+                dataKey="month"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#A1A1AA', fontSize: 12 }}
+                tick={{ fill: "#A1A1AA", fontSize: 12 }}
               />
-              <YAxis 
+              <YAxis
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#A1A1AA', fontSize: 12 }}
-                tickFormatter={(value) => formatCurrency(Number(value)).replace(/([,.]00|,00)$/, "")}
+                tick={{ fill: "#A1A1AA", fontSize: 12 }}
+                tickFormatter={(value) =>
+                  formatCurrency(Number(value)).replace(/([,.]00|,00)$/, "")
+                }
                 width={60}
               />
               <Tooltip
@@ -55,14 +77,16 @@ export function ExpensesOverTimeChart() {
                   if (active && payload && payload.length) {
                     return (
                       <div className="bg-card border border-border rounded-lg p-3 shadow-xl">
-                        <p className="text-sm font-medium text-foreground">{label}</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {label}
+                        </p>
                         <p className="text-lg font-bold text-primary mt-1">
                           {formatCurrency(Number(payload[0].value))}
                         </p>
                       </div>
-                    )
+                    );
                   }
-                  return null
+                  return null;
                 }}
               />
               <Area
@@ -77,5 +101,5 @@ export function ExpensesOverTimeChart() {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

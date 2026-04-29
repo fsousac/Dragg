@@ -15,11 +15,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { transactions } from "@/lib/data"
+import { type Transaction } from "@/lib/data"
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
-export function TransactionsScreen() {
+type TransactionsScreenProps = {
+  transactions: Transaction[]
+}
+
+export function TransactionsScreen({ transactions }: TransactionsScreenProps) {
   const { formatCurrency, formatDate, t } = useI18n()
   const [searchQuery, setSearchQuery] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
@@ -27,7 +31,7 @@ export function TransactionsScreen() {
 
   const uniqueCategories = useMemo(
     () => [...new Set(transactions.map((transaction) => transaction.categoryKey))],
-    [],
+    [transactions],
   )
 
   const filteredTransactions = transactions.filter((transaction) => {
@@ -146,4 +150,3 @@ export function TransactionsScreen() {
     </>
   )
 }
-
