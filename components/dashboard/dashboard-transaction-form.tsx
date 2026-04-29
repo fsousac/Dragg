@@ -6,17 +6,30 @@ import {
   NewTransactionForm,
   type NewTransactionFormData,
 } from "@/components/dashboard/new-transaction-form";
+import {
+  type TransactionFormCategory,
+  type TransactionFormPaymentMethod,
+} from "@/lib/finance/transactions";
 import { toast } from "sonner";
 
-export function DashboardTransactionForm() {
+type DashboardTransactionFormProps = {
+  categories: TransactionFormCategory[];
+  onSubmit: (data: NewTransactionFormData) => Promise<void>;
+  paymentMethods: TransactionFormPaymentMethod[];
+};
+
+export function DashboardTransactionForm({
+  categories,
+  onSubmit,
+  paymentMethods,
+}: DashboardTransactionFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (data: NewTransactionFormData) => {
     setIsLoading(true);
     try {
-      // TODO: Save to Supabase
-      console.log("New transaction:", data);
+      await onSubmit(data);
       toast.success("Transaction recorded successfully!");
       router.refresh();
     } catch (error) {
@@ -29,7 +42,9 @@ export function DashboardTransactionForm() {
 
   return (
     <NewTransactionForm
+      categories={categories}
       onSubmit={handleSubmit}
+      paymentMethods={paymentMethods}
       isLoading={isLoading}
       compact={true}
     />

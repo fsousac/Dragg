@@ -2,12 +2,12 @@
 
 import * as React from "react";
 import { Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const { t } = useI18n();
   const [mounted, setMounted] = React.useState(false);
 
@@ -28,9 +28,9 @@ export function ThemeToggle() {
       variant="ghost"
       size="icon"
       className="w-9 h-9 rounded-xl hover:bg-secondary cursor-pointer"
-      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
     >
-      {theme === "dark" ? (
+      {resolvedTheme === "dark" ? (
         <Sun className="h-5 w-5 text-yellow transition-transform" />
       ) : (
         <Moon className="h-5 w-5 text-primary transition-transform" />

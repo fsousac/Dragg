@@ -1,17 +1,23 @@
-"use client"
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
-import { expensesByCategory } from "@/lib/data"
-import { useI18n } from "@/lib/i18n"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { type ExpensesByCategoryItem } from "@/lib/finance/transactions";
+import { useI18n } from "@/lib/i18n";
 
-export function ExpensesByCategoryChart() {
-  const { formatCurrency, t } = useI18n()
+type ExpensesByCategoryChartProps = {
+  expensesByCategory: ExpensesByCategoryItem[];
+};
+
+export function ExpensesByCategoryChart({
+  expensesByCategory,
+}: ExpensesByCategoryChartProps) {
+  const { formatCurrency, t } = useI18n();
   const chartData = expensesByCategory.map((item) => ({
     ...item,
     name: t(item.nameKey),
-  }))
-  const total = expensesByCategory.reduce((sum, item) => sum + item.value, 0)
+  }));
+  const total = expensesByCategory.reduce((sum, item) => sum + item.value, 0);
 
   return (
     <Card className="bg-card border-border card-shadow">
@@ -38,8 +44,8 @@ export function ExpensesByCategoryChart() {
                   dataKey="value"
                 >
                   {chartData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
+                    <Cell
+                      key={`cell-${index}`}
                       fill={entry.color}
                       className="stroke-card stroke-2"
                     />
@@ -47,12 +53,16 @@ export function ExpensesByCategoryChart() {
                 </Pie>
                 <Tooltip
                   content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload
-                      const percentage = ((data.value / total) * 100).toFixed(1)
+                    if (active && payload && payload.length && total > 0) {
+                      const data = payload[0].payload;
+                      const percentage = ((data.value / total) * 100).toFixed(
+                        1,
+                      );
                       return (
                         <div className="bg-card border border-border rounded-lg p-3 shadow-xl">
-                          <p className="text-sm font-medium text-foreground">{data.name}</p>
+                          <p className="text-sm font-medium text-foreground">
+                            {data.name}
+                          </p>
                           <p className="text-lg font-bold text-foreground mt-1">
                             {formatCurrency(data.value)}
                           </p>
@@ -60,9 +70,9 @@ export function ExpensesByCategoryChart() {
                             {percentage}% {t("common.ofTotal")}
                           </p>
                         </div>
-                      )
+                      );
                     }
-                    return null
+                    return null;
                   }}
                 />
               </PieChart>
@@ -76,7 +86,9 @@ export function ExpensesByCategoryChart() {
                   style={{ backgroundColor: category.color }}
                 />
                 <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{category.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {category.name}
+                  </p>
                   <p className="text-sm font-medium text-foreground">
                     {formatCurrency(category.value)}
                   </p>
@@ -87,5 +99,5 @@ export function ExpensesByCategoryChart() {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

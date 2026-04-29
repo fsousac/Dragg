@@ -1,13 +1,13 @@
-import { redirect } from "next/navigation"
-import type { ReactNode } from "react"
+import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
 
-import { Header } from "@/components/dashboard/header"
-import { MobileNav } from "@/components/dashboard/mobile-nav"
-import { Sidebar } from "@/components/dashboard/sidebar"
-import { createClient } from "@/lib/supabase/server"
+import { Header } from "@/components/dashboard/header";
+import { MobileNav } from "@/components/dashboard/mobile-nav";
+import { Sidebar } from "@/components/dashboard/sidebar";
+import { createClient } from "@/lib/supabase/server";
 
 function getDisplayName(email: string) {
-  return email.split("@")[0] || "Dragg"
+  return email.split("@")[0] || "Dragg";
 }
 
 function getInitials(name: string) {
@@ -18,40 +18,40 @@ function getInitials(name: string) {
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase())
       .join("") || "D"
-  )
+  );
 }
 
 interface AppShellProps {
-  children: ReactNode
+  children: ReactNode;
 }
 
 export async function AppShell({ children }: AppShellProps) {
-  const supabase = await createClient()
+  const supabase = await createClient();
   const [{ data: claimsData }, { data: userData }] = await Promise.all([
     supabase.auth.getClaims(),
     supabase.auth.getUser(),
-  ])
+  ]);
 
-  const claims = claimsData?.claims
-  const user = userData?.user
+  const claims = claimsData?.claims;
+  const user = userData?.user;
 
   if (!claims || !user) {
-    redirect("/")
+    redirect("/");
   }
 
-  const userEmail = user.email ?? claims.email ?? ""
+  const userEmail = user.email ?? claims.email ?? "";
   const userName =
     user.user_metadata?.full_name ??
     user.user_metadata?.name ??
-    getDisplayName(userEmail)
-  const initials = getInitials(userName)
+    getDisplayName(userEmail);
+  const initials = getInitials(userName);
 
   async function signOut() {
-    "use server"
+    "use server";
 
-    const supabase = await createClient()
-    await supabase.auth.signOut()
-    redirect("/")
+    const supabase = await createClient();
+    await supabase.auth.signOut();
+    redirect("/");
   }
 
   return (
@@ -72,5 +72,5 @@ export async function AppShell({ children }: AppShellProps) {
 
       <MobileNav />
     </div>
-  )
+  );
 }

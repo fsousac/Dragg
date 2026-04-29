@@ -1,16 +1,27 @@
-"use client"
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts"
-import { budgetSplitData } from "@/lib/data"
-import { useI18n } from "@/lib/i18n"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Legend,
+  Tooltip,
+} from "recharts";
+import { type BudgetSplitItem } from "@/lib/finance/transactions";
+import { useI18n } from "@/lib/i18n";
 
-export function BudgetSplitChart() {
-  const { formatCurrency, t } = useI18n()
+type BudgetSplitChartProps = {
+  budgetSplitData: BudgetSplitItem[];
+};
+
+export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
+  const { formatCurrency, t } = useI18n();
   const chartData = budgetSplitData.map((item) => ({
     ...item,
     name: t(item.nameKey),
-  }))
+  }));
 
   return (
     <Card className="bg-card border-border card-shadow">
@@ -36,8 +47,8 @@ export function BudgetSplitChart() {
                 dataKey="value"
               >
                 {chartData.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
+                  <Cell
+                    key={`cell-${index}`}
                     fill={entry.color}
                     className="stroke-card stroke-2"
                   />
@@ -46,10 +57,12 @@ export function BudgetSplitChart() {
               <Tooltip
                 content={({ active, payload }) => {
                   if (active && payload && payload.length) {
-                    const data = payload[0].payload
+                    const data = payload[0].payload;
                     return (
                       <div className="bg-card border border-border rounded-lg p-3 shadow-xl">
-                        <p className="text-sm font-medium text-foreground">{data.name}</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {data.name}
+                        </p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {formatCurrency(data.amount)}
                         </p>
@@ -57,9 +70,9 @@ export function BudgetSplitChart() {
                           {data.value}% {t("common.ofBudget")}
                         </p>
                       </div>
-                    )
+                    );
                   }
-                  return null
+                  return null;
                 }}
               />
               <Legend
@@ -68,12 +81,17 @@ export function BudgetSplitChart() {
                 content={({ payload }) => (
                   <div className="flex justify-center gap-4 mt-4">
                     {payload?.map((entry, index) => (
-                      <div key={`legend-${index}`} className="flex items-center gap-2">
+                      <div
+                        key={`legend-${index}`}
+                        className="flex items-center gap-2"
+                      >
                         <div
                           className="w-3 h-3 rounded-full"
                           style={{ backgroundColor: entry.color }}
                         />
-                        <span className="text-xs text-muted-foreground">{entry.value}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {entry.value}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -84,5 +102,5 @@ export function BudgetSplitChart() {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

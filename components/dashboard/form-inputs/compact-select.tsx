@@ -33,8 +33,9 @@ export function CompactSelect({
     <div className="space-y-1.5">
       <Label
         htmlFor={id}
-        className="text-xs font-medium text-foreground/70 uppercase tracking-wide"
+        className="flex items-center gap-1.5 text-xs font-medium text-foreground/70 uppercase tracking-wide"
       >
+        {icon}
         {label}
       </Label>
       <Select value={value} onValueChange={onChange}>
