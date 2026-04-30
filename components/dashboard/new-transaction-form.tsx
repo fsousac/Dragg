@@ -30,7 +30,8 @@ export interface NewTransactionFormData {
   category: string;
   paymentMethod: string;
   installmentCount: number;
-  description?: string;
+  description: string;
+  notes?: string;
 }
 
 interface NewTransactionFormProps {
@@ -62,6 +63,7 @@ export function NewTransactionForm({
     paymentMethod: paymentMethods[0]?.id ?? "none",
     installmentCount: 1,
     description: "",
+    notes: "",
   });
 
   const [errors, setErrors] = useState<
@@ -94,6 +96,8 @@ export function NewTransactionForm({
       newErrors.date = t("common.cancel");
     if (formData.amount <= 0) newErrors.amount = t("common.cancel");
     if (!formData.paymentMethod) newErrors.paymentMethod = t("common.cancel");
+    if (!formData.description?.trim())
+      newErrors.description = t("common.cancel");
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -113,6 +117,7 @@ export function NewTransactionForm({
           paymentMethod: paymentMethods[0]?.id ?? "none",
           installmentCount: 1,
           description: "",
+          notes: "",
         });
       }
     } catch (error) {
@@ -264,8 +269,23 @@ export function NewTransactionForm({
                 error={errors.amount}
               />
 
-              {/* Row 2: Category + Payment Method (Semantic Pair) */}
-              <div className="grid grid-cols-2 gap-3 lg:gap-4">
+              {/* Row 2: Description (1/2) + Category (1/4) + Payment Method (1/4) */}
+              <div className="grid grid-cols-4 gap-3 lg:gap-4">
+                <div className="col-span-2">
+                  <CompactInput
+                    label={t("transaction.description")}
+                    id="description"
+                    type="text"
+                    placeholder="e.g., Grocery store, Gas..."
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    icon={<Tag className="w-4 h-4" />}
+                    error={errors.description}
+                  />
+                </div>
+
                 <CompactSelect
                   label={t("transaction.category")}
                   id="category"
@@ -295,7 +315,7 @@ export function NewTransactionForm({
                 <CompactInput
                   label={t("transaction.date")}
                   id="date"
-                  type="text"
+                  type="date"
                   placeholder="dd/MM/yyyy"
                   value={formData.date}
                   onChange={(e) =>
@@ -322,10 +342,10 @@ export function NewTransactionForm({
               {/* Row 4: Notes (Full Width) */}
               <CompactTextarea
                 label={t("transaction.notes")}
-                id="description"
-                value={formData.description || ""}
+                id="notes"
+                value={formData.notes || ""}
                 onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
+                  setFormData({ ...formData, notes: e.target.value })
                 }
                 placeholder="Optional notes about this transaction..."
                 icon={<FileText className="w-4 h-4" />}
