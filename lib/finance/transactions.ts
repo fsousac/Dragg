@@ -62,7 +62,8 @@ export type NewTransactionInput = {
   category: string;
   paymentMethod: string;
   installmentCount: number;
-  description?: string;
+  description: string;
+  notes?: string;
 };
 
 export type SummaryData = {
@@ -407,13 +408,22 @@ export async function createTransaction(input: NewTransactionInput) {
   const kind: DbTransactionKind =
     input.type === "income" ? "income" : categoryId ? "expense" : input.type;
 
+  // Build notes field: combine installment info with user notes
+  let finalNotes =
+    input.installmentCount > 1 ? `${input.installmentCount}x` : null;
+  if (input.notes?.trim()) {
+    finalNotes = finalNotes
+      ? `${finalNotes} - ${input.notes.trim()}`
+      : input.notes.trim();
+  }
+
   const { error } = await supabase.from("transactions").insert({
     amount: Math.abs(input.amount),
     category_id: categoryId,
     date: toIsoDate(input.date),
-    description: input.description?.trim() || "Transaction",
+    description: input.description.trim(),
     kind,
-    notes: input.installmentCount > 1 ? `${input.installmentCount}x` : null,
+    notes: finalNotes,
     payment_method_id: paymentMethodId,
     user_id: userId,
   });
