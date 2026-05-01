@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import {
   ArrowDownRight,
   ArrowUpRight,
+  ArrowUpDown,
+  ChevronDown,
+  ChevronUp,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -15,6 +18,10 @@ import {
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/dashboard/page-header";
+import {
+  NewTransactionForm,
+  type NewTransactionFormData,
+} from "@/components/dashboard/new-transaction-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,10 +53,12 @@ import { type Transaction, type TransactionType } from "@/lib/data";
 import {
   type TransactionFormCategory,
   type TransactionFormPaymentMethod,
+  type NewTransactionInput,
   type UpdateTransactionInput,
 } from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { DashboardTransactionForm } from "./dashboard-transaction-form";
 
 type SortOption = "date-desc" | "date-asc" | "amount-desc" | "amount-asc";
 
@@ -65,6 +74,7 @@ type EditableTransaction = {
 
 type TransactionsScreenProps = {
   categories: TransactionFormCategory[];
+  createTransactionAction: (data: NewTransactionInput) => Promise<void>;
   deleteTransactionAction: (transactionId: string) => Promise<void>;
   paymentMethods: TransactionFormPaymentMethod[];
   transactions: Transaction[];
@@ -99,6 +109,7 @@ function sanitizeAmountInput(value: string) {
 
 export function TransactionsScreen({
   categories,
+  createTransactionAction,
   deleteTransactionAction,
   paymentMethods,
   transactions,
@@ -110,6 +121,7 @@ export function TransactionsScreen({
   const [typeFilter, setTypeFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortOption, setSortOption] = useState<SortOption>("date-desc");
+  const [isNewTransactionOpen, setIsNewTransactionOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] =
     useState<Transaction | null>(null);
   const [formData, setFormData] = useState<EditableTransaction | null>(null);
@@ -200,9 +212,6 @@ export function TransactionsScreen({
       try {
         await deleteTransactionAction(transaction.id);
         toast.success(t("transaction.deleteSuccess"));
-        if (selectedTransaction?.id === transaction.id) {
-          closeTransactionDialog();
-        }
         router.refresh();
       } catch (error) {
         console.error("Error deleting transaction:", error);
@@ -211,6 +220,28 @@ export function TransactionsScreen({
         setPendingTransactionId(null);
       }
     });
+  };
+
+  const handleNewTransactionSubmit = async (data: NewTransactionFormData) => {
+    try {
+      const input: NewTransactionInput = {
+        amount: data.amount,
+        category: data.category === "none" ? "" : data.category,
+        date: data.date,
+        description: data.description.trim(),
+        installmentCount: data.installmentCount,
+        notes: data.notes?.trim() || undefined,
+        paymentMethod: data.paymentMethod === "none" ? "" : data.paymentMethod,
+        type: data.type,
+      };
+      await createTransactionAction(input);
+      toast.success(t("transaction.recordSuccess"));
+      setIsNewTransactionOpen(false);
+      router.refresh();
+    } catch (error) {
+      console.error("Error creating transaction:", error);
+      toast.error(t("transaction.recordError"));
+    }
   };
 
   const handleUpdateTransaction = () => {
@@ -247,80 +278,64 @@ export function TransactionsScreen({
         title={t("screen.transactions.title")}
         description={t("screen.transactions.description")}
         actions={
-          <Button className="gap-2">
+          <Button
+            className="gap-2"
+            onClick={() => setIsNewTransactionOpen(true)}
+          >
             <Plus className="size-4" />
             {t("screen.transactions.add")}
           </Button>
         }
       />
 
-      <Card className="mb-6 border-border bg-card card-shadow">
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-4 lg:flex-row">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                className="pl-10"
-                placeholder={t("screen.transactions.search")}
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-              />
-            </div>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full lg:w-40">
-                <SelectValue placeholder={t("common.type")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allTypes")}</SelectItem>
-                <SelectItem value="income">{t("common.income")}</SelectItem>
-                <SelectItem value="expense">{t("common.expense")}</SelectItem>
-                <SelectItem value="saving">{t("common.saving")}</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full lg:w-48">
-                <SelectValue placeholder={t("common.category")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allCategories")}</SelectItem>
-                {uniqueCategories.map((categoryKey) => (
-                  <SelectItem key={categoryKey} value={categoryKey}>
-                    {t(categoryKey)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={sortOption}
-              onValueChange={(value) => setSortOption(value as SortOption)}
-            >
-              <SelectTrigger className="w-full lg:w-52">
-                <SelectValue placeholder={t("screen.transactions.sort")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="date-desc">
-                  {t("screen.transactions.sortDateDesc")}
-                </SelectItem>
-                <SelectItem value="date-asc">
-                  {t("screen.transactions.sortDateAsc")}
-                </SelectItem>
-                <SelectItem value="amount-desc">
-                  {t("screen.transactions.sortAmountDesc")}
-                </SelectItem>
-                <SelectItem value="amount-asc">
-                  {t("screen.transactions.sortAmountAsc")}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
       <Card className="border-border bg-card card-shadow">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">
-            {filteredTransactions.length} {t("screen.transactions.count")}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">
+              {filteredTransactions.length} {t("screen.transactions.count")}
+            </CardTitle>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+                onClick={() =>
+                  setSortOption(
+                    sortOption === "date-desc" ? "date-asc" : "date-desc",
+                  )
+                }
+              >
+                {t("common.date")}
+                {sortOption === "date-desc" ? (
+                  <ChevronDown className="size-3.5" />
+                ) : sortOption === "date-asc" ? (
+                  <ChevronUp className="size-3.5" />
+                ) : (
+                  <ArrowUpDown className="size-3.5 opacity-50" />
+                )}
+              </Button>
+              <span className="text-border">|</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+                onClick={() =>
+                  setSortOption(
+                    sortOption === "amount-desc" ? "amount-asc" : "amount-desc",
+                  )
+                }
+              >
+                {t("common.amount")}
+                {sortOption === "amount-desc" ? (
+                  <ChevronDown className="size-3.5" />
+                ) : sortOption === "amount-asc" ? (
+                  <ChevronUp className="size-3.5" />
+                ) : (
+                  <ArrowUpDown className="size-3.5 opacity-50" />
+                )}
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y divide-border">
@@ -615,6 +630,28 @@ export function TransactionsScreen({
               </Button>
             </div>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isNewTransactionOpen}
+        onOpenChange={setIsNewTransactionOpen}
+      >
+        <DialogContent
+          className="sm:max-w-[90%]"
+          aria-describedby="add transaction"
+        >
+          <DialogHeader>
+            <DialogTitle>{t("transaction.addTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("transaction.addDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          <DashboardTransactionForm
+            categories={categories}
+            paymentMethods={paymentMethods}
+            onSubmit={handleNewTransactionSubmit}
+          />
         </DialogContent>
       </Dialog>
     </>

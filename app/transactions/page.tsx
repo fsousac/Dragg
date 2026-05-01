@@ -5,6 +5,7 @@ import {
   listTransactions,
 } from "@/lib/finance/transactions"
 import {
+  createTransactionAction,
   deleteTransactionAction,
   updateTransactionAction,
 } from "@/app/transactions/actions"
@@ -19,6 +20,7 @@ export default async function TransactionsPage() {
     <AppShell>
       <TransactionsScreen
         categories={transactionFormOptions.categories}
+        createTransactionAction={createTransactionAction}
         deleteTransactionAction={deleteTransactionAction}
         paymentMethods={transactionFormOptions.paymentMethods}
         transactions={transactions}
