@@ -35,6 +35,9 @@ type TransactionRow = {
   kind: DbTransactionKind;
   notes: string | null;
   categories: CategoryRow | null;
+  category_id: string | null;
+  payment_method_id: string | null;
+  payment_methods: PaymentMethodRow | null;
 };
 
 export type TransactionFormCategory = {
@@ -62,6 +65,17 @@ export type NewTransactionInput = {
   category: string;
   paymentMethod: string;
   installmentCount: number;
+  description: string;
+  notes?: string;
+};
+
+export type UpdateTransactionInput = {
+  id: string;
+  type: TransactionType;
+  date: string;
+  amount: number;
+  category: string;
+  paymentMethod: string;
   description: string;
   notes?: string;
 };
@@ -146,12 +160,19 @@ const transactionSelect = `
   amount,
   kind,
   notes,
+  category_id,
+  payment_method_id,
   categories (
     id,
     name,
     group_type,
     is_default,
     monthly_limit
+  ),
+  payment_methods (
+    id,
+    name,
+    type
   )
 `;
 
@@ -247,35 +268,62 @@ function toTransaction(row: TransactionRow): Transaction {
     rawCategoryName,
     row.categories?.is_default ?? false,
   );
+  const paymentMethodKey = row.payment_methods
+    ? toPaymentMethodLabelKey(
+        row.payment_methods.name,
+        row.payment_methods.type,
+        null,
+      )
+    : null;
 
   return {
     id: row.id,
     amount: signedAmount,
+    categoryId: row.category_id,
     categoryKey: categoryName,
     date: row.date,
     descriptionKey: row.description || row.notes || categoryName,
     group,
     icon: groupIcons[group],
+    notes: row.notes,
+    paymentMethodId: row.payment_method_id,
+    paymentMethodKey,
     type: row.kind,
   };
 }
 
-function getCurrentMonthRange() {
+function getCurrentMonthValue() {
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function normalizeMonthValue(month?: string) {
+  return month?.match(/^\d{4}-\d{2}$/) ? month : getCurrentMonthValue();
+}
+
+function getMonthRange(month?: string) {
+  const normalizedMonth = normalizeMonthValue(month);
+  const [year, monthNumber] = normalizedMonth.split("-").map(Number);
+  const lastDay = new Date(year, monthNumber, 0).getDate();
 
   return {
-    end: end.toISOString().slice(0, 10),
-    start: start.toISOString().slice(0, 10),
+    end: `${normalizedMonth}-${String(lastDay).padStart(2, "0")}`,
+    month: normalizedMonth,
+    start: `${normalizedMonth}-01`,
   };
 }
 
-function getLastSixMonthKeys() {
-  const now = new Date();
+function getLastSixMonthKeys(month?: string) {
+  const normalizedMonth = normalizeMonthValue(month);
+  const [year, monthNumber] = normalizedMonth.split("-").map(Number);
+  const baseDate = new Date(year, monthNumber - 1, 1);
 
   return Array.from({ length: 6 }, (_, index) => {
-    const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1);
+    const date = new Date(
+      baseDate.getFullYear(),
+      baseDate.getMonth() - (5 - index),
+      1,
+    );
 
     return {
       key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
@@ -433,6 +481,48 @@ export async function createTransaction(input: NewTransactionInput) {
   }
 }
 
+export async function updateTransaction(input: UpdateTransactionInput) {
+  const { supabase, userId } = await getUserContext();
+  const categoryId =
+    input.type === "income" || input.category === "none"
+      ? null
+      : input.category;
+  const paymentMethodId =
+    input.paymentMethod === "none" ? null : input.paymentMethod;
+
+  const { error } = await supabase
+    .from("transactions")
+    .update({
+      amount: Math.abs(input.amount),
+      category_id: categoryId,
+      date: toIsoDate(input.date),
+      description: input.description.trim(),
+      kind: input.type,
+      notes: input.notes?.trim() || null,
+      payment_method_id: paymentMethodId,
+    })
+    .eq("id", input.id)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(`Unable to update transaction: ${error.message}`);
+  }
+}
+
+export async function deleteTransaction(transactionId: string) {
+  const { supabase, userId } = await getUserContext();
+
+  const { error } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("id", transactionId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(`Unable to delete transaction: ${error.message}`);
+  }
+}
+
 export async function listTransactions() {
   const { supabase, userId } = await getUserContext();
 
@@ -450,29 +540,47 @@ export async function listTransactions() {
   return ((data ?? []) as unknown as TransactionRow[]).map(toTransaction);
 }
 
-export async function getDashboardData(): Promise<DashboardData> {
+export async function getDashboardData(month?: string): Promise<DashboardData> {
   const { supabase, userId } = await getUserContext();
-  const [{ categories, paymentMethods }, { start, end }] = await Promise.all([
+  const selectedMonthRange = getMonthRange(month);
+  const monthBuckets = getLastSixMonthKeys(selectedMonthRange.month);
+  const trendStart = `${monthBuckets[0]?.key ?? selectedMonthRange.month}-01`;
+  const [{ categories, paymentMethods }] = await Promise.all([
     getTransactionFormOptions(),
-    Promise.resolve(getCurrentMonthRange()),
   ]);
 
-  const { data, error } = await supabase
-    .from("transactions")
-    .select(transactionSelect)
-    .eq("user_id", userId)
-    .gte("date", start)
-    .lte("date", end)
-    .order("date", { ascending: false })
-    .order("created_at", { ascending: false });
+  const [{ data, error }, { data: trendData, error: trendError }] =
+    await Promise.all([
+      supabase
+        .from("transactions")
+        .select(transactionSelect)
+        .eq("user_id", userId)
+        .gte("date", selectedMonthRange.start)
+        .lte("date", selectedMonthRange.end)
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("transactions")
+        .select(transactionSelect)
+        .eq("user_id", userId)
+        .gte("date", trendStart)
+        .lte("date", selectedMonthRange.end),
+    ]);
 
   if (error) {
     throw new Error(`Unable to load dashboard data: ${error.message}`);
   }
 
+  if (trendError) {
+    throw new Error(`Unable to load dashboard trend data: ${trendError.message}`);
+  }
+
   const transactions = ((data ?? []) as unknown as TransactionRow[]).map(
     toTransaction,
   );
+  const trendTransactions = (
+    (trendData ?? []) as unknown as TransactionRow[]
+  ).map(toTransaction);
   const incomeTransactions = transactions.filter(
     (transaction) => transaction.type === "income",
   );
@@ -481,6 +589,9 @@ export async function getDashboardData(): Promise<DashboardData> {
   );
   const savingTransactions = transactions.filter(
     (transaction) => transaction.type === "saving",
+  );
+  const trendExpenseTransactions = trendTransactions.filter(
+    (transaction) => transaction.type === "expense",
   );
 
   const totalIncome = incomeTransactions.reduce(
@@ -531,12 +642,11 @@ export async function getDashboardData(): Promise<DashboardData> {
     return acc;
   }, [] as ExpensesByCategoryItem[]);
 
-  const monthBuckets = getLastSixMonthKeys();
-  const expensesOverTime = monthBuckets.map((month) => ({
-    amount: expenseTransactions
-      .filter((transaction) => transaction.date.startsWith(month.key))
+  const expensesOverTime = monthBuckets.map((monthBucket) => ({
+    amount: trendExpenseTransactions
+      .filter((transaction) => transaction.date.startsWith(monthBucket.key))
       .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0),
-    monthKey: month.monthKey,
+    monthKey: monthBucket.monthKey,
   }));
 
   const budgetSplitData = [

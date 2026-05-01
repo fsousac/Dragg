@@ -10,8 +10,20 @@ import { TransactionsList } from "@/components/dashboard/transactions-list";
 import { createTransactionAction } from "@/app/transactions/actions";
 import { getDashboardData } from "@/lib/finance/transactions";
 
-export default async function DashboardPage() {
-  const dashboardData = await getDashboardData();
+type DashboardPageProps = {
+  searchParams?: Promise<{
+    month?: string | string[];
+  }>;
+};
+
+export default async function DashboardPage({
+  searchParams,
+}: DashboardPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const selectedMonth = Array.isArray(resolvedSearchParams?.month)
+    ? resolvedSearchParams.month[0]
+    : resolvedSearchParams?.month;
+  const dashboardData = await getDashboardData(selectedMonth);
 
   return (
     <AppShell>

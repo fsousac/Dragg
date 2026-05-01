@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -50,10 +51,41 @@ export function NewTransactionForm({
   paymentMethods,
 }: NewTransactionFormProps) {
   const { t } = useI18n();
+  const router = useRouter();
   const today = format(new Date(), "dd/MM/yyyy");
+  const todayDateInputValue = format(new Date(), "yyyy-MM-dd");
 
   const parseDateValue = (dateValue: string) =>
     parse(dateValue, "dd/MM/yyyy", new Date());
+
+  const toDateInputValue = (dateValue: string) => {
+    const parsedDate = parseDateValue(dateValue);
+    return isValid(parsedDate) ? format(parsedDate, "yyyy-MM-dd") : "";
+  };
+
+  const fromDateInputValue = (dateValue: string) => {
+    const parsedDate = parse(dateValue, "yyyy-MM-dd", new Date());
+    return isValid(parsedDate) ? format(parsedDate, "dd/MM/yyyy") : "";
+  };
+
+  const sanitizeAmountInput = (value: string) => {
+    const normalizedSeparator = value.replace(/\./g, ",");
+    const sanitizedValue = normalizedSeparator.replace(/[^\d,]/g, "");
+    const [integerPart, ...decimalParts] = sanitizedValue.split(",");
+    const decimalPart = decimalParts.join("");
+
+    if (decimalParts.length === 0) {
+      return integerPart;
+    }
+
+    return `${integerPart},${decimalPart}`;
+  };
+
+  const parseAmountInput = (value: string) =>
+    Number(value.replace(",", ".")) || 0;
+
+  const formatAmountInput = (value: number) =>
+    value.toFixed(2).replace(".", ",");
 
   const [formData, setFormData] = useState<NewTransactionFormData>({
     type: "expense",
@@ -65,6 +97,7 @@ export function NewTransactionForm({
     description: "",
     notes: "",
   });
+  const [amountInputValue, setAmountInputValue] = useState("");
 
   const [errors, setErrors] = useState<
     Partial<Record<keyof NewTransactionFormData, string>>
@@ -119,6 +152,7 @@ export function NewTransactionForm({
           description: "",
           notes: "",
         });
+        setAmountInputValue("");
       }
     } catch (error) {
       console.error("Error submitting transaction:", error);
@@ -222,14 +256,14 @@ export function NewTransactionForm({
                 <Label className="text-xs font-medium text-foreground/60 uppercase tracking-wide mb-2 block">
                   {t("transaction.type")}
                 </Label>
-                <div className="flex gap-3">
+                <div className="flex w-full gap-3 lg:w-1/2">
                   <Button
                     type="button"
                     variant="outline"
-                    className={`px-4 h-8 text-xs font-medium transition-all duration-300 ${
+                    className={`h-8 flex-1 px-4 text-xs font-medium transition-all duration-300 ${
                       formData.type === "expense"
-                        ? "bg-rose-300/70 hover:bg-rose-400/70 text-rose-900 shadow-sm border-rose-400/50"
-                        : "border-border/40 hover:bg-foreground/5"
+                        ? "border-rose-400/60 bg-rose-300/70 text-rose-900 shadow-sm hover:bg-rose-400/70 dark:border-rose-400/50 dark:bg-rose-500/20 dark:text-rose-100 dark:hover:bg-rose-500/30"
+                        : "border-border/40 text-foreground/80 hover:bg-foreground/5"
                     }`}
                     onClick={() =>
                       setFormData({ ...formData, type: "expense" })
@@ -240,10 +274,10 @@ export function NewTransactionForm({
                   <Button
                     type="button"
                     variant="outline"
-                    className={`px-4 h-8 text-xs font-medium transition-all duration-300 ${
+                    className={`h-8 flex-1 px-4 text-xs font-medium transition-all duration-300 ${
                       formData.type === "income"
-                        ? "bg-emerald-300/70 hover:bg-emerald-400/70 text-emerald-900 shadow-sm border-emerald-400/50"
-                        : "border-border/40 hover:bg-foreground/5"
+                        ? "border-emerald-400/60 bg-emerald-300/70 text-emerald-900 shadow-sm hover:bg-emerald-400/70 dark:border-emerald-400/50 dark:bg-emerald-500/20 dark:text-emerald-100 dark:hover:bg-emerald-500/30"
+                        : "border-border/40 text-foreground/80 hover:bg-foreground/5"
                     }`}
                     onClick={() => setFormData({ ...formData, type: "income" })}
                   >
@@ -256,27 +290,37 @@ export function NewTransactionForm({
               <CompactInput
                 label={t("transaction.amount")}
                 id="amount"
-                type="number"
-                placeholder="0.00"
-                value={formData.amount || ""}
-                onChange={(e) =>
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*[,.]?[0-9]*"
+                placeholder="0,00"
+                value={amountInputValue}
+                onChange={(e) => {
+                  const nextAmountInputValue = sanitizeAmountInput(
+                    e.target.value,
+                  );
+                  setAmountInputValue(nextAmountInputValue);
                   setFormData({
                     ...formData,
-                    amount: parseFloat(e.target.value) || 0,
-                  })
-                }
+                    amount: parseAmountInput(nextAmountInputValue),
+                  });
+                }}
+                onBlur={() => {
+                  if (!amountInputValue) return;
+                  setAmountInputValue(formatAmountInput(formData.amount));
+                }}
                 icon={<DollarSign className="w-4 h-4" />}
                 error={errors.amount}
               />
 
-              {/* Row 2: Description (1/2) + Category (1/4) + Payment Method (1/4) */}
-              <div className="grid grid-cols-4 gap-3 lg:gap-4">
-                <div className="col-span-2">
+              {/* Row 2: Description + Category + Payment Method */}
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-4 lg:gap-4">
+                <div className="lg:col-span-2">
                   <CompactInput
                     label={t("transaction.description")}
                     id="description"
                     type="text"
-                    placeholder="e.g., Grocery store, Gas..."
+                    placeholder={t("transaction.descriptionPlaceholder")}
                     value={formData.description}
                     onChange={(e) =>
                       setFormData({ ...formData, description: e.target.value })
@@ -295,6 +339,8 @@ export function NewTransactionForm({
                   }
                   options={categoryOptions}
                   icon={<Tag className="w-4 h-4" />}
+                  addActionLabel={t("transaction.addCategory")}
+                  onAddAction={() => router.push("/categories")}
                 />
 
                 <CompactSelect
@@ -307,23 +353,32 @@ export function NewTransactionForm({
                   options={paymentMethodOptions}
                   error={errors.paymentMethod}
                   icon={<CreditCard className="w-4 h-4" />}
+                  addActionLabel={t("transaction.addPaymentMethod")}
+                  onAddAction={() => router.push("/payments")}
                 />
               </div>
 
               {/* Row 3: Date + Installment Frequency (Semantic Pair) */}
-              <div className="grid grid-cols-2 gap-3 lg:gap-4">
-                <CompactInput
-                  label={t("transaction.date")}
-                  id="date"
-                  type="date"
-                  placeholder="dd/MM/yyyy"
-                  value={formData.date}
-                  onChange={(e) =>
-                    setFormData({ ...formData, date: e.target.value })
-                  }
-                  icon={<Calendar className="w-4 h-4" />}
-                  error={errors.date}
-                />
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-4 lg:gap-4">
+                <div className="lg:col-span-2">
+                  <CompactInput
+                    label={t("transaction.date")}
+                    id="date"
+                    type="date"
+                    placeholder="dd/MM/yyyy"
+                    value={
+                      toDateInputValue(formData.date) || todayDateInputValue
+                    }
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        date: fromDateInputValue(e.target.value),
+                      })
+                    }
+                    icon={<Calendar className="w-4 h-4" />}
+                    error={errors.date}
+                  />
+                </div>
 
                 <CompactSelect
                   label={t("transaction.installmentFrequency")}
@@ -347,7 +402,7 @@ export function NewTransactionForm({
                 onChange={(e) =>
                   setFormData({ ...formData, notes: e.target.value })
                 }
-                placeholder="Optional notes about this transaction..."
+                placeholder={t("transaction.notesPlaceholder")}
                 icon={<FileText className="w-4 h-4" />}
               />
 

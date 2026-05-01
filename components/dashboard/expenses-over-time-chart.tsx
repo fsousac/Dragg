@@ -25,6 +25,7 @@ export function ExpensesOverTimeChart({
     ...item,
     month: t(item.monthKey),
   }));
+  const hasData = chartData.some((item) => item.amount > 0);
 
   return (
     <Card className="bg-card border-border card-shadow">
@@ -38,66 +39,72 @@ export function ExpensesOverTimeChart({
       </CardHeader>
       <CardContent>
         <div className="h-[200px] lg:h-[240px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient
-                  id="expenseGradient"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop offset="5%" stopColor="#22C55E" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#22C55E" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-                stroke="rgba(255,255,255,0.05)"
-              />
-              <XAxis
-                dataKey="month"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: "#A1A1AA", fontSize: 12 }}
-              />
-              <YAxis
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: "#A1A1AA", fontSize: 12 }}
-                tickFormatter={(value) =>
-                  formatCurrency(Number(value)).replace(/([,.]00|,00)$/, "")
-                }
-                width={60}
-              />
-              <Tooltip
-                content={({ active, payload, label }) => {
-                  if (active && payload && payload.length) {
-                    return (
-                      <div className="bg-card border border-border rounded-lg p-3 shadow-xl">
-                        <p className="text-sm font-medium text-foreground">
-                          {label}
-                        </p>
-                        <p className="text-lg font-bold text-primary mt-1">
-                          {formatCurrency(Number(payload[0].value))}
-                        </p>
-                      </div>
-                    );
+          {hasData ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData}>
+                <defs>
+                  <linearGradient
+                    id="expenseGradient"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop offset="5%" stopColor="#22C55E" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#22C55E" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="rgba(255,255,255,0.05)"
+                />
+                <XAxis
+                  dataKey="month"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: "#A1A1AA", fontSize: 12 }}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: "#A1A1AA", fontSize: 12 }}
+                  tickFormatter={(value) =>
+                    formatCurrency(Number(value)).replace(/([,.]00|,00)$/, "")
                   }
-                  return null;
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="amount"
-                stroke="#22C55E"
-                strokeWidth={2}
-                fill="url(#expenseGradient)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+                  width={60}
+                />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-card border border-border rounded-lg p-3 shadow-xl">
+                          <p className="text-sm font-medium text-foreground">
+                            {label}
+                          </p>
+                          <p className="text-lg font-bold text-primary mt-1">
+                            {formatCurrency(Number(payload[0].value))}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="amount"
+                  stroke="#22C55E"
+                  strokeWidth={2}
+                  fill="url(#expenseGradient)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex h-full items-center justify-center rounded-md border border-dashed border-border/70 bg-muted/20 text-sm text-muted-foreground">
+              {t("common.noDataForPeriod")}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
