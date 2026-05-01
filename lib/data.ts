@@ -212,7 +212,7 @@ export const categories: Category[] = [
   {
     id: "4",
     nameKey: "data.category.health",
-    icon: "💡",
+    icon: "🏥",
     color: "#FACC15",
     group: "needs",
     budget: 200,
