@@ -1,8 +1,8 @@
 "use client";
 
-import { ChevronDown, Wallet } from "lucide-react";
+import { Wallet } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/select";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useI18n } from "@/lib/i18n";
-import { months } from "@/lib/data";
 
 interface HeaderProps {
   greeting?: string;
@@ -20,8 +19,70 @@ interface HeaderProps {
   userName?: string;
 }
 
+function getCurrentMonthValue() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function isMonthValue(value: string | null) {
+  return Boolean(value?.match(/^\d{4}-\d{2}$/));
+}
+
+function getMonthOptions(selectedMonth: string) {
+  const [selectedYear, selectedMonthIndex] = selectedMonth
+    .split("-")
+    .map(Number);
+  const selectedDate = new Date(selectedYear, selectedMonthIndex - 1, 1);
+  const currentDate = new Date();
+  const baseDate = Number.isNaN(selectedDate.getTime())
+    ? currentDate
+    : selectedDate;
+
+  return Array.from({ length: 18 }, (_, index) => {
+    const date = new Date(
+      baseDate.getFullYear(),
+      baseDate.getMonth() - 12 + index,
+      1,
+    );
+    return {
+      date,
+      value: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
+    };
+  });
+}
+
+function capitalizeFirstLetter(value: string) {
+  return value ? `${value.charAt(0).toLocaleUpperCase()}${value.slice(1)}` : value;
+}
+
 export function Header({ initials = "JD", userName = "John" }: HeaderProps) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const monthParam = searchParams.get("month");
+  const selectedMonth = isMonthValue(monthParam)
+    ? monthParam!
+    : getCurrentMonthValue();
+  const monthOptions = getMonthOptions(selectedMonth);
+
+  const updateSelectedMonth = (value: string) => {
+    const nextSearchParams = new URLSearchParams(searchParams.toString());
+    nextSearchParams.set("month", value);
+    router.push(`${pathname}?${nextSearchParams.toString()}`);
+  };
+
+  const selectedMonthLabel = (value: string) => {
+    const option = monthOptions.find((month) => month.value === value);
+    const label = option
+      ? new Intl.DateTimeFormat(locale, {
+          month: "long",
+          year: "numeric",
+        }).format(option.date)
+      : t("common.selectMonth");
+
+    return capitalizeFirstLetter(label);
+  };
 
   return (
     <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border">
@@ -36,14 +97,19 @@ export function Header({ initials = "JD", userName = "John" }: HeaderProps) {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Select defaultValue="2024-01">
+          <Select value={selectedMonth} onValueChange={updateSelectedMonth}>
             <SelectTrigger className="w-44 bg-card border-border card-shadow">
               <SelectValue placeholder={t("common.selectMonth")} />
             </SelectTrigger>
             <SelectContent>
-              {months.map((month) => (
+              {monthOptions.map((month) => (
                 <SelectItem key={month.value} value={month.value}>
-                  {t(month.key)}
+                  {capitalizeFirstLetter(
+                    new Intl.DateTimeFormat(locale, {
+                      month: "long",
+                      year: "numeric",
+                    }).format(month.date),
+                  )}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -67,10 +133,25 @@ export function Header({ initials = "JD", userName = "John" }: HeaderProps) {
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Button variant="outline" size="sm" className="gap-1 text-sm">
-            {t("data.month.jan")} 2024
-            <ChevronDown className="w-4 h-4" />
-          </Button>
+          <Select value={selectedMonth} onValueChange={updateSelectedMonth}>
+            <SelectTrigger className="h-9 w-36 bg-card text-xs">
+              <SelectValue placeholder={t("common.selectMonth")}>
+                {selectedMonthLabel(selectedMonth)}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {monthOptions.map((month) => (
+                <SelectItem key={month.value} value={month.value}>
+                  {capitalizeFirstLetter(
+                    new Intl.DateTimeFormat(locale, {
+                      month: "long",
+                      year: "numeric",
+                    }).format(month.date),
+                  )}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
     </header>

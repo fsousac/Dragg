@@ -7,9 +7,13 @@ export interface Transaction {
   amount: number;
   type: TransactionType;
   categoryKey: string;
+  categoryId?: string | null;
   group: TransactionGroup;
   date: string;
   icon: string;
+  notes?: string | null;
+  paymentMethodId?: string | null;
+  paymentMethodKey?: string | null;
 }
 
 export const transactions: Transaction[] = [
