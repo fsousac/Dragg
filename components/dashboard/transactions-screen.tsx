@@ -18,10 +18,7 @@ import {
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/dashboard/page-header";
-import {
-  NewTransactionForm,
-  type NewTransactionFormData,
-} from "@/components/dashboard/new-transaction-form";
+import { type NewTransactionFormData } from "@/components/dashboard/new-transaction-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,6 +50,7 @@ import { type Transaction, type TransactionType } from "@/lib/data";
 import {
   type TransactionFormCategory,
   type TransactionFormPaymentMethod,
+  type CreateCategoryInput,
   type NewTransactionInput,
   type UpdateTransactionInput,
 } from "@/lib/finance/transactions";
@@ -74,6 +72,7 @@ type EditableTransaction = {
 
 type TransactionsScreenProps = {
   categories: TransactionFormCategory[];
+  createCategoryAction: (data: CreateCategoryInput) => Promise<void>;
   createTransactionAction: (data: NewTransactionInput) => Promise<void>;
   deleteTransactionAction: (transactionId: string) => Promise<void>;
   paymentMethods: TransactionFormPaymentMethod[];
@@ -109,6 +108,7 @@ function sanitizeAmountInput(value: string) {
 
 export function TransactionsScreen({
   categories,
+  createCategoryAction,
   createTransactionAction,
   deleteTransactionAction,
   paymentMethods,
@@ -649,6 +649,7 @@ export function TransactionsScreen({
           </DialogHeader>
           <DashboardTransactionForm
             categories={categories}
+            createCategoryAction={createCategoryAction}
             paymentMethods={paymentMethods}
             onSubmit={handleNewTransactionSubmit}
           />

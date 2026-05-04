@@ -5,7 +5,10 @@ import {
 } from "@/components/dashboard/new-transaction-form";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { createClient } from "@/lib/supabase/server";
-import { createTransactionAction } from "@/app/transactions/actions";
+import {
+  createCategoryAction,
+  createTransactionAction,
+} from "@/app/transactions/actions";
 import { getTransactionFormOptions } from "@/lib/finance/transactions";
 
 async function handleTransactionSubmit(data: NewTransactionFormData) {
@@ -38,6 +41,7 @@ export default async function NewTransactionPage() {
     <AppShell>
       <NewTransactionForm
         categories={formOptions.categories}
+        createCategoryAction={createCategoryAction}
         onSubmit={handleTransactionSubmit}
         paymentMethods={formOptions.paymentMethods}
       />

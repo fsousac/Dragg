@@ -21,6 +21,20 @@ function getInitials(name: string) {
   );
 }
 
+function getMetadataValue(
+  metadata: Record<string, unknown>,
+  keys: string[],
+) {
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === "string" && value.trim()) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
 interface AppShellProps {
   children: ReactNode;
 }
@@ -45,6 +59,11 @@ export async function AppShell({ children }: AppShellProps) {
     user.user_metadata?.name ??
     getDisplayName(userEmail);
   const initials = getInitials(userName);
+  const avatarUrl = getMetadataValue(user.user_metadata ?? {}, [
+    "avatar_url",
+    "picture",
+    "photo_url",
+  ]);
 
   async function signOut() {
     "use server";
@@ -59,12 +78,17 @@ export async function AppShell({ children }: AppShellProps) {
       <Sidebar
         initials={initials}
         signOutAction={signOut}
+        userAvatarUrl={avatarUrl}
         userEmail={userEmail}
         userName={userName}
       />
 
       <main className="flex-1 min-w-0">
-        <Header initials={initials} userName={userName} />
+        <Header
+          initials={initials}
+          userAvatarUrl={avatarUrl}
+          userName={userName}
+        />
         <div className="px-4 lg:px-8 py-4 lg:py-6 pb-24 lg:pb-8">
           {children}
         </div>

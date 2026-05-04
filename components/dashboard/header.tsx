@@ -2,7 +2,7 @@
 
 import { Wallet } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -16,6 +16,7 @@ import { useI18n } from "@/lib/i18n";
 interface HeaderProps {
   greeting?: string;
   initials?: string;
+  userAvatarUrl?: string | null;
   userName?: string;
 }
 
@@ -55,7 +56,11 @@ function capitalizeFirstLetter(value: string) {
   return value ? `${value.charAt(0).toLocaleUpperCase()}${value.slice(1)}` : value;
 }
 
-export function Header({ initials = "JD", userName = "John" }: HeaderProps) {
+export function Header({
+  initials = "JD",
+  userAvatarUrl,
+  userName = "John",
+}: HeaderProps) {
   const { locale, t } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
@@ -116,6 +121,9 @@ export function Header({ initials = "JD", userName = "John" }: HeaderProps) {
           </Select>
           <ThemeToggle />
           <Avatar className="w-10 h-10 border-2 border-primary">
+            {userAvatarUrl ? (
+              <AvatarImage src={userAvatarUrl} alt={userName} />
+            ) : null}
             <AvatarFallback className="bg-linear-to-br from-primary to-emerald-400 text-primary-foreground font-bold">
               {initials}
             </AvatarFallback>
@@ -152,6 +160,14 @@ export function Header({ initials = "JD", userName = "John" }: HeaderProps) {
               ))}
             </SelectContent>
           </Select>
+          <Avatar className="size-9 border-2 border-primary">
+            {userAvatarUrl ? (
+              <AvatarImage src={userAvatarUrl} alt={userName} />
+            ) : null}
+            <AvatarFallback className="bg-linear-to-br from-primary to-emerald-400 text-xs font-bold text-primary-foreground">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
         </div>
       </div>
     </header>

@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -13,10 +13,11 @@ import {
   Settings,
   Wallet,
   LogOut,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { useI18n } from "@/lib/i18n"
-import { cn } from "@/lib/utils"
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useI18n } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 const navigationItems = [
   { nameKey: "nav.overview", icon: LayoutDashboard, href: "/dashboard" },
@@ -26,24 +27,26 @@ const navigationItems = [
   { nameKey: "nav.payments", icon: CreditCard, href: "/payments" },
   { nameKey: "nav.reports", icon: BarChart3, href: "/reports" },
   { nameKey: "nav.goals", icon: Target, href: "/goals" },
-  { nameKey: "nav.settings", icon: Settings, href: "/settings" }
-]
+  { nameKey: "nav.settings", icon: Settings, href: "/settings" },
+];
 
 interface SidebarProps {
-  initials: string
-  signOutAction: () => Promise<void>
-  userEmail: string
-  userName: string
+  initials: string;
+  signOutAction: () => Promise<void>;
+  userAvatarUrl?: string | null;
+  userEmail: string;
+  userName: string;
 }
 
 export function Sidebar({
   initials,
   signOutAction,
+  userAvatarUrl,
   userEmail,
   userName,
 }: SidebarProps) {
-  const pathname = usePathname()
-  const { t } = useI18n()
+  const pathname = usePathname();
+  const { t } = useI18n();
 
   return (
     <aside className="hidden lg:flex flex-col w-64 bg-card border-r border-border h-screen sticky top-0 card-shadow">
@@ -59,8 +62,8 @@ export function Sidebar({
       <nav className="flex-1 px-4 py-4">
         <ul className="space-y-1">
           {navigationItems.map((item) => {
-            const Icon = item.icon
-            const isActive = pathname === item.href
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
             return (
               <li key={item.nameKey}>
                 <Link
@@ -69,14 +72,14 @@ export function Sidebar({
                     "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
                     isActive
                       ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
                   )}
                 >
                   <Icon className="w-5 h-5" />
                   {t(item.nameKey)}
                 </Link>
               </li>
-            )
+            );
           })}
         </ul>
       </nav>
@@ -84,15 +87,24 @@ export function Sidebar({
       {/* Footer */}
       <div className="px-6 py-6 border-t border-border">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-emerald-400 flex items-center justify-center text-xs font-bold text-primary-foreground">
-            {initials}
-          </div>
+          <Avatar className="size-8">
+            {userAvatarUrl ? (
+              <AvatarImage src={userAvatarUrl} alt={userName} />
+            ) : null}
+            <AvatarFallback className="bg-gradient-to-br from-primary to-emerald-400 text-xs font-bold text-primary-foreground">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">{userName}</p>
-            <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
+            <p className="text-sm font-medium text-foreground truncate">
+              {userName}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {userEmail}
+            </p>
           </div>
         </div>
-        <form action={signOutAction} className="mt-4">
+        <form action={signOutAction} className="mt-4 cursor-pointer">
           <Button
             className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
             size="sm"
@@ -105,5 +117,5 @@ export function Sidebar({
         </form>
       </div>
     </aside>
-  )
+  );
 }

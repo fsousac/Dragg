@@ -1,10 +1,17 @@
 import { AppShell } from "@/components/dashboard/app-shell"
 import { CategoriesScreen } from "@/components/dashboard/categories-screen"
+import { createCategoryAction } from "@/app/transactions/actions"
+import { listCategoryOverview } from "@/lib/finance/transactions"
 
-export default function CategoriesPage() {
+export default async function CategoriesPage() {
+  const categories = await listCategoryOverview()
+
   return (
     <AppShell>
-      <CategoriesScreen />
+      <CategoriesScreen
+        categories={categories}
+        createCategoryAction={createCategoryAction}
+      />
     </AppShell>
   )
 }

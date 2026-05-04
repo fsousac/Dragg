@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/lib/i18n";
 import {
+  type CreateCategoryInput,
   type TransactionFormCategory,
   type TransactionFormPaymentMethod,
 } from "@/lib/finance/transactions";
@@ -23,6 +24,7 @@ import {
   Plus,
 } from "lucide-react";
 import { format, isValid, parse } from "date-fns";
+import { NewCategoryDialog } from "@/components/dashboard/new-category-dialog";
 
 export interface NewTransactionFormData {
   type: "income" | "expense";
@@ -40,6 +42,7 @@ interface NewTransactionFormProps {
   isLoading?: boolean;
   compact?: boolean;
   categories: TransactionFormCategory[];
+  createCategoryAction?: (data: CreateCategoryInput) => Promise<void>;
   paymentMethods: TransactionFormPaymentMethod[];
 }
 
@@ -48,6 +51,7 @@ export function NewTransactionForm({
   isLoading = false,
   compact = false,
   categories,
+  createCategoryAction,
   paymentMethods,
 }: NewTransactionFormProps) {
   const { t } = useI18n();
@@ -98,6 +102,7 @@ export function NewTransactionForm({
     notes: "",
   });
   const [amountInputValue, setAmountInputValue] = useState("");
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
 
   const [errors, setErrors] = useState<
     Partial<Record<keyof NewTransactionFormData, string>>
@@ -170,6 +175,7 @@ export function NewTransactionForm({
           value: category.id,
           label: t(category.label),
           group: category.group,
+          icon: category.icon,
         })),
     [categories, t],
   );
@@ -340,8 +346,20 @@ export function NewTransactionForm({
                   options={categoryOptions}
                   icon={<Tag className="w-4 h-4" />}
                   addActionLabel={t("transaction.addCategory")}
-                  onAddAction={() => router.push("/categories")}
+                  onAddAction={
+                    createCategoryAction
+                      ? () => setIsCategoryDialogOpen(true)
+                      : () => router.push("/categories")
+                  }
                 />
+
+                {createCategoryAction ? (
+                  <NewCategoryDialog
+                    createCategoryAction={createCategoryAction}
+                    open={isCategoryDialogOpen}
+                    onOpenChange={setIsCategoryDialogOpen}
+                  />
+                ) : null}
 
                 <CompactSelect
                   label={t("transaction.paymentMethod")}

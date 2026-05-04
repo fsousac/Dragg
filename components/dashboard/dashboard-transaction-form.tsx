@@ -8,6 +8,7 @@ import {
 } from "@/components/dashboard/new-transaction-form";
 import {
   type TransactionFormCategory,
+  type CreateCategoryInput,
   type TransactionFormPaymentMethod,
 } from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
@@ -15,12 +16,14 @@ import { toast } from "sonner";
 
 type DashboardTransactionFormProps = {
   categories: TransactionFormCategory[];
+  createCategoryAction: (data: CreateCategoryInput) => Promise<void>;
   onSubmit: (data: NewTransactionFormData) => Promise<void>;
   paymentMethods: TransactionFormPaymentMethod[];
 };
 
 export function DashboardTransactionForm({
   categories,
+  createCategoryAction,
   onSubmit,
   paymentMethods,
 }: DashboardTransactionFormProps) {
@@ -45,6 +48,7 @@ export function DashboardTransactionForm({
   return (
     <NewTransactionForm
       categories={categories}
+      createCategoryAction={createCategoryAction}
       onSubmit={handleSubmit}
       paymentMethods={paymentMethods}
       isLoading={isLoading}

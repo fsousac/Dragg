@@ -4,6 +4,7 @@ import { Bell, Globe, HelpCircle, Palette, Shield, User } from "lucide-react"
 
 import { PageHeader } from "@/components/dashboard/page-header"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
+import { type OAuthProfile } from "@/lib/auth/profile"
 import { useI18n } from "@/lib/i18n"
 
 function SettingsCard({
@@ -40,8 +42,24 @@ function SettingsCard({
   )
 }
 
-export function SettingsScreen() {
-  const { locale, setLocale, t } = useI18n()
+type SettingsScreenProps = {
+  profile: OAuthProfile
+}
+
+function getInitials(name: string) {
+  return (
+    name
+      .split(/[\s._-]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "D"
+  )
+}
+
+export function SettingsScreen({ profile }: SettingsScreenProps) {
+  const { formatDate, locale, setLocale, t } = useI18n()
+  const fallbackValue = t("settings.notAvailable")
 
   return (
     <main className="max-w-4xl">
@@ -54,32 +72,51 @@ export function SettingsScreen() {
           description={t("screen.settings.profileDescription")}
         >
           <div className="flex items-center gap-4">
-            <div className="flex size-16 items-center justify-center rounded-full bg-gradient-to-br from-primary to-emerald-400 text-xl font-bold text-primary-foreground">
-              D
+            <Avatar className="size-16 border-2 border-primary">
+              {profile.avatarUrl ? (
+                <AvatarImage src={profile.avatarUrl} alt={profile.fullName} />
+              ) : null}
+              <AvatarFallback className="bg-gradient-to-br from-primary to-emerald-400 text-xl font-bold text-primary-foreground">
+                {getInitials(profile.fullName)}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-semibold text-foreground">
+                {profile.fullName}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {profile.email || fallbackValue}
+              </p>
             </div>
-            <Button variant="outline" size="sm">{t("screen.settings.changeAvatar")}</Button>
           </div>
           <Separator />
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="firstName">{t("screen.settings.firstName")}</Label>
-              <Input id="firstName" defaultValue="Felipe" />
+              <Input id="firstName" value={profile.firstName || fallbackValue} readOnly />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lastName">{t("screen.settings.lastName")}</Label>
-              <Input id="lastName" defaultValue="" />
+              <Input id="lastName" value={profile.lastName || fallbackValue} readOnly />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">{t("screen.settings.email")}</Label>
-              <Input id="email" type="email" defaultValue="felipe@example.com" />
+              <Input id="email" type="email" value={profile.email || fallbackValue} readOnly />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">{t("screen.settings.phone")}</Label>
-              <Input id="phone" type="tel" defaultValue="+55 11 99999-9999" />
+              <Label>{t("settings.createdAt")}</Label>
+              <Input
+                value={
+                  profile.createdAt
+                    ? formatDate(profile.createdAt, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })
+                    : fallbackValue
+                }
+                readOnly
+              />
             </div>
-          </div>
-          <div className="flex justify-end">
-            <Button>{t("screen.settings.saveChanges")}</Button>
           </div>
         </SettingsCard>
 

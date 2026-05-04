@@ -7,7 +7,10 @@ import { ExpensesOverTimeChart } from "@/components/dashboard/expenses-over-time
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { TransactionsList } from "@/components/dashboard/transactions-list";
-import { createTransactionAction } from "@/app/transactions/actions";
+import {
+  createCategoryAction,
+  createTransactionAction,
+} from "@/app/transactions/actions";
 import { getDashboardData } from "@/lib/finance/transactions";
 
 type DashboardPageProps = {
@@ -30,6 +33,7 @@ export default async function DashboardPage({
       <section aria-label="New transaction form" className="mb-6 lg:mb-8">
         <DashboardTransactionForm
           categories={dashboardData.categories}
+          createCategoryAction={createCategoryAction}
           onSubmit={createTransactionAction}
           paymentMethods={dashboardData.paymentMethods}
         />

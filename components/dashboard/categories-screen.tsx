@@ -3,24 +3,35 @@
 import { useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 
+import { NewCategoryDialog } from "@/components/dashboard/new-category-dialog";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { categories, type TransactionGroup } from "@/lib/data";
+import {
+  type CategoryOverviewItem,
+  type CreateCategoryInput,
+} from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-const groupColors: Record<TransactionGroup, string> = {
+const groupColors: Record<CategoryOverviewItem["group"], string> = {
   needs: "bg-needs text-white",
-  income: "bg-income text-white",
   savings: "bg-savings text-white",
   wants: "bg-wants text-white",
 };
 
-export function CategoriesScreen() {
+type CategoriesScreenProps = {
+  categories: CategoryOverviewItem[];
+  createCategoryAction: (data: CreateCategoryInput) => Promise<void>;
+};
+
+export function CategoriesScreen({
+  categories,
+  createCategoryAction,
+}: CategoriesScreenProps) {
   const { formatCurrency, t } = useI18n();
   const [activeTab, setActiveTab] = useState("all");
 
@@ -35,28 +46,29 @@ export function CategoriesScreen() {
         title={t("screen.categories.title")}
         description={t("screen.categories.description")}
         actions={
-          <Button className="gap-2">
-            <Plus className="size-4" />
-            {t("screen.categories.newCategory")}
-          </Button>
+          <NewCategoryDialog createCategoryAction={createCategoryAction}>
+            <Button className="gap-2">
+              <Plus className="size-4" />
+              {t("screen.categories.newCategory")}
+            </Button>
+          </NewCategoryDialog>
         }
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList className="grid w-full max-w-2xl grid-cols-5">
+        <TabsList className="grid w-full max-w-xl grid-cols-4">
           <TabsTrigger value="all">{t("common.all")}</TabsTrigger>
           <TabsTrigger value="needs">{t("data.group.needs")}</TabsTrigger>
           <TabsTrigger value="wants">{t("data.group.wants")}</TabsTrigger>
           <TabsTrigger value="savings">{t("data.group.savings")}</TabsTrigger>
-          <TabsTrigger value="income">{t("data.group.income")}</TabsTrigger>
         </TabsList>
       </Tabs>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filteredCategories.map((category) => {
           const percentage =
-            category.budget > 0
-              ? Math.round((category.spent / category.budget) * 100)
+            category.monthlyLimit > 0
+              ? Math.round((category.spent / category.monthlyLimit) * 100)
               : 0;
           const isOverBudget = percentage > 100;
 
@@ -76,7 +88,7 @@ export function CategoriesScreen() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-foreground">
-                        {t(category.nameKey)}
+                        {t(category.label)}
                       </h3>
                       <Badge
                         variant="secondary"
@@ -103,7 +115,7 @@ export function CategoriesScreen() {
                   </div>
                 </div>
 
-                {category.budget > 0 ? (
+                {category.monthlyLimit > 0 ? (
                   <>
                     <div className="mb-2 flex justify-between text-sm">
                       <span className="text-muted-foreground">
@@ -116,7 +128,7 @@ export function CategoriesScreen() {
                         )}
                       >
                         {formatCurrency(category.spent)} /{" "}
-                        {formatCurrency(category.budget)}
+                        {formatCurrency(category.monthlyLimit)}
                       </span>
                     </div>
                     <div
@@ -148,7 +160,7 @@ export function CategoriesScreen() {
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    {t("screen.categories.incomeNoBudget")}
+                    {t("category.noMonthlyLimit")}
                   </p>
                 )}
               </CardContent>
