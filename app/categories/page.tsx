@@ -1,6 +1,10 @@
 import { AppShell } from "@/components/dashboard/app-shell"
 import { CategoriesScreen } from "@/components/dashboard/categories-screen"
-import { createCategoryAction } from "@/app/transactions/actions"
+import {
+  createCategoryAction,
+  deleteCategoryAction,
+  updateCategoryAction,
+} from "@/app/transactions/actions"
 import { listCategoryOverview } from "@/lib/finance/transactions"
 
 export default async function CategoriesPage() {
@@ -11,6 +15,8 @@ export default async function CategoriesPage() {
       <CategoriesScreen
         categories={categories}
         createCategoryAction={createCategoryAction}
+        deleteCategoryAction={deleteCategoryAction}
+        updateCategoryAction={updateCategoryAction}
       />
     </AppShell>
   )

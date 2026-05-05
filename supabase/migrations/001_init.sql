@@ -28,7 +28,7 @@ create table
     user_id uuid not null default auth.uid () references auth.users (id) on delete cascade,
     name text not null,
     type text not null check (
-      type in ('pix', 'debit', 'credit', 'cash', 'other')
+      type in ('pix', 'debit', 'credit', 'cash', 'bank', 'boleto', 'other')
     ),
     credit_limit numeric,
     created_at timestamptz not null default now ()

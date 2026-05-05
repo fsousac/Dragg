@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Plus, Tag } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -25,15 +25,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { type CreateCategoryInput } from "@/lib/finance/transactions";
+import {
+  type CreateCategoryInput,
+  type UpdateCategoryInput,
+} from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
 
 type NewCategoryDialogProps = {
+  category?: UpdateCategoryInput & {
+    showName?: boolean;
+  };
   children?: ReactNode;
   createCategoryAction: (data: CreateCategoryInput) => Promise<void>;
   onCreated?: () => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  updateCategoryAction?: (data: UpdateCategoryInput) => Promise<void>;
 };
 
 type CategoryGroup = CreateCategoryInput["group"];
@@ -79,11 +86,13 @@ function formatCurrencyInput(value: string) {
 }
 
 export function NewCategoryDialog({
+  category,
   children,
   createCategoryAction,
   onCreated,
   open: controlledOpen,
   onOpenChange,
+  updateCategoryAction,
 }: NewCategoryDialogProps) {
   const router = useRouter();
   const { t } = useI18n();
@@ -93,6 +102,7 @@ export function NewCategoryDialog({
   const [name, setName] = useState("");
   const [group, setGroup] = useState<CategoryGroup>("needs");
   const [monthlyLimit, setMonthlyLimit] = useState("");
+  const isEditing = Boolean(category);
 
   const open = controlledOpen ?? internalOpen;
   const setOpen = (nextOpen: boolean) => {
@@ -101,36 +111,65 @@ export function NewCategoryDialog({
   };
 
   const resetForm = () => {
-    setIcon("🏷️");
-    setName("");
-    setGroup("needs");
-    setMonthlyLimit("");
+    setIcon(category?.icon ?? "🏷️");
+    setName(category?.showName === false ? "" : (category?.name ?? ""));
+    setGroup(category?.group ?? "needs");
+    setMonthlyLimit(
+      category?.monthlyLimit
+        ? String(category.monthlyLimit).replace(".", ",")
+        : "",
+    );
   };
+
+  useEffect(() => {
+    if (open) {
+      setIcon(category?.icon ?? "🏷️");
+      setName(category?.showName === false ? "" : (category?.name ?? ""));
+      setGroup(category?.group ?? "needs");
+      setMonthlyLimit(
+        category?.monthlyLimit
+          ? String(category.monthlyLimit).replace(".", ",")
+          : "",
+      );
+    }
+  }, [open, category]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!name.trim()) {
+    const submittedName = name.trim() || category?.name || "";
+
+    if (!submittedName.trim()) {
       toast.error(t("category.createValidationError"));
       return;
     }
 
     setIsSaving(true);
     try {
-      await createCategoryAction({
+      const payload = {
         group,
         icon,
         monthlyLimit: parseCurrencyInput(monthlyLimit),
-        name,
-      });
-      toast.success(t("category.createSuccess"));
+        name: submittedName,
+      };
+
+      if (category && updateCategoryAction) {
+        await updateCategoryAction({ ...payload, id: category.id });
+        toast.success(t("category.updateSuccess"));
+      } else {
+        await createCategoryAction(payload);
+        toast.success(t("category.createSuccess"));
+      }
+
       resetForm();
       setOpen(false);
       onCreated?.();
       router.refresh();
     } catch (error) {
-      console.error("Error creating category:", error);
-      toast.error(t("category.createError"));
+      console.error("Error saving category:", error);
+      toast.error(
+        isEditing ? t("category.updateError") : t("category.createError"),
+      );
     } finally {
       setIsSaving(false);
     }
@@ -141,9 +180,15 @@ export function NewCategoryDialog({
       {children ? <DialogTrigger asChild>{children}</DialogTrigger> : null}
       <DialogContent className="overflow-y-auto sm:h-[50vh] sm:w-[50vw] sm:max-w-none">
         <DialogHeader>
-          <DialogTitle>{t("screen.categories.newCategory")}</DialogTitle>
+          <DialogTitle>
+            {isEditing
+              ? t("screen.categories.editCategory")
+              : t("screen.categories.newCategory")}
+          </DialogTitle>
           <DialogDescription>
-            {t("category.createDescription")}
+            {isEditing
+              ? t("category.editDescription")
+              : t("category.createDescription")}
           </DialogDescription>
         </DialogHeader>
 
@@ -235,7 +280,11 @@ export function NewCategoryDialog({
             </Button>
             <Button type="submit" disabled={isSaving}>
               <Plus className="size-4" />
-              {isSaving ? t("category.creating") : t("category.create")}
+              {isSaving
+                ? t("category.saving")
+                : isEditing
+                  ? t("category.update")
+                  : t("category.create")}
             </Button>
           </DialogFooter>
         </form>

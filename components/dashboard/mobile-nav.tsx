@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -22,6 +22,7 @@ const mobileNavItems = [
 
 export function MobileNav() {
   const pathname = usePathname()
+  const router = useRouter()
   const { t } = useI18n()
 
   return (
@@ -34,6 +35,8 @@ export function MobileNav() {
             <Link
               key={item.nameKey}
               href={item.href}
+              prefetch
+              onTouchStart={() => router.prefetch(item.href)}
               className={cn(
                 "flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-200 min-w-[60px]",
                 isActive

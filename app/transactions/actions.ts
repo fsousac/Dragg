@@ -5,12 +5,19 @@ import { z } from "zod";
 
 import {
   createCategory,
+  createPaymentMethod,
+  createSubscription,
   createTransaction,
+  deleteCategory,
   deletePaymentMethod,
   deleteTransaction,
   type CreateCategoryInput,
+  type CreatePaymentMethodInput,
+  type CreateSubscriptionInput,
   type NewTransactionInput,
+  type UpdateCategoryInput,
   type UpdatePaymentMethodInput,
+  updateCategory,
   updatePaymentMethod,
   updateTransaction,
   type UpdateTransactionInput,
@@ -69,12 +76,33 @@ const createTransactionActionSchema = z
   })
   .strict();
 
+const createSubscriptionActionSchema = z
+  .object({
+    amount: z.number().finite().positive().max(1_000_000_000),
+    category: z.string().trim().min(0).max(64),
+    description: safeShortTextSchema,
+    nextDate: dateSchema,
+    paymentMethod: z.string().trim().min(0).max(64),
+  })
+  .strict();
+
+const updateCategoryActionSchema = createCategoryActionSchema
+  .extend({
+    id: uuidSchema,
+  })
+  .strict();
+
 const updatePaymentMethodActionSchema = z
   .object({
+    creditLimit: z.number().finite().min(0).max(1_000_000_000).optional(),
     id: uuidSchema,
     name: safeShortTextSchema,
-    type: z.enum(["bank", "credit", "debit"]),
+    type: z.enum(["bank", "boleto", "credit", "debit", "other"]),
   })
+  .strict();
+
+const createPaymentMethodActionSchema = updatePaymentMethodActionSchema
+  .omit({ id: true })
   .strict();
 
 const updateTransactionActionSchema = z
@@ -101,6 +129,28 @@ export async function createCategoryAction(data: CreateCategoryInput) {
   revalidatePath("/transactions/new");
 }
 
+export async function updateCategoryAction(data: UpdateCategoryInput) {
+  const parsed = updateCategoryActionSchema.parse(data);
+
+  await updateCategory(parsed);
+
+  revalidatePath("/categories");
+  revalidatePath("/dashboard");
+  revalidatePath("/transactions");
+  revalidatePath("/transactions/new");
+}
+
+export async function deleteCategoryAction(categoryId: string) {
+  const parsedCategoryId = uuidSchema.parse(categoryId);
+
+  await deleteCategory(parsedCategoryId);
+
+  revalidatePath("/categories");
+  revalidatePath("/dashboard");
+  revalidatePath("/transactions");
+  revalidatePath("/transactions/new");
+}
+
 export async function createTransactionAction(data: NewTransactionInput) {
   const parsed = createTransactionActionSchema.parse(data);
 
@@ -115,12 +165,39 @@ export async function createTransactionAction(data: NewTransactionInput) {
   revalidatePath("/transactions/new");
 }
 
+export async function createSubscriptionAction(data: CreateSubscriptionInput) {
+  const parsed = createSubscriptionActionSchema.parse(data);
+
+  await createSubscription({
+    ...parsed,
+    category: parsed.category || "none",
+    paymentMethod: parsed.paymentMethod || "none",
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/payments");
+  revalidatePath("/transactions");
+}
+
 export async function updatePaymentMethodAction(
   data: UpdatePaymentMethodInput,
 ) {
   const parsed = updatePaymentMethodActionSchema.parse(data);
 
   await updatePaymentMethod(parsed);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/payments");
+  revalidatePath("/transactions");
+  revalidatePath("/transactions/new");
+}
+
+export async function createPaymentMethodAction(
+  data: CreatePaymentMethodInput,
+) {
+  const parsed = createPaymentMethodActionSchema.parse(data);
+
+  await createPaymentMethod(parsed);
 
   revalidatePath("/dashboard");
   revalidatePath("/payments");

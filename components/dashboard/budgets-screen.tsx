@@ -14,11 +14,25 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { budgetData, budgetSplitData, categories } from "@/lib/data";
+import {
+  type BudgetData,
+  type BudgetSplitItem,
+  type CategoryOverviewItem,
+} from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-export function BudgetsScreen() {
+type BudgetsScreenProps = {
+  budgetData: BudgetData;
+  budgetSplitData: BudgetSplitItem[];
+  categories: CategoryOverviewItem[];
+};
+
+export function BudgetsScreen({
+  budgetData,
+  budgetSplitData,
+  categories,
+}: BudgetsScreenProps) {
   const { formatCurrency, t } = useI18n();
   const totalBudget =
     budgetData.needs.budget +
@@ -34,7 +48,7 @@ export function BudgetsScreen() {
 
   const budgetGroups = [
     {
-      description: t("data.category.housing"),
+      description: t("data.category.needs"),
       icon: "🏠",
       key: "needs" as const,
       name: t("data.group.needs"),
@@ -218,10 +232,10 @@ export function BudgetsScreen() {
         <CardContent>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {categories
-              .filter((category) => category.budget > 0)
+              .filter((category) => category.monthlyLimit > 0)
               .map((category) => {
                 const percentage = Math.round(
-                  (category.spent / category.budget) * 100,
+                  (category.spent / category.monthlyLimit) * 100,
                 );
                 return (
                   <div
@@ -232,12 +246,12 @@ export function BudgetsScreen() {
                       <div className="flex items-center gap-2">
                         <span>{category.icon}</span>
                         <span className="font-medium text-foreground">
-                          {t(category.nameKey)}
+                          {t(category.label)}
                         </span>
                       </div>
                       <span className="text-sm text-muted-foreground">
                         {formatCurrency(category.spent)} /{" "}
-                        {formatCurrency(category.budget)}
+                        {formatCurrency(category.monthlyLimit)}
                       </span>
                     </div>
                     <div

@@ -11,9 +11,21 @@ import {
   updateTransactionAction,
 } from "@/app/transactions/actions"
 
-export default async function TransactionsPage() {
+type TransactionsPageProps = {
+  searchParams?: Promise<{
+    month?: string | string[];
+  }>;
+};
+
+export default async function TransactionsPage({
+  searchParams,
+}: TransactionsPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const selectedMonth = Array.isArray(resolvedSearchParams?.month)
+    ? resolvedSearchParams.month[0]
+    : resolvedSearchParams?.month;
   const [transactions, transactionFormOptions] = await Promise.all([
-    listTransactions(),
+    listTransactions({ month: selectedMonth }),
     getTransactionFormOptions(),
   ])
 

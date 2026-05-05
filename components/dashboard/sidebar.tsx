@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -46,6 +46,7 @@ export function Sidebar({
   userName,
 }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { t } = useI18n();
 
   return (
@@ -68,6 +69,9 @@ export function Sidebar({
               <li key={item.nameKey}>
                 <Link
                   href={item.href}
+                  prefetch
+                  onMouseEnter={() => router.prefetch(item.href)}
+                  onFocus={() => router.prefetch(item.href)}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
                     isActive

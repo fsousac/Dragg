@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import {
-  NewTransactionForm,
-  type NewTransactionFormData,
-} from "@/components/dashboard/new-transaction-form";
+  TransactionForm,
+  type TransactionFormData,
+} from "@/components/dashboard/transaction-form";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -11,7 +11,7 @@ import {
 } from "@/app/transactions/actions";
 import { getTransactionFormOptions } from "@/lib/finance/transactions";
 
-async function handleTransactionSubmit(data: NewTransactionFormData) {
+async function handleTransactionSubmit(data: TransactionFormData) {
   "use server";
 
   const supabase = await createClient();
@@ -39,7 +39,7 @@ export default async function NewTransactionPage() {
 
   return (
     <AppShell>
-      <NewTransactionForm
+      <TransactionForm
         categories={formOptions.categories}
         createCategoryAction={createCategoryAction}
         onSubmit={handleTransactionSubmit}

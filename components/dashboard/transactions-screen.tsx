@@ -11,14 +11,13 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
-  Search,
   Trash2,
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/dashboard/page-header";
-import { type NewTransactionFormData } from "@/components/dashboard/new-transaction-form";
+import { type TransactionFormData } from "@/components/dashboard/transaction-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,7 +55,7 @@ import {
 } from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { DashboardTransactionForm } from "./dashboard-transaction-form";
+import { TransactionForm } from "./transaction-form";
 
 type SortOption = "date-desc" | "date-asc" | "amount-desc" | "amount-asc";
 
@@ -222,26 +221,20 @@ export function TransactionsScreen({
     });
   };
 
-  const handleNewTransactionSubmit = async (data: NewTransactionFormData) => {
-    try {
-      const input: NewTransactionInput = {
-        amount: data.amount,
-        category: data.category === "none" ? "" : data.category,
-        date: data.date,
-        description: data.description.trim(),
-        installmentCount: data.installmentCount,
-        notes: data.notes?.trim() || undefined,
-        paymentMethod: data.paymentMethod === "none" ? "" : data.paymentMethod,
-        type: data.type,
-      };
-      await createTransactionAction(input);
-      toast.success(t("transaction.recordSuccess"));
-      setIsNewTransactionOpen(false);
-      router.refresh();
-    } catch (error) {
-      console.error("Error creating transaction:", error);
-      toast.error(t("transaction.recordError"));
-    }
+  const handleNewTransactionSubmit = async (data: TransactionFormData) => {
+    const input: NewTransactionInput = {
+      amount: data.amount,
+      category: data.category === "none" ? "" : data.category,
+      date: data.date,
+      description: data.description.trim(),
+      installmentCount: data.installmentCount,
+      notes: data.notes?.trim() || undefined,
+      paymentMethod: data.paymentMethod === "none" ? "" : data.paymentMethod,
+      type: data.type,
+    };
+
+    await createTransactionAction(input);
+    setIsNewTransactionOpen(false);
   };
 
   const handleUpdateTransaction = () => {
@@ -647,7 +640,7 @@ export function TransactionsScreen({
               {t("transaction.addDescription")}
             </DialogDescription>
           </DialogHeader>
-          <DashboardTransactionForm
+          <TransactionForm
             categories={categories}
             createCategoryAction={createCategoryAction}
             paymentMethods={paymentMethods}

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { Header } from "@/components/dashboard/header";
 import { MobileNav } from "@/components/dashboard/mobile-nav";
+import { NavigationPrefetcher } from "@/components/dashboard/navigation-prefetcher";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { createClient } from "@/lib/supabase/server";
 
@@ -75,6 +76,8 @@ export async function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="flex min-h-screen bg-background">
+      <NavigationPrefetcher />
+
       <Sidebar
         initials={initials}
         signOutAction={signOut}

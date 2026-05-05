@@ -2,15 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Plus,
-  Minus,
-  ArrowLeftRight,
-  Target,
-  PieChart,
-  BarChart3,
-  Folder,
-} from "lucide-react";
+import { Plus, Minus, Target, PieChart, BarChart3, Folder } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
 const actions = [

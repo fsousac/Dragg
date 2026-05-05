@@ -8,7 +8,7 @@ export default async function HomePage() {
   const { data } = await supabase.auth.getClaims();
 
   if (data?.claims) {
-    redirect("/transactions/new");
+    redirect("/dashboard");
   }
 
   return (
