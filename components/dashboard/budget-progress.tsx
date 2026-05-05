@@ -1,33 +1,33 @@
-"use client"
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { budgetData } from "@/lib/data"
-import { useI18n } from "@/lib/i18n"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { type BudgetData } from "@/lib/finance/transactions";
+import { useI18n } from "@/lib/i18n";
 
-const budgets = [
-  {
-    nameKey: "data.group.needs",
-    ...budgetData.needs,
-    color: "#F97316",
-    bgColor: "bg-[#F97316]"
-  },
-  {
-    nameKey: "data.group.wants",
-    ...budgetData.wants,
-    color: "#EC4899",
-    bgColor: "bg-[#EC4899]"
-  },
-  {
-    nameKey: "data.group.savings",
-    ...budgetData.savings,
-    color: "#8B5CF6",
-    bgColor: "bg-[#8B5CF6]"
-  }
-]
+type BudgetProgressProps = {
+  budgetData: BudgetData;
+};
 
-export function BudgetProgress() {
-  const { formatCurrency, t } = useI18n()
+export function BudgetProgress({ budgetData }: BudgetProgressProps) {
+  const { formatCurrency, t } = useI18n();
+  const budgets = [
+    {
+      nameKey: "data.group.needs",
+      ...budgetData.needs,
+      color: "#F97316",
+    },
+    {
+      nameKey: "data.group.wants",
+      ...budgetData.wants,
+      color: "#EC4899",
+    },
+    {
+      nameKey: "data.group.savings",
+      ...budgetData.savings,
+      color: "#8B5CF6",
+    },
+  ];
 
   return (
     <Card className="bg-card border-border card-shadow">
@@ -48,7 +48,9 @@ export function BudgetProgress() {
                   className="w-3 h-3 rounded-full"
                   style={{ backgroundColor: budget.color }}
                 />
-                <span className="text-sm font-medium text-foreground">{t(budget.nameKey)}</span>
+                <span className="text-sm font-medium text-foreground">
+                  {t(budget.nameKey)}
+                </span>
               </div>
               <div className="text-right">
                 <span className="text-sm font-semibold text-foreground">
@@ -65,7 +67,7 @@ export function BudgetProgress() {
                 className="h-2 lg:h-3 bg-accent"
                 style={{
                   // @ts-expect-error CSS variable
-                  "--progress-foreground": budget.color
+                  "--progress-foreground": budget.color,
                 }}
               />
             </div>
@@ -76,5 +78,5 @@ export function BudgetProgress() {
         ))}
       </CardContent>
     </Card>
-  )
+  );
 }

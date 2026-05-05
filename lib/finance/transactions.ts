@@ -1,0 +1,1615 @@
+import "server-only";
+
+import { redirect } from "next/navigation";
+
+import {
+  type Transaction,
+  type TransactionGroup,
+  type TransactionType,
+} from "@/lib/data";
+import { createClient } from "@/lib/supabase/server";
+
+type DbCategoryGroup = Exclude<TransactionGroup, "income">;
+type DbTransactionKind = TransactionType;
+
+type CategoryRow = {
+  icon?: string | null;
+  id: string;
+  group_type: DbCategoryGroup;
+  is_default: boolean | null;
+  monthly_limit: number | string | null;
+  name: string;
+};
+
+type PaymentMethodRow = {
+  credit_limit: number | string | null;
+  id: string;
+  is_default: boolean | null;
+  name: string;
+  type: "pix" | "debit" | "credit" | "cash" | "bank" | "boleto" | "other";
+};
+
+type TransactionRow = {
+  id: string;
+  amount: number | string;
+  date: string;
+  description: string;
+  kind: DbTransactionKind;
+  notes: string | null;
+  categories: CategoryRow | null;
+  category_id: string | null;
+  payment_method_id: string | null;
+  payment_methods: PaymentMethodRow | null;
+};
+
+export type TransactionFormCategory = {
+  group: DbCategoryGroup;
+  id: string;
+  icon: string;
+  label: string;
+  monthlyLimit: number;
+};
+
+export type TransactionFormPaymentMethod = {
+  id: string;
+  label: string;
+  type: PaymentMethodRow["type"];
+};
+
+export type PaymentMethodOverviewItem = TransactionFormPaymentMethod & {
+  canModify: boolean;
+  creditLimit: number;
+  isDefault: boolean;
+  name: string;
+  spent: number;
+};
+
+export type SubscriptionOverviewItem = {
+  amount: number;
+  categoryKey: string;
+  frequency: "monthly";
+  icon: string;
+  id: string;
+  name: string;
+  nextDate: string;
+  paymentMethodKey?: string | null;
+  status: "active";
+};
+
+export type TransactionFormOptions = {
+  categories: TransactionFormCategory[];
+  paymentMethods: TransactionFormPaymentMethod[];
+};
+
+export type CreateCategoryInput = {
+  group: DbCategoryGroup;
+  icon: string;
+  monthlyLimit?: number;
+  name: string;
+};
+
+export type UpdateCategoryInput = CreateCategoryInput & {
+  id: string;
+};
+
+export type NewTransactionInput = {
+  type: "income" | "expense";
+  date: string;
+  amount: number;
+  category: string;
+  paymentMethod: string;
+  installmentCount: number;
+  description: string;
+  notes?: string;
+};
+
+export type CreateSubscriptionInput = {
+  amount: number;
+  category: string;
+  description: string;
+  nextDate: string;
+  paymentMethod: string;
+};
+
+export type CreatePaymentMethodInput = {
+  creditLimit?: number;
+  name: string;
+  type: UpdatePaymentMethodInput["type"];
+};
+
+export type UpdateTransactionInput = {
+  id: string;
+  type: TransactionType;
+  date: string;
+  amount: number;
+  category: string;
+  paymentMethod: string;
+  description: string;
+  notes?: string;
+};
+
+export type UpdatePaymentMethodInput = {
+  creditLimit?: number;
+  id: string;
+  name: string;
+  type: Exclude<PaymentMethodRow["type"], "cash" | "pix">;
+};
+
+export type SummaryData = {
+  totalIncome: number;
+  totalExpenses: number;
+  totalSaved: number;
+  currentBalance: number;
+};
+
+export type BudgetData = Record<
+  DbCategoryGroup,
+  { spent: number; budget: number; percentage: number }
+>;
+
+export type BudgetSplitItem = {
+  amount: number;
+  nameKey: string;
+  maxAmount: number;
+  spentAmount: number;
+  value: number;
+  color: string;
+};
+
+export type CategoryOverviewItem = {
+  canModify: boolean;
+  color: string;
+  group: DbCategoryGroup;
+  icon: string;
+  id: string;
+  isDefault: boolean;
+  label: string;
+  monthlyLimit: number;
+  name: string;
+  spent: number;
+};
+
+export type ExpensesByCategoryItem = {
+  nameKey: string;
+  value: number;
+  color: string;
+};
+
+export type ExpensesOverTimeItem = {
+  monthKey: string;
+  amount: number;
+};
+
+export type DashboardData = TransactionFormOptions & {
+  budgetData: BudgetData;
+  budgetSplitData: BudgetSplitItem[];
+  expensesByCategory: ExpensesByCategoryItem[];
+  expensesOverTime: ExpensesOverTimeItem[];
+  latestTransactions: Transaction[];
+  summaryData: SummaryData;
+};
+
+export type BudgetOverviewData = {
+  budgetData: BudgetData;
+  budgetSplitData: BudgetSplitItem[];
+  categories: CategoryOverviewItem[];
+};
+
+const monthKeys = [
+  "data.month.jan",
+  "data.month.feb",
+  "data.month.mar",
+  "data.month.apr",
+  "data.month.may",
+  "data.month.jun",
+  "data.month.jul",
+  "data.month.aug",
+  "data.month.sep",
+  "data.month.oct",
+  "data.month.nov",
+  "data.month.dec",
+] as const;
+
+const groupBudgetRatios = {
+  needs: 0.5,
+  wants: 0.3,
+  savings: 0.2,
+} as const;
+
+const categoryGroups = ["needs", "wants", "savings"] as const;
+const editablePaymentMethodTypes = [
+  "bank",
+  "boleto",
+  "credit",
+  "debit",
+  "other",
+] as const;
+const transactionKinds = ["expense", "income", "saving"] as const;
+
+const groupColors = {
+  needs: "#F97316",
+  wants: "#EC4899",
+  savings: "#8B5CF6",
+} as const;
+
+const groupIcons = {
+  income: "💼",
+  needs: "🏠",
+  savings: "📈",
+  wants: "🎉",
+} as const;
+
+const categoryIconMap: Record<string, string> = {
+  debt: "🧾",
+  debts: "🧾",
+  education: "📚",
+  food: "🛒",
+  health: "🏥",
+  housing: "🏠",
+  important: "⚡",
+  income: "💼",
+  investments: "📈",
+  leisure: "🎮",
+  other: "🏷️",
+  others: "🏷️",
+  shopping: "🛍️",
+  subscriptions: "🎬",
+  transportation: "🚗",
+};
+
+const transactionSelect = `
+  id,
+  date,
+  description,
+  amount,
+  kind,
+  notes,
+  category_id,
+  payment_method_id,
+  categories (
+    id,
+    name,
+    icon,
+    group_type,
+    is_default,
+    monthly_limit
+  ),
+  payment_methods (
+    id,
+    name,
+    type
+  )
+`;
+
+const transactionSelectWithoutCategoryIcon = `
+  id,
+  date,
+  description,
+  amount,
+  kind,
+  notes,
+  category_id,
+  payment_method_id,
+  categories (
+    id,
+    name,
+    group_type,
+    is_default,
+    monthly_limit
+  ),
+  payment_methods (
+    id,
+    name,
+    type
+  )
+`;
+
+const categoryTranslationMap: Record<string, string> = {
+  debt: "data.category.debts",
+  debts: "data.category.debts",
+  education: "data.category.education",
+  food: "data.category.food",
+  health: "data.category.health",
+  housing: "data.category.housing",
+  important: "data.category.important",
+  income: "data.category.receipts",
+  investments: "data.category.investments",
+  leisure: "data.category.leisure",
+  other: "data.category.other",
+  others: "data.category.other",
+  shopping: "data.category.shopping",
+  subscriptions: "data.category.subscriptions",
+  transportation: "data.category.transportation",
+};
+
+const paymentMethodTranslationMap: Record<string, string> = {
+  cash: "transaction.paymentMethods.cash",
+  "credit card": "transaction.paymentMethods.creditCard",
+  "debit card": "transaction.paymentMethods.debitCard",
+  pix: "transaction.paymentMethods.pix",
+};
+
+const defaultPaymentMethodNames = new Set([
+  "cash",
+  "credit card",
+  "debit card",
+  "pix",
+]);
+
+function normalizeLabel(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
+function assertUuid(value: string, label: string) {
+  if (!isUuid(value)) {
+    throw new Error(`${label} is invalid.`);
+  }
+}
+
+function normalizeNullableId(value: string, label: string) {
+  const normalizedValue = value.trim();
+
+  if (normalizedValue === "none") return null;
+
+  assertUuid(normalizedValue, label);
+  return normalizedValue;
+}
+
+function isCategoryGroup(value: string): value is DbCategoryGroup {
+  return categoryGroups.includes(value as DbCategoryGroup);
+}
+
+function isEditablePaymentMethodType(
+  value: string,
+): value is UpdatePaymentMethodInput["type"] {
+  return editablePaymentMethodTypes.some((type) => type === value);
+}
+
+function isTransactionKind(value: string): value is DbTransactionKind {
+  return transactionKinds.includes(value as DbTransactionKind);
+}
+
+function assertPositiveFiniteAmount(value: number, label: string) {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${label} must be greater than zero.`);
+  }
+}
+
+function assertValidIsoDate(value: string) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+
+  if (
+    !value.match(/^\d{4}-\d{2}-\d{2}$/) ||
+    Number.isNaN(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== value
+  ) {
+    throw new Error("Transaction date is invalid.");
+  }
+}
+
+function assertNonEmptyString(value: string, label: string, maxLength = 160) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    throw new Error(`${label} is required.`);
+  }
+
+  if (trimmedValue.length > maxLength) {
+    throw new Error(`${label} is too long.`);
+  }
+
+  return trimmedValue;
+}
+
+function normalizeOptionalString(value: string | undefined, maxLength = 500) {
+  const trimmedValue = value?.trim();
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  if (trimmedValue.length > maxLength) {
+    throw new Error("Text field is too long.");
+  }
+
+  return trimmedValue;
+}
+
+function toCategoryLabelKey(categoryName: string, isDefault: boolean | null) {
+  // Treat null as true (default to translating if is_default column doesn't exist)
+  if (isDefault === false) {
+    return categoryName;
+  }
+
+  return categoryTranslationMap[normalizeLabel(categoryName)] ?? categoryName;
+}
+
+function toCategoryIcon(categoryName: string, icon?: string | null) {
+  return icon?.trim() || categoryIconMap[normalizeLabel(categoryName)] || "🏷️";
+}
+
+function toPaymentMethodLabelKey(
+  paymentMethodName: string,
+  paymentMethodType: PaymentMethodRow["type"],
+  isDefault: boolean | null,
+) {
+  const normalizedPaymentMethodName = normalizeLabel(paymentMethodName);
+  const shouldTranslateDefaultName =
+    isDefault === true ||
+    (isDefault === null &&
+      defaultPaymentMethodNames.has(normalizedPaymentMethodName));
+
+  if (!shouldTranslateDefaultName) {
+    return paymentMethodName;
+  }
+
+  if (paymentMethodType === "pix") return "transaction.paymentMethods.pix";
+  if (paymentMethodType === "cash") return "transaction.paymentMethods.cash";
+  if (paymentMethodType === "credit")
+    return "transaction.paymentMethods.creditCard";
+  if (paymentMethodType === "debit")
+    return "transaction.paymentMethods.debitCard";
+  if (paymentMethodType === "boleto")
+    return "transaction.paymentMethods.boleto";
+
+  return (
+    paymentMethodTranslationMap[normalizedPaymentMethodName] ??
+    paymentMethodName
+  );
+}
+
+async function getUserContext() {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+
+  if (!data?.claims?.sub) {
+    redirect("/");
+  }
+
+  return { supabase, userId: data.claims.sub };
+}
+
+async function assertUserCategory(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  categoryId: string | null,
+) {
+  if (!categoryId) return;
+  assertUuid(categoryId, "Category");
+
+  const { data, error } = await supabase
+    .from("categories")
+    .select("id")
+    .eq("id", categoryId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Unable to validate category: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error("Category is invalid.");
+  }
+}
+
+async function assertUserPaymentMethod(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  paymentMethodId: string | null,
+) {
+  if (!paymentMethodId) return;
+  assertUuid(paymentMethodId, "Payment method");
+
+  const { data, error } = await supabase
+    .from("payment_methods")
+    .select("id")
+    .eq("id", paymentMethodId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Unable to validate payment method: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error("Payment method is invalid.");
+  }
+}
+
+function toIsoDate(dateValue: string) {
+  const [day, month, year] = dateValue.split("/");
+
+  if (!day || !month || !year) {
+    return dateValue;
+  }
+
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function addMonthsClamped(date: Date, monthOffset: number) {
+  const year = date.getFullYear();
+  const month = date.getMonth() + monthOffset;
+  const day = date.getDate();
+  const lastDayOfTargetMonth = new Date(year, month + 1, 0).getDate();
+
+  return new Date(year, month, Math.min(day, lastDayOfTargetMonth));
+}
+
+function toTransaction(row: TransactionRow): Transaction {
+  const amount = Number(row.amount);
+  const group =
+    row.kind === "income" ? "income" : (row.categories?.group_type ?? "wants");
+  const signedAmount = row.kind === "income" ? amount : -amount;
+  const rawCategoryName = row.categories?.name ?? row.kind;
+  const categoryName = toCategoryLabelKey(
+    rawCategoryName,
+    row.categories?.is_default ?? false,
+  );
+  const paymentMethodKey = row.payment_methods
+    ? toPaymentMethodLabelKey(
+        row.payment_methods.name,
+        row.payment_methods.type,
+        null,
+      )
+    : null;
+
+  return {
+    id: row.id,
+    amount: signedAmount,
+    categoryId: row.category_id,
+    categoryKey: categoryName,
+    date: row.date,
+    descriptionKey: row.description || row.notes || categoryName,
+    group,
+    icon:
+      row.kind === "income"
+        ? groupIcons.income
+        : toCategoryIcon(rawCategoryName, row.categories?.icon),
+    notes: row.notes,
+    paymentMethodId: row.payment_method_id,
+    paymentMethodKey,
+    type: row.kind,
+  };
+}
+
+function getCurrentMonthValue() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getTodayValue() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function normalizeMonthValue(month?: string) {
+  return month?.match(/^\d{4}-\d{2}$/) ? month : getCurrentMonthValue();
+}
+
+function getMonthRange(month?: string) {
+  const normalizedMonth = normalizeMonthValue(month);
+  const [year, monthNumber] = normalizedMonth.split("-").map(Number);
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+
+  return {
+    end: `${normalizedMonth}-${String(lastDay).padStart(2, "0")}`,
+    month: normalizedMonth,
+    start: `${normalizedMonth}-01`,
+  };
+}
+
+function getCollectedMonthRange(month?: string) {
+  const monthRange = getMonthRange(month);
+  const today = getTodayValue();
+
+  return {
+    ...monthRange,
+    end: monthRange.end > today ? today : monthRange.end,
+  };
+}
+
+function getLastSixMonthKeys(month?: string) {
+  const normalizedMonth = normalizeMonthValue(month);
+  const [year, monthNumber] = normalizedMonth.split("-").map(Number);
+  const baseDate = new Date(year, monthNumber - 1, 1);
+
+  return Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(
+      baseDate.getFullYear(),
+      baseDate.getMonth() - (5 - index),
+      1,
+    );
+
+    return {
+      key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
+      monthKey: monthKeys[date.getMonth()],
+    };
+  });
+}
+
+function emptyBudgetData(): BudgetData {
+  return {
+    needs: { budget: 0, percentage: 0, spent: 0 },
+    savings: { budget: 0, percentage: 0, spent: 0 },
+    wants: { budget: 0, percentage: 0, spent: 0 },
+  };
+}
+
+async function listCategories() {
+  const { supabase, userId } = await getUserContext();
+  const { data, error } = await supabase
+    .from("categories")
+    .select("id, name, icon, group_type, is_default, monthly_limit")
+    .eq("user_id", userId)
+    .order("is_default", { ascending: false })
+    .order("name", { ascending: true });
+
+  if (!error) {
+    return (data ?? []) as CategoryRow[];
+  }
+
+  if (error.code === "42703") {
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from("categories")
+      .select("id, name, group_type, is_default, monthly_limit")
+      .eq("user_id", userId)
+      .order("is_default", { ascending: false })
+      .order("name", { ascending: true });
+
+    if (fallbackError) {
+      throw new Error(`Unable to load categories: ${fallbackError.message}`);
+    }
+
+    return (fallbackData ?? []) as CategoryRow[];
+  }
+
+  throw new Error(`Unable to load categories: ${error.message}`);
+}
+
+export async function listCategoryOverview(
+  month?: string,
+): Promise<CategoryOverviewItem[]> {
+  const categories = await listCategories();
+  const transactions = await listTransactions({ month });
+
+  return categories.map((category) => {
+    const label = toCategoryLabelKey(category.name, category.is_default);
+    const spent = transactions
+      .filter((transaction) => transaction.categoryId === category.id)
+      .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+
+    return {
+      color: groupColors[category.group_type],
+      canModify: true,
+      group: category.group_type,
+      icon: toCategoryIcon(category.name, category.icon),
+      id: category.id,
+      isDefault: Boolean(category.is_default),
+      label,
+      monthlyLimit: Number(category.monthly_limit ?? 0),
+      name: category.name,
+      spent,
+    };
+  });
+}
+
+async function listPaymentMethods() {
+  const { supabase, userId } = await getUserContext();
+  const { data, error } = await supabase
+    .from("payment_methods")
+    .select("id, name, type, is_default, credit_limit")
+    .eq("user_id", userId)
+    .order("is_default", { ascending: false })
+    .order("name", { ascending: true });
+
+  if (!error) {
+    return (data ?? []) as PaymentMethodRow[];
+  }
+
+  // Backward-compatible fallback for schemas without is_default in payment_methods.
+  if (error.code === "42703") {
+    const { data: limitFallbackData, error: limitFallbackError } =
+      await supabase
+        .from("payment_methods")
+        .select("id, name, type, credit_limit")
+        .eq("user_id", userId)
+        .order("name", { ascending: true });
+
+    if (!limitFallbackError) {
+      return (
+        (limitFallbackData ?? []) as Omit<PaymentMethodRow, "is_default">[]
+      ).map((paymentMethod) => ({
+        ...paymentMethod,
+        is_default: null,
+      }));
+    }
+
+    if (limitFallbackError.code !== "42703") {
+      throw new Error(
+        `Unable to load payment methods: ${limitFallbackError.message}`,
+      );
+    }
+
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from("payment_methods")
+      .select("id, name, type")
+      .eq("user_id", userId)
+      .order("name", { ascending: true });
+
+    if (fallbackError) {
+      throw new Error(
+        `Unable to load payment methods: ${fallbackError.message}`,
+      );
+    }
+
+    return (
+      (fallbackData ?? []) as Omit<
+        PaymentMethodRow,
+        "credit_limit" | "is_default"
+      >[]
+    ).map((paymentMethod) => ({
+      ...paymentMethod,
+      credit_limit: null,
+      is_default: null,
+    }));
+  }
+
+  throw new Error(`Unable to load payment methods: ${error.message}`);
+}
+
+function isProtectedPaymentMethod(paymentMethod: PaymentMethodRow) {
+  return paymentMethod.type === "cash" || paymentMethod.type === "pix";
+}
+
+async function getCategoryForMutation(categoryId: string) {
+  assertUuid(categoryId, "Category");
+
+  const { supabase, userId } = await getUserContext();
+  const { data, error } = await supabase
+    .from("categories")
+    .select("id, name, icon, group_type, is_default, monthly_limit")
+    .eq("id", categoryId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Unable to load category: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error("Category not found.");
+  }
+
+  return {
+    category: data as CategoryRow,
+    supabase,
+    userId,
+  };
+}
+
+export async function listPaymentMethodOverview(month?: string): Promise<
+  PaymentMethodOverviewItem[]
+> {
+  const [paymentMethods, transactions] = await Promise.all([
+    listPaymentMethods(),
+    listTransactions({ month }),
+  ]);
+
+  return paymentMethods.map((paymentMethod) => ({
+    canModify: !isProtectedPaymentMethod(paymentMethod),
+    creditLimit: Number(paymentMethod.credit_limit ?? 0),
+    id: paymentMethod.id,
+    isDefault: Boolean(paymentMethod.is_default),
+    label: toPaymentMethodLabelKey(
+      paymentMethod.name,
+      paymentMethod.type,
+      paymentMethod.is_default,
+    ),
+    name: paymentMethod.name,
+    spent: transactions
+      .filter(
+        (transaction) =>
+          transaction.paymentMethodId === paymentMethod.id &&
+          transaction.type !== "income",
+      )
+      .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0),
+    type: paymentMethod.type,
+  }));
+}
+
+export async function listSubscriptionOverview(): Promise<
+  SubscriptionOverviewItem[]
+> {
+  const transactions = await listTransactions({ includeFuture: true });
+  const today = getTodayValue();
+  const subscriptionTransactions = transactions
+    .filter((transaction) => transaction.notes?.startsWith("subscription"))
+    .sort((left, right) => left.date.localeCompare(right.date));
+  const groupedSubscriptions = new Map<string, SubscriptionOverviewItem>();
+
+  for (const transaction of subscriptionTransactions) {
+    const groupKey = [
+      transaction.descriptionKey,
+      transaction.categoryId ?? transaction.categoryKey,
+      transaction.paymentMethodId ?? transaction.paymentMethodKey ?? "",
+    ].join("|");
+    const existingSubscription = groupedSubscriptions.get(groupKey);
+    const isFutureOrToday = transaction.date >= today;
+
+    if (!existingSubscription) {
+      groupedSubscriptions.set(groupKey, {
+        amount: Math.abs(transaction.amount),
+        categoryKey: transaction.categoryKey,
+        frequency: "monthly",
+        icon: transaction.icon,
+        id: groupKey,
+        name: transaction.descriptionKey,
+        nextDate: transaction.date,
+        paymentMethodKey: transaction.paymentMethodKey,
+        status: "active",
+      });
+      continue;
+    }
+
+    if (
+      (existingSubscription.nextDate < today && isFutureOrToday) ||
+      (isFutureOrToday && transaction.date < existingSubscription.nextDate)
+    ) {
+      existingSubscription.nextDate = transaction.date;
+    }
+  }
+
+  return [...groupedSubscriptions.values()];
+}
+
+async function getPaymentMethodForMutation(paymentMethodId: string) {
+  assertUuid(paymentMethodId, "Payment method");
+
+  const { supabase, userId } = await getUserContext();
+  const { data, error } = await supabase
+    .from("payment_methods")
+    .select("id, name, type, is_default, credit_limit")
+    .eq("id", paymentMethodId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Unable to load payment method: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error("Payment method not found.");
+  }
+
+  return {
+    paymentMethod: data as PaymentMethodRow,
+    supabase,
+    userId,
+  };
+}
+
+export async function getTransactionFormOptions(): Promise<TransactionFormOptions> {
+  const [categories, paymentMethods] = await Promise.all([
+    listCategories(),
+    listPaymentMethods(),
+  ]);
+
+  const mappedCategories = categories.map((category) => ({
+    group: category.group_type,
+    id: category.id,
+    icon: toCategoryIcon(category.name, category.icon),
+    label: toCategoryLabelKey(category.name, category.is_default),
+    monthlyLimit: Number(category.monthly_limit ?? 0),
+  }));
+
+  const mappedPaymentMethods = paymentMethods.map((paymentMethod) => ({
+    id: paymentMethod.id,
+    label: toPaymentMethodLabelKey(
+      paymentMethod.name,
+      paymentMethod.type,
+      paymentMethod.is_default,
+    ),
+    type: paymentMethod.type,
+  }));
+
+  // If user has no categories or payment methods yet, provide a sentinel
+  // "none" option so the form can render a placeholder and handle selection.
+  const categoriesResult: TransactionFormCategory[] =
+    mappedCategories.length > 0
+      ? mappedCategories
+      : [
+          {
+            group: "wants" as DbCategoryGroup,
+            id: "none",
+            icon: "🏷️",
+            label: "none",
+            monthlyLimit: 0,
+          },
+        ];
+
+  const paymentMethodsResult: TransactionFormPaymentMethod[] =
+    mappedPaymentMethods.length > 0
+      ? mappedPaymentMethods
+      : [
+          {
+            id: "none",
+            label: "none",
+            type: "cash",
+          },
+        ];
+
+  return {
+    categories: categoriesResult,
+    paymentMethods: paymentMethodsResult,
+  };
+}
+
+export async function createTransaction(input: NewTransactionInput) {
+  const { supabase, userId } = await getUserContext();
+  const description = assertNonEmptyString(input.description, "Description");
+  const amount = Math.abs(input.amount);
+  assertPositiveFiniteAmount(amount, "Amount");
+
+  if (input.type !== "income" && input.type !== "expense") {
+    throw new Error("Transaction type is invalid.");
+  }
+
+  const categoryId =
+    input.type === "income"
+      ? null
+      : normalizeNullableId(input.category, "Category");
+  const paymentMethodId = normalizeNullableId(
+    input.paymentMethod,
+    "Payment method",
+  );
+  const kind: DbTransactionKind =
+    input.type === "income" ? "income" : categoryId ? "expense" : input.type;
+  const date = toIsoDate(input.date);
+  const installmentCount = Number(input.installmentCount);
+
+  assertValidIsoDate(date);
+  await Promise.all([
+    assertUserCategory(supabase, userId, categoryId),
+    assertUserPaymentMethod(supabase, userId, paymentMethodId),
+  ]);
+
+  if (
+    !Number.isInteger(installmentCount) ||
+    installmentCount < 1 ||
+    installmentCount > 120
+  ) {
+    throw new Error("Installment count is invalid.");
+  }
+
+  const occurrenceCount = input.type === "expense" ? installmentCount : 1;
+  const installmentAmount =
+    installmentCount > 1
+      ? Number((amount / installmentCount).toFixed(2))
+      : amount;
+  const totalRoundedInstallments = Number(
+    (installmentAmount * installmentCount).toFixed(2),
+  );
+  const installmentRemainder = Number(
+    (amount - totalRoundedInstallments).toFixed(2),
+  );
+  const notes = normalizeOptionalString(input.notes);
+
+  const [year, month, day] = date.split("-").map(Number);
+  const baseDate = new Date(year, month - 1, day);
+  const rows = Array.from({ length: occurrenceCount }, (_, index) => {
+    const occurrenceDate = addMonthsClamped(baseDate, index);
+    const dateValue = [
+      occurrenceDate.getFullYear(),
+      String(occurrenceDate.getMonth() + 1).padStart(2, "0"),
+      String(occurrenceDate.getDate()).padStart(2, "0"),
+    ].join("-");
+    const scheduleNote =
+      installmentCount > 1 ? `${index + 1}/${installmentCount}` : null;
+    const finalNotes =
+      [scheduleNote, notes].filter(Boolean).join(" - ") || null;
+    const rowAmount =
+      index === installmentCount - 1
+        ? Number((installmentAmount + installmentRemainder).toFixed(2))
+        : installmentAmount;
+
+    return {
+      amount: rowAmount,
+      category_id: categoryId,
+      date: dateValue,
+      description:
+        installmentCount > 1
+          ? `${description} (${index + 1}/${installmentCount})`
+          : description,
+      kind,
+      notes: finalNotes,
+      payment_method_id: paymentMethodId,
+      user_id: userId,
+    };
+  });
+
+  const { error } = await supabase.from("transactions").insert(rows);
+
+  if (error) {
+    throw new Error(`Unable to save transaction: ${error.message}`);
+  }
+}
+
+export async function createSubscription(input: CreateSubscriptionInput) {
+  const { supabase, userId } = await getUserContext();
+  const description = assertNonEmptyString(input.description, "Subscription");
+  const amount = Math.abs(input.amount);
+  assertPositiveFiniteAmount(amount, "Amount");
+
+  const categoryId = normalizeNullableId(input.category, "Category");
+  const paymentMethodId = normalizeNullableId(
+    input.paymentMethod,
+    "Payment method",
+  );
+  const date = toIsoDate(input.nextDate);
+
+  assertValidIsoDate(date);
+  await Promise.all([
+    assertUserCategory(supabase, userId, categoryId),
+    assertUserPaymentMethod(supabase, userId, paymentMethodId),
+  ]);
+
+  const [year, month, day] = date.split("-").map(Number);
+  const baseDate = new Date(year, month - 1, day);
+  const rows = Array.from({ length: 12 }, (_, index) => {
+    const occurrenceDate = addMonthsClamped(baseDate, index);
+    const dateValue = [
+      occurrenceDate.getFullYear(),
+      String(occurrenceDate.getMonth() + 1).padStart(2, "0"),
+      String(occurrenceDate.getDate()).padStart(2, "0"),
+    ].join("-");
+
+    return {
+      amount,
+      category_id: categoryId,
+      date: dateValue,
+      description,
+      kind: "expense" as DbTransactionKind,
+      notes: `subscription ${index + 1}/12`,
+      payment_method_id: paymentMethodId,
+      user_id: userId,
+    };
+  });
+
+  const { error } = await supabase.from("transactions").insert(rows);
+
+  if (error) {
+    throw new Error(`Unable to save subscription: ${error.message}`);
+  }
+}
+
+export async function createPaymentMethod(input: CreatePaymentMethodInput) {
+  const { supabase, userId } = await getUserContext();
+  const name = assertNonEmptyString(input.name, "Payment method name");
+  const creditLimit = Number(input.creditLimit ?? 0);
+
+  if (!isEditablePaymentMethodType(input.type)) {
+    throw new Error("Payment method type is invalid.");
+  }
+
+  if (!Number.isFinite(creditLimit) || creditLimit < 0) {
+    throw new Error("Payment method credit limit is invalid.");
+  }
+
+  const { error } = await supabase.from("payment_methods").insert({
+    credit_limit: creditLimit,
+    name,
+    type: input.type,
+    user_id: userId,
+  });
+
+  if (error?.code === "42703") {
+    const { error: fallbackError } = await supabase
+      .from("payment_methods")
+      .insert({
+        name,
+        type: input.type,
+        user_id: userId,
+      });
+
+    if (fallbackError) {
+      throw new Error(
+        `Unable to save payment method: ${fallbackError.message}`,
+      );
+    }
+
+    return;
+  }
+
+  if (error) {
+    throw new Error(`Unable to save payment method: ${error.message}`);
+  }
+}
+
+export async function updatePaymentMethod(input: UpdatePaymentMethodInput) {
+  assertUuid(input.id, "Payment method");
+  const name = assertNonEmptyString(input.name, "Payment method name");
+  const creditLimit = Number(input.creditLimit ?? 0);
+
+  if (!isEditablePaymentMethodType(input.type)) {
+    throw new Error("Payment method type is invalid.");
+  }
+
+  if (!Number.isFinite(creditLimit) || creditLimit < 0) {
+    throw new Error("Payment method credit limit is invalid.");
+  }
+
+  const { paymentMethod, supabase, userId } = await getPaymentMethodForMutation(
+    input.id,
+  );
+
+  if (isProtectedPaymentMethod(paymentMethod)) {
+    throw new Error("This payment method cannot be edited.");
+  }
+
+  const { error } = await supabase
+    .from("payment_methods")
+    .update({
+      credit_limit: creditLimit,
+      name,
+      type: input.type,
+    })
+    .eq("id", input.id)
+    .eq("user_id", userId);
+
+  if (error?.code === "42703") {
+    const { error: fallbackError } = await supabase
+      .from("payment_methods")
+      .update({
+        name,
+        type: input.type,
+      })
+      .eq("id", input.id)
+      .eq("user_id", userId);
+
+    if (fallbackError) {
+      throw new Error(
+        `Unable to update payment method: ${fallbackError.message}`,
+      );
+    }
+
+    return;
+  }
+
+  if (error) {
+    throw new Error(`Unable to update payment method: ${error.message}`);
+  }
+}
+
+export async function deletePaymentMethod(paymentMethodId: string) {
+  assertUuid(paymentMethodId, "Payment method");
+  const { paymentMethod, supabase, userId } =
+    await getPaymentMethodForMutation(paymentMethodId);
+
+  if (isProtectedPaymentMethod(paymentMethod)) {
+    throw new Error("This payment method cannot be deleted.");
+  }
+
+  const { error } = await supabase
+    .from("payment_methods")
+    .delete()
+    .eq("id", paymentMethodId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(`Unable to delete payment method: ${error.message}`);
+  }
+}
+
+export async function createCategory(input: CreateCategoryInput) {
+  const { supabase, userId } = await getUserContext();
+  const name = assertNonEmptyString(input.name, "Category name");
+  const monthlyLimit = Number(input.monthlyLimit ?? 0);
+
+  if (!isCategoryGroup(input.group)) {
+    throw new Error("Category group is invalid.");
+  }
+
+  if (!Number.isFinite(monthlyLimit) || monthlyLimit < 0) {
+    throw new Error("Category monthly limit is invalid.");
+  }
+
+  const payload = {
+    group_type: input.group,
+    icon: toCategoryIcon(input.name, input.icon),
+    is_default: false,
+    monthly_limit: monthlyLimit,
+    name,
+    user_id: userId,
+  };
+
+  const { error } = await supabase.from("categories").insert(payload);
+
+  if (error?.code === "42703") {
+    const fallbackPayload: Omit<typeof payload, "icon"> & { icon?: string } = {
+      ...payload,
+    };
+    delete fallbackPayload.icon;
+    const { error: fallbackError } = await supabase
+      .from("categories")
+      .insert(fallbackPayload);
+
+    if (fallbackError) {
+      throw new Error(`Unable to save category: ${fallbackError.message}`);
+    }
+
+    return;
+  }
+
+  if (error) {
+    throw new Error(`Unable to save category: ${error.message}`);
+  }
+}
+
+export async function updateCategory(input: UpdateCategoryInput) {
+  const name = assertNonEmptyString(input.name, "Category name");
+  const monthlyLimit = Number(input.monthlyLimit ?? 0);
+
+  if (!isCategoryGroup(input.group)) {
+    throw new Error("Category group is invalid.");
+  }
+
+  if (!Number.isFinite(monthlyLimit) || monthlyLimit < 0) {
+    throw new Error("Category monthly limit is invalid.");
+  }
+
+  const { supabase, userId } = await getCategoryForMutation(input.id);
+
+  const payload = {
+    group_type: input.group,
+    icon: toCategoryIcon(input.name, input.icon),
+    monthly_limit: monthlyLimit,
+    name,
+  };
+
+  const { error } = await supabase
+    .from("categories")
+    .update(payload)
+    .eq("id", input.id)
+    .eq("user_id", userId);
+
+  if (error?.code === "42703") {
+    const fallbackPayload: Omit<typeof payload, "icon"> & { icon?: string } = {
+      ...payload,
+    };
+    delete fallbackPayload.icon;
+    const { error: fallbackError } = await supabase
+      .from("categories")
+      .update(fallbackPayload)
+      .eq("id", input.id)
+      .eq("user_id", userId);
+
+    if (fallbackError) {
+      throw new Error(`Unable to update category: ${fallbackError.message}`);
+    }
+
+    return;
+  }
+
+  if (error) {
+    throw new Error(`Unable to update category: ${error.message}`);
+  }
+}
+
+export async function deleteCategory(categoryId: string) {
+  const { supabase, userId } = await getCategoryForMutation(categoryId);
+
+  const { error } = await supabase
+    .from("categories")
+    .delete()
+    .eq("id", categoryId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(`Unable to delete category: ${error.message}`);
+  }
+}
+
+export async function updateTransaction(input: UpdateTransactionInput) {
+  const { supabase, userId } = await getUserContext();
+  assertUuid(input.id, "Transaction");
+  const amount = Math.abs(input.amount);
+  const date = toIsoDate(input.date);
+  const description = assertNonEmptyString(input.description, "Description");
+
+  assertPositiveFiniteAmount(amount, "Amount");
+  assertValidIsoDate(date);
+
+  if (!isTransactionKind(input.type)) {
+    throw new Error("Transaction type is invalid.");
+  }
+
+  const categoryId =
+    input.type === "income" || input.category === "none"
+      ? null
+      : input.category;
+  const paymentMethodId =
+    input.paymentMethod === "none" ? null : input.paymentMethod;
+
+  await Promise.all([
+    assertUserCategory(supabase, userId, categoryId),
+    assertUserPaymentMethod(supabase, userId, paymentMethodId),
+  ]);
+
+  const { error } = await supabase
+    .from("transactions")
+    .update({
+      amount,
+      category_id: categoryId,
+      date,
+      description,
+      kind: input.type,
+      notes: input.notes?.trim() || null,
+      payment_method_id: paymentMethodId,
+    })
+    .eq("id", input.id)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(`Unable to update transaction: ${error.message}`);
+  }
+}
+
+export async function deleteTransaction(transactionId: string) {
+  assertUuid(transactionId, "Transaction");
+  const { supabase, userId } = await getUserContext();
+
+  const { error } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("id", transactionId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(`Unable to delete transaction: ${error.message}`);
+  }
+}
+
+export async function listTransactions(options?: {
+  includeFuture?: boolean;
+  month?: string;
+}) {
+  const { supabase, userId } = await getUserContext();
+  const includeFuture = options?.includeFuture ?? false;
+  const monthRange = options?.month
+    ? includeFuture
+      ? getMonthRange(options.month)
+      : getCollectedMonthRange(options.month)
+    : null;
+
+  let query = supabase
+    .from("transactions")
+    .select(transactionSelect)
+    .eq("user_id", userId)
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (monthRange) {
+    query = query.gte("date", monthRange.start).lte("date", monthRange.end);
+  } else if (!includeFuture) {
+    query = query.lte("date", getTodayValue());
+  }
+
+  const { data, error } = await query;
+
+  if (!error) {
+    return ((data ?? []) as unknown as TransactionRow[]).map(toTransaction);
+  }
+
+  if (error.code === "42703") {
+    let fallbackQuery = supabase
+      .from("transactions")
+      .select(transactionSelectWithoutCategoryIcon)
+      .eq("user_id", userId)
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (monthRange) {
+      fallbackQuery = fallbackQuery
+        .gte("date", monthRange.start)
+        .lte("date", monthRange.end);
+    } else if (!includeFuture) {
+      fallbackQuery = fallbackQuery.lte("date", getTodayValue());
+    }
+
+    const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+
+    if (fallbackError) {
+      throw new Error(`Unable to load transactions: ${fallbackError.message}`);
+    }
+
+    return ((fallbackData ?? []) as unknown as TransactionRow[]).map(
+      toTransaction,
+    );
+  }
+
+  throw new Error(`Unable to load transactions: ${error.message}`);
+}
+
+export async function getDashboardData(month?: string): Promise<DashboardData> {
+  const { supabase, userId } = await getUserContext();
+  const selectedMonthRange = getCollectedMonthRange(month);
+  const monthBuckets = getLastSixMonthKeys(selectedMonthRange.month);
+  const trendStart = `${monthBuckets[0]?.key ?? selectedMonthRange.month}-01`;
+  const [{ categories, paymentMethods }] = await Promise.all([
+    getTransactionFormOptions(),
+  ]);
+
+  const loadDashboardTransactions = (selectQuery: string) =>
+    Promise.all([
+      supabase
+        .from("transactions")
+        .select(selectQuery)
+        .eq("user_id", userId)
+        .gte("date", selectedMonthRange.start)
+        .lte("date", selectedMonthRange.end)
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("transactions")
+        .select(selectQuery)
+        .eq("user_id", userId)
+        .gte("date", trendStart)
+        .lte("date", selectedMonthRange.end),
+    ]);
+
+  let [{ data, error }, { data: trendData, error: trendError }] =
+    await loadDashboardTransactions(transactionSelect);
+
+  if (error?.code === "42703" || trendError?.code === "42703") {
+    [{ data, error }, { data: trendData, error: trendError }] =
+      await loadDashboardTransactions(transactionSelectWithoutCategoryIcon);
+  }
+
+  if (error) {
+    throw new Error(`Unable to load dashboard data: ${error.message}`);
+  }
+
+  if (trendError) {
+    throw new Error(
+      `Unable to load dashboard trend data: ${trendError.message}`,
+    );
+  }
+
+  const transactions = ((data ?? []) as unknown as TransactionRow[]).map(
+    toTransaction,
+  );
+  const trendTransactions = (
+    (trendData ?? []) as unknown as TransactionRow[]
+  ).map(toTransaction);
+  const incomeTransactions = transactions.filter(
+    (transaction) => transaction.type === "income",
+  );
+  const expenseTransactions = transactions.filter(
+    (transaction) => transaction.type === "expense",
+  );
+  const savingTransactions = transactions.filter(
+    (transaction) => transaction.type === "saving",
+  );
+  const trendExpenseTransactions = trendTransactions.filter(
+    (transaction) => transaction.type === "expense",
+  );
+
+  const totalIncome = incomeTransactions.reduce(
+    (sum, transaction) => sum + Math.abs(transaction.amount),
+    0,
+  );
+  const totalExpenses = expenseTransactions.reduce(
+    (sum, transaction) => sum + Math.abs(transaction.amount),
+    0,
+  );
+  const totalSaved = savingTransactions.reduce(
+    (sum, transaction) => sum + Math.abs(transaction.amount),
+    0,
+  );
+
+  const budgetData = emptyBudgetData();
+  for (const group of Object.keys(groupBudgetRatios) as DbCategoryGroup[]) {
+    const categoryLimits = categories
+      .filter((category) => category.group === group)
+      .reduce((sum, category) => sum + category.monthlyLimit, 0);
+    const spent = transactions
+      .filter((transaction) => transaction.group === group)
+      .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+    const budget = categoryLimits || totalIncome * groupBudgetRatios[group];
+
+    budgetData[group] = {
+      budget,
+      percentage: budget > 0 ? Math.round((spent / budget) * 100) : 0,
+      spent,
+    };
+  }
+
+  const expensesByCategory = expenseTransactions.reduce((acc, transaction) => {
+    const existing = acc.find(
+      (item) => item.nameKey === transaction.categoryKey,
+    );
+
+    if (existing) {
+      existing.value += Math.abs(transaction.amount);
+    } else {
+      acc.push({
+        color: groupColors[transaction.group as DbCategoryGroup] ?? "#64748B",
+        nameKey: transaction.categoryKey,
+        value: Math.abs(transaction.amount),
+      });
+    }
+
+    return acc;
+  }, [] as ExpensesByCategoryItem[]);
+
+  const expensesOverTime = monthBuckets.map((monthBucket) => ({
+    amount: trendExpenseTransactions
+      .filter((transaction) => transaction.date.startsWith(monthBucket.key))
+      .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0),
+    monthKey: monthBucket.monthKey,
+  }));
+
+  const budgetSplitData = [
+    {
+      amount: budgetData.needs.spent,
+      color: groupColors.needs,
+      maxAmount: totalIncome * groupBudgetRatios.needs,
+      nameKey: "data.group.needs",
+      spentAmount: budgetData.needs.spent,
+      value: 50,
+    },
+    {
+      amount: budgetData.wants.spent,
+      color: groupColors.wants,
+      maxAmount: totalIncome * groupBudgetRatios.wants,
+      nameKey: "data.group.wants",
+      spentAmount: budgetData.wants.spent,
+      value: 30,
+    },
+    {
+      amount: budgetData.savings.spent,
+      color: groupColors.savings,
+      maxAmount: totalIncome * groupBudgetRatios.savings,
+      nameKey: "data.group.savings",
+      spentAmount: budgetData.savings.spent,
+      value: 20,
+    },
+  ];
+
+  return {
+    budgetData,
+    budgetSplitData,
+    categories,
+    expensesByCategory,
+    expensesOverTime,
+    latestTransactions: transactions.slice(0, 5),
+    paymentMethods,
+    summaryData: {
+      currentBalance: totalIncome - totalExpenses,
+      totalExpenses,
+      totalIncome,
+      totalSaved,
+    },
+  };
+}
+
+export async function getBudgetOverviewData(
+  month?: string,
+): Promise<BudgetOverviewData> {
+  const [dashboardData, categories] = await Promise.all([
+    getDashboardData(month),
+    listCategoryOverview(month),
+  ]);
+
+  return {
+    budgetData: dashboardData.budgetData,
+    budgetSplitData: dashboardData.budgetSplitData,
+    categories,
+  };
+}

@@ -1,16 +1,26 @@
-"use client"
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts"
-import { budgetSplitData } from "@/lib/data"
-import { useI18n } from "@/lib/i18n"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+} from "recharts";
+import { type BudgetSplitItem } from "@/lib/finance/transactions";
+import { useI18n } from "@/lib/i18n";
 
-export function BudgetSplitChart() {
-  const { formatCurrency, t } = useI18n()
+type BudgetSplitChartProps = {
+  budgetSplitData: BudgetSplitItem[];
+};
+
+export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
+  const { formatCurrency, t } = useI18n();
   const chartData = budgetSplitData.map((item) => ({
     ...item,
     name: t(item.nameKey),
-  }))
+  }));
 
   return (
     <Card className="bg-card border-border card-shadow">
@@ -36,8 +46,8 @@ export function BudgetSplitChart() {
                 dataKey="value"
               >
                 {chartData.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
+                  <Cell
+                    key={`cell-${index}`}
                     fill={entry.color}
                     className="stroke-card stroke-2"
                   />
@@ -46,43 +56,56 @@ export function BudgetSplitChart() {
               <Tooltip
                 content={({ active, payload }) => {
                   if (active && payload && payload.length) {
-                    const data = payload[0].payload
+                    const data = payload[0].payload;
                     return (
                       <div className="bg-card border border-border rounded-lg p-3 shadow-xl">
-                        <p className="text-sm font-medium text-foreground">{data.name}</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {data.name}
+                        </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {formatCurrency(data.amount)}
+                          {t("common.spent")}:{" "}
+                          {formatCurrency(data.spentAmount)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {data.value}% {t("common.ofBudget")}
                         </p>
+                        <p className="text-xs font-medium text-foreground">
+                          {t("category.maximum")}:{" "}
+                          {formatCurrency(data.maxAmount)}
+                        </p>
                       </div>
-                    )
+                    );
                   }
-                  return null
+                  return null;
                 }}
-              />
-              <Legend
-                verticalAlign="bottom"
-                height={36}
-                content={({ payload }) => (
-                  <div className="flex justify-center gap-4 mt-4">
-                    {payload?.map((entry, index) => (
-                      <div key={`legend-${index}`} className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: entry.color }}
-                        />
-                        <span className="text-xs text-muted-foreground">{entry.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
               />
             </PieChart>
           </ResponsiveContainer>
         </div>
+        <div className="grid grid-cols-1 gap-2 pt-2">
+          {chartData.map((item) => (
+            <div key={item.nameKey} className="flex items-center gap-3">
+              <div
+                className="size-3 rounded-full"
+                style={{ backgroundColor: item.color }}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="truncate text-xs font-medium text-foreground">
+                    {item.name} ({item.value}%)
+                  </p>
+                  <p className="text-xs font-semibold text-foreground">
+                    {formatCurrency(item.maxAmount)}
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t("common.spent")}: {formatCurrency(item.spentAmount)}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
       </CardContent>
     </Card>
-  )
+  );
 }

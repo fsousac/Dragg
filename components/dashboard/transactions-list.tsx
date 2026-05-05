@@ -1,27 +1,32 @@
-"use client"
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { ArrowRight } from "lucide-react"
-import { transactions } from "@/lib/data"
-import { useI18n } from "@/lib/i18n"
-import { cn } from "@/lib/utils"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ArrowRight } from "lucide-react";
+import { type Transaction, type TransactionGroup } from "@/lib/data";
+import { useI18n } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
-const groupColors = {
+const groupColors: Record<TransactionGroup, string> = {
   needs: "bg-[#F97316]/10 text-[#F97316]",
   wants: "bg-[#EC4899]/10 text-[#EC4899]",
-  savings: "bg-[#8B5CF6]/10 text-[#8B5CF6]"
-}
+  savings: "bg-[#8B5CF6]/10 text-[#8B5CF6]",
+  income: "bg-[#22C55E]/10 text-[#22C55E]",
+};
 
 const amountColors = {
   income: "text-[#22C55E]",
   expense: "text-[#FB7185]",
-  saving: "text-[#8B5CF6]"
-}
+  saving: "text-[#8B5CF6]",
+};
 
-export function TransactionsList() {
-  const { formatCurrency, formatDate, t } = useI18n()
-  const latestTransactions = transactions.slice(0, 5)
+type TransactionsListProps = {
+  transactions: Transaction[];
+};
+
+export function TransactionsList({ transactions }: TransactionsListProps) {
+  const { formatCurrency, formatDate, t } = useI18n();
+  const latestTransactions = transactions.slice(0, 5);
 
   return (
     <Card className="bg-card border-border card-shadow">
@@ -34,7 +39,11 @@ export function TransactionsList() {
             {t("dashboard.latestTransactions.description")}
           </p>
         </div>
-        <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-primary hover:text-primary/80"
+        >
           {t("common.viewAll")}
           <ArrowRight className="w-4 h-4 ml-1" />
         </Button>
@@ -54,24 +63,28 @@ export function TransactionsList() {
                   {t(transaction.descriptionKey)}
                 </p>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className={cn(
-                    "text-[10px] lg:text-xs px-2 py-0.5 rounded-full font-medium capitalize",
-                    groupColors[transaction.group]
-                  )}>
+                  <span
+                    className={cn(
+                      "text-[10px] lg:text-xs px-2 py-0.5 rounded-full font-medium capitalize",
+                      groupColors[transaction.group],
+                    )}
+                  >
                     {t(`data.group.${transaction.group}`)}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {formatDate(transaction.date, {
                       month: "short",
-                      day: "numeric"
+                      day: "numeric",
                     })}
                   </span>
                 </div>
               </div>
-              <p className={cn(
-                "text-sm lg:text-base font-semibold tabular-nums",
-                amountColors[transaction.type]
-              )}>
+              <p
+                className={cn(
+                  "text-sm lg:text-base font-semibold tabular-nums",
+                  amountColors[transaction.type],
+                )}
+              >
                 {transaction.amount > 0 ? "+" : ""}
                 {formatCurrency(Math.abs(transaction.amount))}
               </p>
@@ -80,5 +93,5 @@ export function TransactionsList() {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

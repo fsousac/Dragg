@@ -1,33 +1,78 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
+import { NewCategoryDialog } from "@/components/dashboard/new-category-dialog";
 import { PageHeader } from "@/components/dashboard/page-header";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { categories, type TransactionGroup } from "@/lib/data";
+import {
+  type CategoryOverviewItem,
+  type CreateCategoryInput,
+  type UpdateCategoryInput,
+} from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-const groupColors: Record<TransactionGroup, string> = {
+const groupColors: Record<CategoryOverviewItem["group"], string> = {
   needs: "bg-needs text-white",
-  income: "bg-income text-white",
   savings: "bg-savings text-white",
   wants: "bg-wants text-white",
 };
 
-export function CategoriesScreen() {
+type CategoriesScreenProps = {
+  categories: CategoryOverviewItem[];
+  createCategoryAction: (data: CreateCategoryInput) => Promise<void>;
+  deleteCategoryAction: (categoryId: string) => Promise<void>;
+  updateCategoryAction: (data: UpdateCategoryInput) => Promise<void>;
+};
+
+export function CategoriesScreen({
+  categories,
+  createCategoryAction,
+  deleteCategoryAction,
+  updateCategoryAction,
+}: CategoriesScreenProps) {
   const { formatCurrency, t } = useI18n();
   const [activeTab, setActiveTab] = useState("all");
+  const [deletingCategory, setDeletingCategory] =
+    useState<CategoryOverviewItem | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const filteredCategories =
     activeTab === "all"
       ? categories
       : categories.filter((category) => category.group === activeTab);
+
+  const handleDeleteCategory = () => {
+    if (!deletingCategory) return;
+
+    startTransition(async () => {
+      try {
+        await deleteCategoryAction(deletingCategory.id);
+        toast.success(t("category.deleteSuccess"));
+        setDeletingCategory(null);
+      } catch (error) {
+        console.error("Error deleting category:", error);
+        toast.error(t("category.deleteError"));
+      }
+    });
+  };
 
   return (
     <>
@@ -35,28 +80,29 @@ export function CategoriesScreen() {
         title={t("screen.categories.title")}
         description={t("screen.categories.description")}
         actions={
-          <Button className="gap-2">
-            <Plus className="size-4" />
-            {t("screen.categories.newCategory")}
-          </Button>
+          <NewCategoryDialog createCategoryAction={createCategoryAction}>
+            <Button className="gap-2">
+              <Plus className="size-4" />
+              {t("screen.categories.newCategory")}
+            </Button>
+          </NewCategoryDialog>
         }
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList className="grid w-full max-w-2xl grid-cols-5">
+        <TabsList className="grid w-full max-w-xl grid-cols-4">
           <TabsTrigger value="all">{t("common.all")}</TabsTrigger>
           <TabsTrigger value="needs">{t("data.group.needs")}</TabsTrigger>
           <TabsTrigger value="wants">{t("data.group.wants")}</TabsTrigger>
           <TabsTrigger value="savings">{t("data.group.savings")}</TabsTrigger>
-          <TabsTrigger value="income">{t("data.group.income")}</TabsTrigger>
         </TabsList>
       </Tabs>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filteredCategories.map((category) => {
           const percentage =
-            category.budget > 0
-              ? Math.round((category.spent / category.budget) * 100)
+            category.monthlyLimit > 0
+              ? Math.round((category.spent / category.monthlyLimit) * 100)
               : 0;
           const isOverBudget = percentage > 100;
 
@@ -76,7 +122,7 @@ export function CategoriesScreen() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-foreground">
-                        {t(category.nameKey)}
+                        {t(category.label)}
                       </h3>
                       <Badge
                         variant="secondary"
@@ -90,20 +136,42 @@ export function CategoriesScreen() {
                     </div>
                   </div>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="size-8">
-                      <Pencil className="size-4" />
-                    </Button>
+                    <NewCategoryDialog
+                      category={{
+                        group: category.group,
+                        icon: category.icon,
+                        id: category.id,
+                        monthlyLimit: category.monthlyLimit,
+                        name: category.name,
+                        showName: !category.isDefault,
+                      }}
+                      createCategoryAction={createCategoryAction}
+                      updateCategoryAction={updateCategoryAction}
+                    >
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8"
+                        disabled={!category.canModify}
+                        aria-label={t("common.edit")}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                    </NewCategoryDialog>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="size-8 text-destructive"
+                      disabled={!category.canModify}
+                      aria-label={t("common.delete")}
+                      onClick={() => setDeletingCategory(category)}
                     >
                       <Trash2 className="size-4" />
                     </Button>
                   </div>
                 </div>
 
-                {category.budget > 0 ? (
+                {category.monthlyLimit > 0 ? (
                   <>
                     <div className="mb-2 flex justify-between text-sm">
                       <span className="text-muted-foreground">
@@ -116,7 +184,7 @@ export function CategoriesScreen() {
                         )}
                       >
                         {formatCurrency(category.spent)} /{" "}
-                        {formatCurrency(category.budget)}
+                        {formatCurrency(category.monthlyLimit)}
                       </span>
                     </div>
                     <div
@@ -148,7 +216,7 @@ export function CategoriesScreen() {
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    {t("screen.categories.incomeNoBudget")}
+                    {t("category.noMonthlyLimit")}
                   </p>
                 )}
               </CardContent>
@@ -156,6 +224,36 @@ export function CategoriesScreen() {
           );
         })}
       </div>
+
+      <AlertDialog
+        open={Boolean(deletingCategory)}
+        onOpenChange={(open) => {
+          if (!open) setDeletingCategory(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("category.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("category.deleteDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                handleDeleteCategory();
+              }}
+            >
+              {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

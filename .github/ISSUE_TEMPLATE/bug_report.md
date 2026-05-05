@@ -1,16 +1,32 @@
 ---
 name: Bug report
-about: Report a bug
+about: Report something that is not working correctly
+title: "[Bug]: "
+labels: bug
+assignees: ""
 ---
 
-## Description
+## What happened?
+
+Describe the bug clearly.
 
 ## Steps to reproduce
 
+1.
+2.
+3.
+
 ## Expected behavior
 
-## Screenshots
+What did you expect to happen?
 
 ## Environment
-- Device:
+
+- OS:
 - Browser:
+- Node.js version:
+- Supabase local or hosted:
+
+## Screenshots or logs
+
+Paste screenshots or relevant logs. Do not include secrets.

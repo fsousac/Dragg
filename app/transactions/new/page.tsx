@@ -1,24 +1,27 @@
 import { redirect } from "next/navigation";
 import {
-  NewTransactionForm,
-  type NewTransactionFormData,
-} from "@/components/dashboard/new-transaction-form";
+  TransactionForm,
+  type TransactionFormData,
+} from "@/components/dashboard/transaction-form";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { createClient } from "@/lib/supabase/server";
+import {
+  createCategoryAction,
+  createTransactionAction,
+} from "@/app/transactions/actions";
+import { getTransactionFormOptions } from "@/lib/finance/transactions";
 
-async function handleTransactionSubmit(data: NewTransactionFormData) {
+async function handleTransactionSubmit(data: TransactionFormData) {
   "use server";
 
   const supabase = await createClient();
-  const { data: session } = await supabase.auth.getSession();
+  const { data: claimsData } = await supabase.auth.getClaims();
 
-  if (!session?.user?.id) {
+  if (!claimsData?.claims?.sub) {
     redirect("/");
   }
 
-  // TODO: Implement transaction saving to Supabase
-  // For now, just log the data
-  console.log("New transaction:", data);
+  await createTransactionAction(data);
 
   // Redirect to dashboard after successful submission
   redirect("/dashboard");
@@ -32,9 +35,16 @@ export default async function NewTransactionPage() {
     redirect("/");
   }
 
+  const formOptions = await getTransactionFormOptions();
+
   return (
     <AppShell>
-      <NewTransactionForm />
+      <TransactionForm
+        categories={formOptions.categories}
+        createCategoryAction={createCategoryAction}
+        onSubmit={handleTransactionSubmit}
+        paymentMethods={formOptions.paymentMethods}
+      />
     </AppShell>
   );
 }

@@ -10,11 +10,14 @@ interface CompactInputProps {
   type?: string;
   value?: string | number;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
   placeholder?: string;
   icon?: ReactNode;
   error?: string;
   min?: string;
   max?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  pattern?: string;
   inputClassName?: string;
 }
 
@@ -24,11 +27,14 @@ export function CompactInput({
   type = "text",
   value,
   onChange,
+  onBlur,
   placeholder,
   icon,
   error,
   min,
   max,
+  inputMode,
+  pattern,
   inputClassName,
 }: CompactInputProps) {
   return (
@@ -50,9 +56,12 @@ export function CompactInput({
           type={type}
           value={value}
           onChange={onChange}
+          onBlur={onBlur}
           placeholder={placeholder}
           min={min}
           max={max}
+          inputMode={inputMode}
+          pattern={pattern}
           className={`
             ${icon ? "pl-9" : ""} h-9 text-sm bg-background/70 border-border/60
             hover:border-border/80 focus:border-primary/70 focus:bg-background/80

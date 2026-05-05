@@ -1,52 +1,45 @@
-"use client"
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import {
-  Plus,
-  Minus,
-  ArrowLeftRight,
-  Target,
-  PieChart,
-  BarChart3
-} from "lucide-react"
-import { useI18n } from "@/lib/i18n"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Plus, Minus, Target, PieChart, BarChart3, Folder } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 const actions = [
   {
     nameKey: "dashboard.quickActions.addIncome",
     icon: Plus,
-    color: "bg-[#22C55E]/10 text-[#22C55E] hover:bg-[#22C55E]/20"
+    color: "bg-[#22C55E]/10 text-[#22C55E] hover:bg-[#22C55E]/20",
   },
   {
     nameKey: "dashboard.quickActions.addExpense",
     icon: Minus,
-    color: "bg-[#FB7185]/10 text-[#FB7185] hover:bg-[#FB7185]/20"
+    color: "bg-[#FB7185]/10 text-[#FB7185] hover:bg-[#FB7185]/20",
   },
   {
-    nameKey: "dashboard.quickActions.transfer",
-    icon: ArrowLeftRight,
-    color: "bg-[#FACC15]/10 text-[#FACC15] hover:bg-[#FACC15]/20"
+    nameKey: "dashboard.quickActions.addCategory",
+    icon: Folder,
+    color: "bg-[#FACC15]/10 text-[#FACC15] hover:bg-[#FACC15]/20",
   },
   {
     nameKey: "dashboard.quickActions.addGoal",
     icon: Target,
-    color: "bg-[#8B5CF6]/10 text-[#8B5CF6] hover:bg-[#8B5CF6]/20"
+    color: "bg-[#8B5CF6]/10 text-[#8B5CF6] hover:bg-[#8B5CF6]/20",
   },
   {
     nameKey: "dashboard.quickActions.createBudget",
     icon: PieChart,
-    color: "bg-[#EC4899]/10 text-[#EC4899] hover:bg-[#EC4899]/20"
+    color: "bg-[#EC4899]/10 text-[#EC4899] hover:bg-[#EC4899]/20",
   },
   {
     nameKey: "dashboard.quickActions.viewReports",
     icon: BarChart3,
-    color: "bg-[#F97316]/10 text-[#F97316] hover:bg-[#F97316]/20"
-  }
-]
+    color: "bg-[#F97316]/10 text-[#F97316] hover:bg-[#F97316]/20",
+  },
+];
 
 export function QuickActions() {
-  const { t } = useI18n()
+  const { t } = useI18n();
 
   return (
     <Card className="bg-card border-border card-shadow">
@@ -61,22 +54,22 @@ export function QuickActions() {
       <CardContent>
         <div className="grid grid-cols-3 gap-2 lg:gap-3">
           {actions.map((action) => {
-            const Icon = action.icon
+            const Icon = action.icon;
             return (
               <Button
                 key={action.nameKey}
                 variant="ghost"
-                className={`flex flex-col items-center gap-2 h-auto py-4 lg:py-6 ${action.color} transition-all duration-200`}
+                className={`flex flex-col items-center gap-2 h-auto py-4 lg:py-6 ${action.color} transition-all duration-200 cursor-pointer`}
               >
                 <Icon className="w-5 h-5 lg:w-6 lg:h-6" />
                 <span className="text-[10px] lg:text-xs font-medium text-center leading-tight">
                   {t(action.nameKey)}
                 </span>
               </Button>
-            )
+            );
           })}
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

@@ -7,9 +7,13 @@ export interface Transaction {
   amount: number;
   type: TransactionType;
   categoryKey: string;
+  categoryId?: string | null;
   group: TransactionGroup;
   date: string;
   icon: string;
+  notes?: string | null;
+  paymentMethodId?: string | null;
+  paymentMethodKey?: string | null;
 }
 
 export const transactions: Transaction[] = [
@@ -208,7 +212,7 @@ export const categories: Category[] = [
   {
     id: "4",
     nameKey: "data.category.health",
-    icon: "💡",
+    icon: "🏥",
     color: "#FACC15",
     group: "needs",
     budget: 200,
