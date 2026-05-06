@@ -95,6 +95,7 @@ const updateCategoryActionSchema = createCategoryActionSchema
 const updatePaymentMethodActionSchema = z
   .object({
     creditLimit: z.number().finite().min(0).max(1_000_000_000).optional(),
+    dueDay: z.number().int().min(1).max(31).nullable().optional(),
     id: uuidSchema,
     name: safeShortTextSchema,
     type: z.enum(["bank", "boleto", "credit", "debit", "other"]),

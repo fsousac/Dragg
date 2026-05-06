@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Wallet } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { withSelectedMonth } from "@/components/dashboard/month-route";
 import { useI18n } from "@/lib/i18n";
 
 interface HeaderProps {
@@ -53,7 +55,9 @@ function getMonthOptions(selectedMonth: string) {
 }
 
 function capitalizeFirstLetter(value: string) {
-  return value ? `${value.charAt(0).toLocaleUpperCase()}${value.slice(1)}` : value;
+  return value
+    ? `${value.charAt(0).toLocaleUpperCase()}${value.slice(1)}`
+    : value;
 }
 
 export function Header({
@@ -120,14 +124,25 @@ export function Header({
             </SelectContent>
           </Select>
           <ThemeToggle />
-          <Avatar className="w-10 h-10 border-2 border-primary">
-            {userAvatarUrl ? (
-              <AvatarImage src={userAvatarUrl} alt={userName} />
-            ) : null}
-            <AvatarFallback className="bg-linear-to-br from-primary to-emerald-400 text-primary-foreground font-bold">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
+          <Link
+            href={withSelectedMonth("/settings", searchParams)}
+            prefetch
+            onMouseEnter={() =>
+              router.prefetch(withSelectedMonth("/settings", searchParams))
+            }
+            onFocus={() =>
+              router.prefetch(withSelectedMonth("/settings", searchParams))
+            }
+          >
+            <Avatar className="w-10 h-10 border-2 border-primary">
+              {userAvatarUrl ? (
+                <AvatarImage src={userAvatarUrl} alt={userName} />
+              ) : null}
+              <AvatarFallback className="bg-linear-to-br from-primary to-emerald-400 text-primary-foreground font-bold">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+          </Link>
         </div>
       </div>
 
@@ -160,14 +175,20 @@ export function Header({
               ))}
             </SelectContent>
           </Select>
-          <Avatar className="size-9 border-2 border-primary">
-            {userAvatarUrl ? (
-              <AvatarImage src={userAvatarUrl} alt={userName} />
-            ) : null}
-            <AvatarFallback className="bg-linear-to-br from-primary to-emerald-400 text-xs font-bold text-primary-foreground">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
+          <Link
+            href={withSelectedMonth("/settings", searchParams)}
+            prefetch
+            aria-label={t("nav.settings")}
+          >
+            <Avatar className="size-9 border-2 border-primary">
+              {userAvatarUrl ? (
+                <AvatarImage src={userAvatarUrl} alt={userName} />
+              ) : null}
+              <AvatarFallback className="bg-linear-to-br from-primary to-emerald-400 text-xs font-bold text-primary-foreground">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+          </Link>
         </div>
       </div>
     </header>

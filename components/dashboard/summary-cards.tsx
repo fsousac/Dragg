@@ -27,6 +27,8 @@ export function SummaryCards({ summaryData }: SummaryCardsProps) {
       value: summaryData.totalExpenses,
       icon: TrendingDown,
       trend: "+0.0%",
+      noteKey: "dashboard.summary.predictedExpenses",
+      noteValue: summaryData.predictedExpenses,
       trendUp: false,
       colorClass: "text-[#FB7185]",
       bgClass: "bg-[#FB7185]/10",
@@ -74,6 +76,11 @@ export function SummaryCards({ summaryData }: SummaryCardsProps) {
                 <p className={`text-xl lg:text-2xl font-bold mt-1 ${card.colorClass}`}>
                   {formatCurrency(card.value)}
                 </p>
+                {"noteKey" in card && card.noteKey ? (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {t(card.noteKey)}: {formatCurrency(card.noteValue)}
+                  </p>
+                ) : null}
               </div>
             </CardContent>
           </Card>

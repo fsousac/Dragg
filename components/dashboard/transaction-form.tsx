@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { format, isValid, parse } from "date-fns";
 import {
   Calendar,
@@ -17,6 +17,7 @@ import { NewCategoryDialog } from "@/components/dashboard/new-category-dialog";
 import { CompactInput } from "@/components/dashboard/form-inputs/compact-input";
 import { CompactSelect } from "@/components/dashboard/form-inputs/compact-select";
 import { CompactTextarea } from "@/components/dashboard/form-inputs/compact-textarea";
+import { withSelectedMonth } from "@/components/dashboard/month-route";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -24,7 +25,9 @@ import {
   type CreateCategoryInput,
   type TransactionFormCategory,
   type TransactionFormPaymentMethod,
+  type CreatePaymentMethodInput,
 } from "@/lib/finance/transactions";
+import { NewPaymentMethodDialog } from "@/components/dashboard/new-payment-method-dialog";
 import { useI18n } from "@/lib/i18n";
 
 export interface TransactionFormData {
@@ -41,6 +44,7 @@ export interface TransactionFormData {
 type TransactionFormProps = {
   categories: TransactionFormCategory[];
   createCategoryAction?: (data: CreateCategoryInput) => Promise<void>;
+  createPaymentMethodAction?: (data: CreatePaymentMethodInput) => Promise<void>;
   onSubmit: (data: TransactionFormData) => Promise<void>;
   paymentMethods: TransactionFormPaymentMethod[];
 };
@@ -48,11 +52,13 @@ type TransactionFormProps = {
 export function TransactionForm({
   categories,
   createCategoryAction,
+  createPaymentMethodAction,
   onSubmit,
   paymentMethods,
 }: TransactionFormProps) {
   const { t } = useI18n();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const today = format(new Date(), "dd/MM/yyyy");
   const todayDateInputValue = format(new Date(), "yyyy-MM-dd");
 
@@ -71,6 +77,7 @@ export function TransactionForm({
     notes: "",
   });
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -337,7 +344,10 @@ export function TransactionForm({
               onAddAction={
                 createCategoryAction
                   ? () => setIsCategoryDialogOpen(true)
-                  : () => router.push("/categories")
+                  : () =>
+                      router.push(
+                        withSelectedMonth("/categories", searchParams),
+                      )
               }
             />
 
@@ -377,8 +387,21 @@ export function TransactionForm({
               error={errors.paymentMethod}
               icon={<CreditCard className="w-4 h-4" />}
               addActionLabel={t("transaction.addPaymentMethod")}
-              onAddAction={() => router.push("/payments")}
+              onAddAction={() =>
+                createPaymentMethodAction
+                  ? setIsPaymentDialogOpen(true)
+                  : router.push(withSelectedMonth("/payments", searchParams))
+              }
             />
+
+            {createPaymentMethodAction ? (
+              <NewPaymentMethodDialog
+                createPaymentMethodAction={createPaymentMethodAction}
+                open={isPaymentDialogOpen}
+                onOpenChange={setIsPaymentDialogOpen}
+                onCreated={() => setIsPaymentDialogOpen(false)}
+              />
+            ) : null}
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-4 lg:gap-4">
@@ -397,6 +420,7 @@ export function TransactionForm({
                 }
                 icon={<Calendar className="w-4 h-4" />}
                 error={errors.date}
+                inputClassName="max-w-full min-w-0 appearance-none overflow-hidden pr-3 [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left"
               />
             </div>
 

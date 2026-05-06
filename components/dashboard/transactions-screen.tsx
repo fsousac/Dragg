@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -17,6 +18,7 @@ import {
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/dashboard/page-header";
+import { withSelectedMonth } from "@/components/dashboard/month-route";
 import { type TransactionFormData } from "@/components/dashboard/transaction-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,6 +54,7 @@ import {
   type CreateCategoryInput,
   type NewTransactionInput,
   type UpdateTransactionInput,
+  type CreatePaymentMethodInput,
 } from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -72,9 +75,11 @@ type EditableTransaction = {
 type TransactionsScreenProps = {
   categories: TransactionFormCategory[];
   createCategoryAction: (data: CreateCategoryInput) => Promise<void>;
+  createPaymentMethodAction?: (data: CreatePaymentMethodInput) => Promise<void>;
   createTransactionAction: (data: NewTransactionInput) => Promise<void>;
   deleteTransactionAction: (transactionId: string) => Promise<void>;
   paymentMethods: TransactionFormPaymentMethod[];
+  showPrevious: boolean;
   transactions: Transaction[];
   updateTransactionAction: (data: UpdateTransactionInput) => Promise<void>;
 };
@@ -108,14 +113,17 @@ function sanitizeAmountInput(value: string) {
 export function TransactionsScreen({
   categories,
   createCategoryAction,
+  createPaymentMethodAction,
   createTransactionAction,
   deleteTransactionAction,
   paymentMethods,
+  showPrevious,
   transactions,
   updateTransactionAction,
 }: TransactionsScreenProps) {
   const { formatCurrency, formatDate, t } = useI18n();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -128,6 +136,10 @@ export function TransactionsScreen({
     string | null
   >(null);
   const [isPending, startTransition] = useTransition();
+  const transactionsHref = withSelectedMonth("/transactions", searchParams);
+  const previousTransactionsHref = `${transactionsHref}${
+    transactionsHref.includes("?") ? "&" : "?"
+  }history=1`;
 
   const categoryOptions = useMemo(
     () =>
@@ -288,6 +300,19 @@ export function TransactionsScreen({
               {filteredTransactions.length} {t("screen.transactions.count")}
             </CardTitle>
             <div className="flex items-center gap-1">
+              <Button asChild size="sm" variant="outline">
+                <Link
+                  href={
+                    showPrevious
+                      ? withSelectedMonth("/transactions", searchParams)
+                      : previousTransactionsHref
+                  }
+                >
+                  {showPrevious
+                    ? t("screen.transactions.hidePrevious")
+                    : t("screen.transactions.showPrevious")}
+                </Link>
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -333,7 +358,12 @@ export function TransactionsScreen({
         <CardContent className="p-0">
           <div className="divide-y divide-border">
             {filteredTransactions.map((transaction) => (
-              <div key={transaction.id} className="flex items-center gap-2 p-4">
+              <div
+                key={transaction.id}
+                className={`flex items-center gap-2 p-4 ${
+                  (transaction as any).isPlanned ? "opacity-70" : ""
+                }`}
+              >
                 <button
                   type="button"
                   className="flex min-w-0 flex-1 items-center gap-4 rounded-md text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -422,6 +452,22 @@ export function TransactionsScreen({
           </div>
         </CardContent>
       </Card>
+
+      <div className="mt-4 flex justify-end">
+        <Button asChild size="sm" variant="outline">
+          <Link
+            href={
+              showPrevious
+                ? withSelectedMonth("/transactions", searchParams)
+                : previousTransactionsHref
+            }
+          >
+            {showPrevious
+              ? t("screen.transactions.hidePrevious")
+              : t("screen.transactions.showPrevious")}
+          </Link>
+        </Button>
+      </div>
 
       <Dialog
         open={Boolean(selectedTransaction)}
@@ -631,21 +677,24 @@ export function TransactionsScreen({
         onOpenChange={setIsNewTransactionOpen}
       >
         <DialogContent
-          className="sm:max-w-[90%]"
+          className="sm:max-w-[90dvw]"
           aria-describedby="add transaction"
         >
-          <DialogHeader>
+          <DialogHeader className="not-sm:hidden">
             <DialogTitle>{t("transaction.addTitle")}</DialogTitle>
             <DialogDescription>
               {t("transaction.addDescription")}
             </DialogDescription>
           </DialogHeader>
-          <TransactionForm
-            categories={categories}
-            createCategoryAction={createCategoryAction}
-            paymentMethods={paymentMethods}
-            onSubmit={handleNewTransactionSubmit}
-          />
+          <div className="pt-[1dvh]">
+            <TransactionForm
+              categories={categories}
+              createCategoryAction={createCategoryAction}
+              createPaymentMethodAction={createPaymentMethodAction}
+              paymentMethods={paymentMethods}
+              onSubmit={handleNewTransactionSubmit}
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </>

@@ -14,6 +14,9 @@ export interface Transaction {
   notes?: string | null;
   paymentMethodId?: string | null;
   paymentMethodKey?: string | null;
+  paymentMethodDueDay?: number | null;
+  paymentMethodType?: string | null;
+  isPlanned?: boolean;
 }
 
 export const transactions: Transaction[] = [
@@ -122,6 +125,7 @@ export const transactions: Transaction[] = [
 export const summaryData = {
   totalIncome: 6050,
   totalExpenses: 2156.22,
+  predictedExpenses: 2156.22,
   totalSaved: 800,
   currentBalance: 3893.78,
 };

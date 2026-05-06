@@ -98,6 +98,18 @@ export function ExpensesOverTimeChart({
                   strokeWidth={2}
                   fill="url(#expenseGradient)"
                 />
+                {chartData.some(
+                  (d) => d.plannedAmount && d.plannedAmount > 0,
+                ) ? (
+                  <Area
+                    type="monotone"
+                    dataKey="plannedAmount"
+                    stroke="#FB7185"
+                    strokeWidth={2}
+                    strokeDasharray="4 4"
+                    fillOpacity={0}
+                  />
+                ) : null}
               </AreaChart>
             </ResponsiveContainer>
           ) : (

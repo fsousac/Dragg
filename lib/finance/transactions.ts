@@ -23,6 +23,7 @@ type CategoryRow = {
 
 type PaymentMethodRow = {
   credit_limit: number | string | null;
+  due_day?: number | string | null;
   id: string;
   is_default: boolean | null;
   name: string;
@@ -59,6 +60,7 @@ export type TransactionFormPaymentMethod = {
 export type PaymentMethodOverviewItem = TransactionFormPaymentMethod & {
   canModify: boolean;
   creditLimit: number;
+  dueDay: number | null;
   isDefault: boolean;
   name: string;
   spent: number;
@@ -113,6 +115,7 @@ export type CreateSubscriptionInput = {
 
 export type CreatePaymentMethodInput = {
   creditLimit?: number;
+  dueDay?: number | null;
   name: string;
   type: UpdatePaymentMethodInput["type"];
 };
@@ -130,6 +133,7 @@ export type UpdateTransactionInput = {
 
 export type UpdatePaymentMethodInput = {
   creditLimit?: number;
+  dueDay?: number | null;
   id: string;
   name: string;
   type: Exclude<PaymentMethodRow["type"], "cash" | "pix">;
@@ -138,6 +142,7 @@ export type UpdatePaymentMethodInput = {
 export type SummaryData = {
   totalIncome: number;
   totalExpenses: number;
+  predictedExpenses: number;
   totalSaved: number;
   currentBalance: number;
 };
@@ -178,6 +183,36 @@ export type ExpensesByCategoryItem = {
 export type ExpensesOverTimeItem = {
   monthKey: string;
   amount: number;
+  plannedAmount?: number;
+};
+
+export type ReportMonthlyItem = {
+  excessExpenses: number;
+  expenses: number;
+  grossSavings: number;
+  income: number;
+  month: string;
+  monthKey: string;
+  netWorth: number;
+  savings: number;
+  year: string;
+};
+
+export type ReportTransactionItem = {
+  amount: number;
+  category: string;
+  date: string;
+  description: string;
+  financialMonth: string;
+  paymentMethod: string | null;
+  type: TransactionType;
+};
+
+export type ReportsData = {
+  monthlyReports: ReportMonthlyItem[];
+  periodMonths: number;
+  selectedMonth: string;
+  transactions: ReportTransactionItem[];
 };
 
 export type DashboardData = TransactionFormOptions & {
@@ -277,6 +312,7 @@ const transactionSelect = `
   payment_methods (
     id,
     name,
+    due_day,
     type
   )
 `;
@@ -466,13 +502,54 @@ function toPaymentMethodLabelKey(
 
 async function getUserContext() {
   const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
+  const [{ data: claimsData }, { data: userData }] = await Promise.all([
+    supabase.auth.getClaims(),
+    supabase.auth.getUser(),
+  ]);
 
-  if (!data?.claims?.sub) {
+  if (!claimsData?.claims?.sub) {
     redirect("/");
   }
 
-  return { supabase, userId: data.claims.sub };
+  return {
+    createdAt: userData.user?.created_at ?? null,
+    supabase,
+    userId: claimsData.claims.sub,
+  };
+}
+
+function toUtcDateValue(value: string) {
+  const parsedDate = new Date(value);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return null;
+  }
+
+  return [
+    parsedDate.getUTCFullYear(),
+    String(parsedDate.getUTCMonth() + 1).padStart(2, "0"),
+    String(parsedDate.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function assertDateNotBeforeUserCreated(
+  dateValue: string,
+  userCreatedAt: string | null,
+) {
+  if (!userCreatedAt) return;
+
+  const userCreatedDate = toUtcDateValue(userCreatedAt);
+
+  if (!userCreatedDate) return;
+
+  const userCreatedMonth = userCreatedDate.slice(0, 7);
+  const transactionMonth = dateValue.slice(0, 7);
+
+  if (transactionMonth < userCreatedMonth) {
+    throw new Error(
+      "Transaction date cannot be earlier than the user creation month.",
+    );
+  }
 }
 
 async function assertUserCategory(
@@ -542,6 +619,44 @@ function addMonthsClamped(date: Date, monthOffset: number) {
   return new Date(year, month, Math.min(day, lastDayOfTargetMonth));
 }
 
+function toMonthValue(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getPreviousMonthValue(month: string) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return toMonthValue(new Date(year, monthNumber - 2, 1));
+}
+
+function getFinancialMonth(transaction: Transaction) {
+  if (
+    transaction.paymentMethodType !== "credit" ||
+    !transaction.paymentMethodDueDay
+  ) {
+    return transaction.date.slice(0, 7);
+  }
+
+  const [year, month, day] = transaction.date.split("-").map(Number);
+  const transactionMonth = new Date(year, month - 1, 1);
+
+  if (day > transaction.paymentMethodDueDay) {
+    return toMonthValue(addMonthsClamped(transactionMonth, 1));
+  }
+
+  return toMonthValue(transactionMonth);
+}
+
+function filterByFinancialMonth(
+  transactions: Transaction[],
+  month: string,
+  includePrevious = false,
+) {
+  return transactions.filter((transaction) => {
+    const financialMonth = getFinancialMonth(transaction);
+    return includePrevious ? financialMonth <= month : financialMonth === month;
+  });
+}
+
 function toTransaction(row: TransactionRow): Transaction {
   const amount = Number(row.amount);
   const group =
@@ -574,7 +689,12 @@ function toTransaction(row: TransactionRow): Transaction {
         : toCategoryIcon(rawCategoryName, row.categories?.icon),
     notes: row.notes,
     paymentMethodId: row.payment_method_id,
+    paymentMethodDueDay:
+      row.payment_methods?.due_day == null
+        ? null
+        : Number(row.payment_methods.due_day),
     paymentMethodKey,
+    paymentMethodType: row.payment_methods?.type ?? null,
     type: row.kind,
   };
 }
@@ -615,22 +735,114 @@ function getCollectedMonthRange(month?: string) {
 }
 
 function getLastSixMonthKeys(month?: string) {
+  return getLastMonthKeys(month, 6);
+}
+
+function getLastMonthKeys(month: string | undefined, count: number) {
   const normalizedMonth = normalizeMonthValue(month);
   const [year, monthNumber] = normalizedMonth.split("-").map(Number);
   const baseDate = new Date(year, monthNumber - 1, 1);
 
-  return Array.from({ length: 6 }, (_, index) => {
+  return Array.from({ length: count }, (_, index) => {
     const date = new Date(
       baseDate.getFullYear(),
-      baseDate.getMonth() - (5 - index),
+      baseDate.getMonth() - (count - 1 - index),
       1,
     );
 
     return {
       key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
       monthKey: monthKeys[date.getMonth()],
+      year: String(date.getFullYear()),
     };
   });
+}
+
+function getMonthlySavingsBalance(transactions: Transaction[]) {
+  const income = transactions
+    .filter((transaction) => transaction.type === "income")
+    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+  const savings = transactions
+    .filter((transaction) => transaction.type === "saving")
+    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+  const needsSpent = transactions
+    .filter(
+      (transaction) =>
+        transaction.type === "expense" && transaction.group === "needs",
+    )
+    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+  const wantsSpent = transactions
+    .filter(
+      (transaction) =>
+        transaction.type === "expense" && transaction.group === "wants",
+    )
+    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+  const excessExpenses =
+    Math.max(needsSpent - income * groupBudgetRatios.needs, 0) +
+    Math.max(wantsSpent - income * groupBudgetRatios.wants, 0);
+
+  return savings - excessExpenses;
+}
+
+function getMonthlyFinanceSummary(transactions: Transaction[]) {
+  const income = transactions
+    .filter((transaction) => transaction.type === "income")
+    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+  const expenses = transactions
+    .filter((transaction) => transaction.type === "expense")
+    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+  const grossSavings = transactions
+    .filter((transaction) => transaction.type === "saving")
+    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+  const needsSpent = transactions
+    .filter(
+      (transaction) =>
+        transaction.type === "expense" && transaction.group === "needs",
+    )
+    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+  const wantsSpent = transactions
+    .filter(
+      (transaction) =>
+        transaction.type === "expense" && transaction.group === "wants",
+    )
+    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+  const excessExpenses =
+    Math.max(needsSpent - income * groupBudgetRatios.needs, 0) +
+    Math.max(wantsSpent - income * groupBudgetRatios.wants, 0);
+
+  return {
+    excessExpenses,
+    expenses,
+    grossSavings,
+    income,
+    savings: grossSavings - excessExpenses,
+  };
+}
+
+function getCumulativeSavingsBalance(
+  transactions: Transaction[],
+  month: string,
+) {
+  const months = [
+    ...new Set(
+      transactions
+        .map((transaction) => getFinancialMonth(transaction))
+        .filter((financialMonth) => financialMonth <= month),
+    ),
+  ];
+
+  return months.reduce((sum, financialMonth) => {
+    const monthlyTransactions = transactions.filter(
+      (transaction) => getFinancialMonth(transaction) === financialMonth,
+    );
+
+    return sum + getMonthlySavingsBalance(monthlyTransactions);
+  }, 0);
+}
+
+function getSafeReportPeriod(periodMonths?: number) {
+  if (!periodMonths || Number.isNaN(periodMonths)) return 6;
+  return Math.min(Math.max(Math.trunc(periodMonths), 1), 12);
 }
 
 function emptyBudgetData(): BudgetData {
@@ -703,7 +915,7 @@ async function listPaymentMethods() {
   const { supabase, userId } = await getUserContext();
   const { data, error } = await supabase
     .from("payment_methods")
-    .select("id, name, type, is_default, credit_limit")
+    .select("id, name, type, is_default, credit_limit, due_day")
     .eq("user_id", userId)
     .order("is_default", { ascending: false })
     .order("name", { ascending: true });
@@ -726,6 +938,7 @@ async function listPaymentMethods() {
         (limitFallbackData ?? []) as Omit<PaymentMethodRow, "is_default">[]
       ).map((paymentMethod) => ({
         ...paymentMethod,
+        due_day: null,
         is_default: null,
       }));
     }
@@ -756,6 +969,7 @@ async function listPaymentMethods() {
     ).map((paymentMethod) => ({
       ...paymentMethod,
       credit_limit: null,
+      due_day: null,
       is_default: null,
     }));
   }
@@ -793,9 +1007,9 @@ async function getCategoryForMutation(categoryId: string) {
   };
 }
 
-export async function listPaymentMethodOverview(month?: string): Promise<
-  PaymentMethodOverviewItem[]
-> {
+export async function listPaymentMethodOverview(
+  month?: string,
+): Promise<PaymentMethodOverviewItem[]> {
   const [paymentMethods, transactions] = await Promise.all([
     listPaymentMethods(),
     listTransactions({ month }),
@@ -804,6 +1018,8 @@ export async function listPaymentMethodOverview(month?: string): Promise<
   return paymentMethods.map((paymentMethod) => ({
     canModify: !isProtectedPaymentMethod(paymentMethod),
     creditLimit: Number(paymentMethod.credit_limit ?? 0),
+    dueDay:
+      paymentMethod.due_day == null ? null : Number(paymentMethod.due_day),
     id: paymentMethod.id,
     isDefault: Boolean(paymentMethod.is_default),
     label: toPaymentMethodLabelKey(
@@ -872,12 +1088,42 @@ async function getPaymentMethodForMutation(paymentMethodId: string) {
   assertUuid(paymentMethodId, "Payment method");
 
   const { supabase, userId } = await getUserContext();
-  const { data, error } = await supabase
+  const paymentMethodResult = await supabase
     .from("payment_methods")
-    .select("id, name, type, is_default, credit_limit")
+    .select("id, name, type, is_default, credit_limit, due_day")
     .eq("id", paymentMethodId)
     .eq("user_id", userId)
     .maybeSingle();
+  let data = paymentMethodResult.data as PaymentMethodRow | null;
+  let error = paymentMethodResult.error;
+
+  if (error?.code === "42703") {
+    const fallbackWithLimit = await supabase
+      .from("payment_methods")
+      .select("id, name, type, is_default, credit_limit")
+      .eq("id", paymentMethodId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    const fallback =
+      fallbackWithLimit.error?.code === "42703"
+        ? await supabase
+            .from("payment_methods")
+            .select("id, name, type, credit_limit")
+            .eq("id", paymentMethodId)
+            .eq("user_id", userId)
+            .maybeSingle()
+        : fallbackWithLimit;
+
+    data = fallback.data
+      ? ({
+          ...fallback.data,
+          due_day: null,
+          is_default:
+            "is_default" in fallback.data ? fallback.data.is_default : null,
+        } as PaymentMethodRow)
+      : null;
+    error = fallback.error;
+  }
 
   if (error) {
     throw new Error(`Unable to load payment method: ${error.message}`);
@@ -909,6 +1155,8 @@ export async function getTransactionFormOptions(): Promise<TransactionFormOption
   }));
 
   const mappedPaymentMethods = paymentMethods.map((paymentMethod) => ({
+    dueDay:
+      paymentMethod.due_day == null ? null : Number(paymentMethod.due_day),
     id: paymentMethod.id,
     label: toPaymentMethodLabelKey(
       paymentMethod.name,
@@ -951,7 +1199,7 @@ export async function getTransactionFormOptions(): Promise<TransactionFormOption
 }
 
 export async function createTransaction(input: NewTransactionInput) {
-  const { supabase, userId } = await getUserContext();
+  const { createdAt, supabase, userId } = await getUserContext();
   const description = assertNonEmptyString(input.description, "Description");
   const amount = Math.abs(input.amount);
   assertPositiveFiniteAmount(amount, "Amount");
@@ -974,6 +1222,7 @@ export async function createTransaction(input: NewTransactionInput) {
   const installmentCount = Number(input.installmentCount);
 
   assertValidIsoDate(date);
+  assertDateNotBeforeUserCreated(date, createdAt);
   await Promise.all([
     assertUserCategory(supabase, userId, categoryId),
     assertUserPaymentMethod(supabase, userId, paymentMethodId),
@@ -1041,7 +1290,7 @@ export async function createTransaction(input: NewTransactionInput) {
 }
 
 export async function createSubscription(input: CreateSubscriptionInput) {
-  const { supabase, userId } = await getUserContext();
+  const { createdAt, supabase, userId } = await getUserContext();
   const description = assertNonEmptyString(input.description, "Subscription");
   const amount = Math.abs(input.amount);
   assertPositiveFiniteAmount(amount, "Amount");
@@ -1054,6 +1303,7 @@ export async function createSubscription(input: CreateSubscriptionInput) {
   const date = toIsoDate(input.nextDate);
 
   assertValidIsoDate(date);
+  assertDateNotBeforeUserCreated(date, createdAt);
   await Promise.all([
     assertUserCategory(supabase, userId, categoryId),
     assertUserPaymentMethod(supabase, userId, paymentMethodId),
@@ -1092,6 +1342,7 @@ export async function createPaymentMethod(input: CreatePaymentMethodInput) {
   const { supabase, userId } = await getUserContext();
   const name = assertNonEmptyString(input.name, "Payment method name");
   const creditLimit = Number(input.creditLimit ?? 0);
+  const dueDay = input.type === "credit" ? (input.dueDay ?? null) : null;
 
   if (!isEditablePaymentMethodType(input.type)) {
     throw new Error("Payment method type is invalid.");
@@ -1101,21 +1352,38 @@ export async function createPaymentMethod(input: CreatePaymentMethodInput) {
     throw new Error("Payment method credit limit is invalid.");
   }
 
+  if (
+    dueDay !== null &&
+    (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31)
+  ) {
+    throw new Error("Payment method due day is invalid.");
+  }
+
   const { error } = await supabase.from("payment_methods").insert({
     credit_limit: creditLimit,
+    due_day: dueDay,
     name,
     type: input.type,
     user_id: userId,
   });
 
   if (error?.code === "42703") {
-    const { error: fallbackError } = await supabase
-      .from("payment_methods")
-      .insert({
-        name,
-        type: input.type,
-        user_id: userId,
-      });
+    const fallbackWithLimit = await supabase.from("payment_methods").insert({
+      credit_limit: creditLimit,
+      name,
+      type: input.type,
+      user_id: userId,
+    });
+    const fallbackError =
+      fallbackWithLimit.error?.code === "42703"
+        ? (
+            await supabase.from("payment_methods").insert({
+              name,
+              type: input.type,
+              user_id: userId,
+            })
+          ).error
+        : fallbackWithLimit.error;
 
     if (fallbackError) {
       throw new Error(
@@ -1135,6 +1403,7 @@ export async function updatePaymentMethod(input: UpdatePaymentMethodInput) {
   assertUuid(input.id, "Payment method");
   const name = assertNonEmptyString(input.name, "Payment method name");
   const creditLimit = Number(input.creditLimit ?? 0);
+  const dueDay = input.type === "credit" ? (input.dueDay ?? null) : null;
 
   if (!isEditablePaymentMethodType(input.type)) {
     throw new Error("Payment method type is invalid.");
@@ -1142,6 +1411,13 @@ export async function updatePaymentMethod(input: UpdatePaymentMethodInput) {
 
   if (!Number.isFinite(creditLimit) || creditLimit < 0) {
     throw new Error("Payment method credit limit is invalid.");
+  }
+
+  if (
+    dueDay !== null &&
+    (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31)
+  ) {
+    throw new Error("Payment method due day is invalid.");
   }
 
   const { paymentMethod, supabase, userId } = await getPaymentMethodForMutation(
@@ -1156,6 +1432,7 @@ export async function updatePaymentMethod(input: UpdatePaymentMethodInput) {
     .from("payment_methods")
     .update({
       credit_limit: creditLimit,
+      due_day: dueDay,
       name,
       type: input.type,
     })
@@ -1163,14 +1440,28 @@ export async function updatePaymentMethod(input: UpdatePaymentMethodInput) {
     .eq("user_id", userId);
 
   if (error?.code === "42703") {
-    const { error: fallbackError } = await supabase
+    const fallbackWithLimit = await supabase
       .from("payment_methods")
       .update({
+        credit_limit: creditLimit,
         name,
         type: input.type,
       })
       .eq("id", input.id)
       .eq("user_id", userId);
+    const fallbackError =
+      fallbackWithLimit.error?.code === "42703"
+        ? (
+            await supabase
+              .from("payment_methods")
+              .update({
+                name,
+                type: input.type,
+              })
+              .eq("id", input.id)
+              .eq("user_id", userId)
+          ).error
+        : fallbackWithLimit.error;
 
     if (fallbackError) {
       throw new Error(
@@ -1316,7 +1607,7 @@ export async function deleteCategory(categoryId: string) {
 }
 
 export async function updateTransaction(input: UpdateTransactionInput) {
-  const { supabase, userId } = await getUserContext();
+  const { createdAt, supabase, userId } = await getUserContext();
   assertUuid(input.id, "Transaction");
   const amount = Math.abs(input.amount);
   const date = toIsoDate(input.date);
@@ -1324,6 +1615,7 @@ export async function updateTransaction(input: UpdateTransactionInput) {
 
   assertPositiveFiniteAmount(amount, "Amount");
   assertValidIsoDate(date);
+  assertDateNotBeforeUserCreated(date, createdAt);
 
   if (!isTransactionKind(input.type)) {
     throw new Error("Transaction type is invalid.");
@@ -1376,15 +1668,20 @@ export async function deleteTransaction(transactionId: string) {
 }
 
 export async function listTransactions(options?: {
+  includePrevious?: boolean;
   includeFuture?: boolean;
   month?: string;
 }) {
   const { supabase, userId } = await getUserContext();
+  const includePrevious = options?.includePrevious ?? false;
   const includeFuture = options?.includeFuture ?? false;
   const monthRange = options?.month
     ? includeFuture
       ? getMonthRange(options.month)
       : getCollectedMonthRange(options.month)
+    : null;
+  const queryStart = monthRange
+    ? `${getPreviousMonthValue(monthRange.month)}-01`
     : null;
 
   let query = supabase
@@ -1395,7 +1692,10 @@ export async function listTransactions(options?: {
     .order("created_at", { ascending: false });
 
   if (monthRange) {
-    query = query.gte("date", monthRange.start).lte("date", monthRange.end);
+    query = query.lte("date", monthRange.end);
+    if (!includePrevious && queryStart) {
+      query = query.gte("date", queryStart);
+    }
   } else if (!includeFuture) {
     query = query.lte("date", getTodayValue());
   }
@@ -1403,7 +1703,12 @@ export async function listTransactions(options?: {
   const { data, error } = await query;
 
   if (!error) {
-    return ((data ?? []) as unknown as TransactionRow[]).map(toTransaction);
+    const transactions = ((data ?? []) as unknown as TransactionRow[]).map(
+      toTransaction,
+    );
+    return monthRange
+      ? filterByFinancialMonth(transactions, monthRange.month, includePrevious)
+      : transactions;
   }
 
   if (error.code === "42703") {
@@ -1415,9 +1720,10 @@ export async function listTransactions(options?: {
       .order("created_at", { ascending: false });
 
     if (monthRange) {
-      fallbackQuery = fallbackQuery
-        .gte("date", monthRange.start)
-        .lte("date", monthRange.end);
+      fallbackQuery = fallbackQuery.lte("date", monthRange.end);
+      if (!includePrevious && queryStart) {
+        fallbackQuery = fallbackQuery.gte("date", queryStart);
+      }
     } else if (!includeFuture) {
       fallbackQuery = fallbackQuery.lte("date", getTodayValue());
     }
@@ -1428,75 +1734,41 @@ export async function listTransactions(options?: {
       throw new Error(`Unable to load transactions: ${fallbackError.message}`);
     }
 
-    return ((fallbackData ?? []) as unknown as TransactionRow[]).map(
-      toTransaction,
-    );
+    const transactions = (
+      (fallbackData ?? []) as unknown as TransactionRow[]
+    ).map(toTransaction);
+    return monthRange
+      ? filterByFinancialMonth(transactions, monthRange.month, includePrevious)
+      : transactions;
   }
 
   throw new Error(`Unable to load transactions: ${error.message}`);
 }
 
 export async function getDashboardData(month?: string): Promise<DashboardData> {
-  const { supabase, userId } = await getUserContext();
-  const selectedMonthRange = getCollectedMonthRange(month);
-  const monthBuckets = getLastSixMonthKeys(selectedMonthRange.month);
-  const trendStart = `${monthBuckets[0]?.key ?? selectedMonthRange.month}-01`;
-  const [{ categories, paymentMethods }] = await Promise.all([
+  const selectedMonth = normalizeMonthValue(month);
+  const monthBuckets = getLastSixMonthKeys(selectedMonth);
+  const [
+    transactions,
+    scheduledTransactions,
+    trendTransactions,
+    { categories, paymentMethods },
+  ] = await Promise.all([
+    listTransactions({ month: selectedMonth }),
+    listTransactions({ includeFuture: true, month: selectedMonth }),
+    listTransactions({ includePrevious: true, month: selectedMonth }),
     getTransactionFormOptions(),
   ]);
-
-  const loadDashboardTransactions = (selectQuery: string) =>
-    Promise.all([
-      supabase
-        .from("transactions")
-        .select(selectQuery)
-        .eq("user_id", userId)
-        .gte("date", selectedMonthRange.start)
-        .lte("date", selectedMonthRange.end)
-        .order("date", { ascending: false })
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("transactions")
-        .select(selectQuery)
-        .eq("user_id", userId)
-        .gte("date", trendStart)
-        .lte("date", selectedMonthRange.end),
-    ]);
-
-  let [{ data, error }, { data: trendData, error: trendError }] =
-    await loadDashboardTransactions(transactionSelect);
-
-  if (error?.code === "42703" || trendError?.code === "42703") {
-    [{ data, error }, { data: trendData, error: trendError }] =
-      await loadDashboardTransactions(transactionSelectWithoutCategoryIcon);
-  }
-
-  if (error) {
-    throw new Error(`Unable to load dashboard data: ${error.message}`);
-  }
-
-  if (trendError) {
-    throw new Error(
-      `Unable to load dashboard trend data: ${trendError.message}`,
-    );
-  }
-
-  const transactions = ((data ?? []) as unknown as TransactionRow[]).map(
-    toTransaction,
-  );
-  const trendTransactions = (
-    (trendData ?? []) as unknown as TransactionRow[]
-  ).map(toTransaction);
   const incomeTransactions = transactions.filter(
     (transaction) => transaction.type === "income",
   );
   const expenseTransactions = transactions.filter(
     (transaction) => transaction.type === "expense",
   );
-  const savingTransactions = transactions.filter(
-    (transaction) => transaction.type === "saving",
-  );
   const trendExpenseTransactions = trendTransactions.filter(
+    (transaction) => transaction.type === "expense",
+  );
+  const scheduledExpenseTransactions = scheduledTransactions.filter(
     (transaction) => transaction.type === "expense",
   );
 
@@ -1508,20 +1780,21 @@ export async function getDashboardData(month?: string): Promise<DashboardData> {
     (sum, transaction) => sum + Math.abs(transaction.amount),
     0,
   );
-  const totalSaved = savingTransactions.reduce(
+  const predictedExpenses = scheduledExpenseTransactions.reduce(
     (sum, transaction) => sum + Math.abs(transaction.amount),
     0,
+  );
+  const totalSaved = getCumulativeSavingsBalance(
+    trendTransactions,
+    selectedMonth,
   );
 
   const budgetData = emptyBudgetData();
   for (const group of Object.keys(groupBudgetRatios) as DbCategoryGroup[]) {
-    const categoryLimits = categories
-      .filter((category) => category.group === group)
-      .reduce((sum, category) => sum + category.monthlyLimit, 0);
     const spent = transactions
       .filter((transaction) => transaction.group === group)
       .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
-    const budget = categoryLimits || totalIncome * groupBudgetRatios[group];
+    const budget = totalIncome * groupBudgetRatios[group];
 
     budgetData[group] = {
       budget,
@@ -1530,27 +1803,47 @@ export async function getDashboardData(month?: string): Promise<DashboardData> {
     };
   }
 
-  const expensesByCategory = expenseTransactions.reduce((acc, transaction) => {
-    const existing = acc.find(
-      (item) => item.nameKey === transaction.categoryKey,
-    );
+  const expensesByCategory = expenseTransactions
+    .reduce((acc, transaction) => {
+      const group = transaction.group as DbCategoryGroup;
+      const nameKey = `data.group.${group}`;
+      const existing = acc.find((item) => item.nameKey === nameKey);
 
-    if (existing) {
-      existing.value += Math.abs(transaction.amount);
-    } else {
-      acc.push({
-        color: groupColors[transaction.group as DbCategoryGroup] ?? "#64748B",
-        nameKey: transaction.categoryKey,
-        value: Math.abs(transaction.amount),
-      });
-    }
+      if (existing) {
+        existing.value += Math.abs(transaction.amount);
+      } else {
+        acc.push({
+          color: groupColors[group] ?? "#64748B",
+          nameKey,
+          value: Math.abs(transaction.amount),
+        });
+      }
 
-    return acc;
-  }, [] as ExpensesByCategoryItem[]);
+      return acc;
+    }, [] as ExpensesByCategoryItem[])
+    .sort((left, right) => {
+      const order = {
+        "data.group.needs": 0,
+        "data.group.wants": 1,
+        "data.group.savings": 2,
+      };
+
+      return (
+        (order[left.nameKey as keyof typeof order] ?? 99) -
+        (order[right.nameKey as keyof typeof order] ?? 99)
+      );
+    });
 
   const expensesOverTime = monthBuckets.map((monthBucket) => ({
     amount: trendExpenseTransactions
-      .filter((transaction) => transaction.date.startsWith(monthBucket.key))
+      .filter(
+        (transaction) => getFinancialMonth(transaction) === monthBucket.key,
+      )
+      .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0),
+    plannedAmount: scheduledExpenseTransactions
+      .filter(
+        (transaction) => getFinancialMonth(transaction) === monthBucket.key,
+      )
       .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0),
     monthKey: monthBucket.monthKey,
   }));
@@ -1588,14 +1881,115 @@ export async function getDashboardData(month?: string): Promise<DashboardData> {
     categories,
     expensesByCategory,
     expensesOverTime,
-    latestTransactions: transactions.slice(0, 5),
+    // Merge recent actual transactions with scheduled (future) transactions,
+    // marking scheduled ones with `isPlanned` so the UI can render them faded.
+    latestTransactions: (() => {
+      const today = getTodayValue();
+      const byId = new Map<string, any>();
+
+      for (const tx of transactions) {
+        byId.set(tx.id, tx);
+      }
+
+      for (const tx of scheduledTransactions) {
+        // if already present (actual), skip; otherwise add as planned only
+        if (!byId.has(tx.id)) {
+          // mark planned if in the future relative to today
+          const isPlanned = tx.date > today;
+          byId.set(tx.id, { ...tx, isPlanned });
+        }
+      }
+
+      return [...byId.values()]
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, 5);
+    })(),
     paymentMethods,
     summaryData: {
       currentBalance: totalIncome - totalExpenses,
+      predictedExpenses,
       totalExpenses,
       totalIncome,
       totalSaved,
     },
+  };
+}
+
+export async function getReportsData(
+  month?: string,
+  periodMonths?: number,
+): Promise<ReportsData> {
+  const selectedMonth = normalizeMonthValue(month);
+  const safePeriodMonths = getSafeReportPeriod(periodMonths);
+  const periodBuckets = getLastMonthKeys(selectedMonth, safePeriodMonths);
+  const periodMonthSet = new Set(periodBuckets.map((bucket) => bucket.key));
+  const transactions = await listTransactions({
+    includePrevious: true,
+    month: selectedMonth,
+  });
+  const transactionMonthPairs = transactions.map((transaction) => ({
+    financialMonth: getFinancialMonth(transaction),
+    transaction,
+  }));
+  const allMonthKeys = [
+    ...new Set(transactionMonthPairs.map((pair) => pair.financialMonth)),
+  ].sort();
+  const netWorthByMonth = new Map<string, number>();
+  let netWorth = 0;
+
+  for (const financialMonth of allMonthKeys) {
+    const monthTransactions = transactionMonthPairs
+      .filter((pair) => pair.financialMonth === financialMonth)
+      .map((pair) => pair.transaction);
+    netWorth += getMonthlyFinanceSummary(monthTransactions).savings;
+    netWorthByMonth.set(financialMonth, netWorth);
+  }
+
+  let lastKnownNetWorth = 0;
+  const monthlyReports = periodBuckets.map((bucket) => {
+    const monthTransactions = transactionMonthPairs
+      .filter((pair) => pair.financialMonth === bucket.key)
+      .map((pair) => pair.transaction);
+    const summary = getMonthlyFinanceSummary(monthTransactions);
+
+    if (netWorthByMonth.has(bucket.key)) {
+      lastKnownNetWorth = netWorthByMonth.get(bucket.key) ?? lastKnownNetWorth;
+    } else {
+      const previousMonthWithBalance = allMonthKeys
+        .filter((financialMonth) => financialMonth < bucket.key)
+        .at(-1);
+      lastKnownNetWorth = previousMonthWithBalance
+        ? (netWorthByMonth.get(previousMonthWithBalance) ?? lastKnownNetWorth)
+        : 0;
+    }
+
+    return {
+      ...summary,
+      month: bucket.key,
+      monthKey: bucket.monthKey,
+      netWorth: lastKnownNetWorth,
+      year: bucket.year,
+    };
+  });
+
+  const reportTransactions = transactionMonthPairs
+    .filter((pair) => periodMonthSet.has(pair.financialMonth))
+    .map(({ financialMonth, transaction }) => ({
+      amount: Math.abs(transaction.amount),
+      category: transaction.categoryKey,
+      date: transaction.date,
+      description: transaction.descriptionKey,
+      financialMonth,
+      paymentMethod: transaction.paymentMethodKey ?? null,
+      type: transaction.type,
+    }))
+    .sort((left, right) => right.date.localeCompare(left.date));
+
+  return {
+    monthlyReports: monthlyReports.reverse(),
+    periodMonths: safePeriodMonths,
+    selectedMonth,
+    transactions: reportTransactions,
   };
 }
 

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+
+import { withSelectedMonth } from "@/components/dashboard/month-route";
 
 export const sidebarRoutes = [
   "/dashboard",
@@ -17,12 +19,14 @@ export const sidebarRoutes = [
 export function NavigationPrefetcher() {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const didMount = useRef(false);
 
   useEffect(() => {
     const prefetchRoutes = () => {
       sidebarRoutes
         .filter((route) => route !== pathname)
+        .map((route) => withSelectedMonth(route, searchParams))
         .forEach((route) => router.prefetch(route));
     };
 
@@ -38,7 +42,7 @@ export function NavigationPrefetcher() {
         window.clearTimeout(idleCallbackId);
       }
     };
-  }, [pathname, router]);
+  }, [pathname, router, searchParams]);
 
   useEffect(() => {
     if (!didMount.current) {

@@ -62,16 +62,15 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
                         <p className="text-sm font-medium text-foreground">
                           {data.name}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {t("common.spent")}:{" "}
-                          {formatCurrency(data.spentAmount)}
+                        <p className="mt-1 text-lg font-bold text-foreground">
+                          {formatCurrency(data.maxAmount)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {data.value}% {t("common.ofBudget")}
                         </p>
-                        <p className="text-xs font-medium text-foreground">
-                          {t("category.maximum")}:{" "}
-                          {formatCurrency(data.maxAmount)}
+                        <p className="mt-1 text-xs font-medium text-foreground">
+                          {t("common.spent")}:{" "}
+                          {formatCurrency(data.spentAmount)}
                         </p>
                       </div>
                     );
@@ -82,7 +81,7 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
             </PieChart>
           </ResponsiveContainer>
         </div>
-        <div className="grid grid-cols-1 gap-2 pt-2">
+        <div className="grid grid-cols-1 gap-3 pt-2">
           {chartData.map((item) => (
             <div key={item.nameKey} className="flex items-center gap-3">
               <div
@@ -98,9 +97,19 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
                     {formatCurrency(item.maxAmount)}
                   </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {t("common.spent")}: {formatCurrency(item.spentAmount)}
-                </p>
+                <div className="mt-1 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                  <span>
+                    {t("common.spent")}: {formatCurrency(item.spentAmount)}
+                  </span>
+                  <span>
+                    {Math.round(
+                      item.maxAmount > 0
+                        ? (item.spentAmount / item.maxAmount) * 100
+                        : 0,
+                    )}
+                    % {t("common.used")}
+                  </span>
+                </div>
               </div>
             </div>
           ))}

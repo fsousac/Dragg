@@ -1,6 +1,7 @@
 "use client"
 
-import { Download, TrendingDown, TrendingUp } from "lucide-react"
+import { Download, FileSpreadsheet, FileText, TrendingDown, TrendingUp } from "lucide-react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   Area,
   AreaChart,
@@ -18,23 +19,66 @@ import { PageHeader } from "@/components/dashboard/page-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { monthlyReports } from "@/lib/data"
+import { type ReportsData } from "@/lib/finance/transactions"
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
-export function ReportsScreen() {
-  const { formatCurrency, t } = useI18n()
-  const currentMonth = monthlyReports[0]
-  const previousMonth = monthlyReports[1]
-  const incomeChange = ((currentMonth.income - previousMonth.income) / previousMonth.income) * 100
-  const expenseChange = ((currentMonth.expenses - previousMonth.expenses) / previousMonth.expenses) * 100
-  const savingsChange = ((currentMonth.savings - previousMonth.savings) / previousMonth.savings) * 100
+type ReportsScreenProps = {
+  reportsData: ReportsData
+}
+
+function getPercentageChange(current: number, previous: number) {
+  if (previous === 0) return current === 0 ? 0 : 100
+  return ((current - previous) / previous) * 100
+}
+
+function csvEscape(value: string | number | null) {
+  const text = value == null ? "" : String(value)
+  return `"${text.replaceAll('"', '""')}"`
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;")
+}
+
+export function ReportsScreen({ reportsData }: ReportsScreenProps) {
+  const { formatCurrency, formatDate, t } = useI18n()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const monthlyReports = reportsData.monthlyReports
+  const currentMonth = monthlyReports[0] ?? {
+    excessExpenses: 0,
+    expenses: 0,
+    grossSavings: 0,
+    income: 0,
+    month: reportsData.selectedMonth,
+    monthKey: "screen.reports.month",
+    netWorth: 0,
+    savings: 0,
+    year: "",
+  }
+  const previousMonth = monthlyReports[1] ?? currentMonth
+  const incomeChange = getPercentageChange(currentMonth.income, previousMonth.income)
+  const expenseChange = getPercentageChange(currentMonth.expenses, previousMonth.expenses)
+  const savingsChange = getPercentageChange(currentMonth.savings, previousMonth.savings)
 
   const incomeVsExpensesData = monthlyReports
     .map((report) => ({
@@ -52,28 +96,139 @@ export function ReportsScreen() {
     }))
     .reverse()
 
+  function handlePeriodChange(period: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("period", period)
+    router.push(`${pathname}?${params.toString()}`)
+  }
+
+  function downloadCsv() {
+    const rows = [
+      [
+        "Data",
+        "Mes financeiro",
+        "Tipo",
+        "Descricao",
+        "Categoria",
+        "Forma de pagamento",
+        "Valor",
+      ],
+      ...reportsData.transactions.map((transaction) => [
+        transaction.date,
+        transaction.financialMonth,
+        transaction.type,
+        t(transaction.description),
+        t(transaction.category),
+        transaction.paymentMethod ? t(transaction.paymentMethod) : "",
+        transaction.amount.toFixed(2),
+      ]),
+    ]
+    const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\n")
+    const blob = new Blob([`\uFEFF${csv}`], {
+      type: "text/csv;charset=utf-8",
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `dragg-relatorio-${reportsData.selectedMonth}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  function printPdfReport() {
+    const expenseLines = reportsData.transactions
+      .filter((transaction) => transaction.type === "expense")
+      .map((transaction) =>
+        [
+          formatDate(transaction.date),
+          transaction.financialMonth,
+          t(transaction.description),
+          t(transaction.category),
+          transaction.paymentMethod ? t(transaction.paymentMethod) : "-",
+          formatCurrency(transaction.amount),
+        ].join(" | "),
+      )
+    const summaryLines = monthlyReports.map((report) =>
+      [
+        `${t(report.monthKey)} ${report.year}`,
+        `${t("common.income")}: ${formatCurrency(report.income)}`,
+        `${t("common.expense")}: ${formatCurrency(report.expenses)}`,
+        `${t("common.saving")}: ${formatCurrency(report.savings)}`,
+        `${t("screen.reports.netWorth")}: ${formatCurrency(report.netWorth)}`,
+      ].join(" | "),
+    )
+    const reportText = [
+      `Dragg - ${t("screen.reports.title")}`,
+      "",
+      t("screen.reports.breakdown"),
+      ...summaryLines,
+      "",
+      t("screen.reports.allExpenses"),
+      ...(expenseLines.length ? expenseLines : [t("screen.reports.noExpenses")]),
+    ].join("\n")
+    const printWindow = window.open("", "_blank")
+
+    if (!printWindow) return
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Dragg - ${escapeHtml(t("screen.reports.title"))}</title>
+          <style>
+            body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 32px; color: #111; }
+            pre { white-space: pre-wrap; line-height: 1.5; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <pre>${escapeHtml(reportText)}</pre>
+          <script>window.onload = () => window.print()</script>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+  }
+
   return (
     <>
       <PageHeader
         title={t("screen.reports.title")}
         description={t("screen.reports.description")}
         actions={
-          <div className="flex items-center gap-3">
-            <Select defaultValue="6months">
+          <div className="flex flex-wrap items-center gap-3">
+            <Select
+              value={String(reportsData.periodMonths)}
+              onValueChange={handlePeriodChange}
+            >
               <SelectTrigger className="w-40">
                 <SelectValue placeholder={t("screen.reports.period")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="1month">{t("screen.reports.lastMonth")}</SelectItem>
-                <SelectItem value="3months">{t("screen.reports.lastThreeMonths")}</SelectItem>
-                <SelectItem value="6months">{t("screen.reports.lastSixMonths")}</SelectItem>
-                <SelectItem value="1year">{t("screen.reports.lastYear")}</SelectItem>
+                <SelectItem value="1">{t("screen.reports.lastMonth")}</SelectItem>
+                <SelectItem value="3">{t("screen.reports.lastThreeMonths")}</SelectItem>
+                <SelectItem value="6">{t("screen.reports.lastSixMonths")}</SelectItem>
+                <SelectItem value="12">{t("screen.reports.lastYear")}</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" className="gap-2">
-              <Download className="size-4" />
-              {t("screen.reports.export")}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Download className="size-4" />
+                  {t("screen.reports.export")}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={printPdfReport}>
+                  <FileText className="size-4" />
+                  {t("screen.reports.exportPdf")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={downloadCsv}>
+                  <FileSpreadsheet className="size-4" />
+                  {t("screen.reports.exportCsv")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         }
       />
@@ -100,7 +255,7 @@ export function ReportsScreen() {
             <p className="text-sm text-muted-foreground">{t("screen.reports.netWorth")}</p>
             <p className="mt-1 text-2xl font-bold text-income">{formatCurrency(currentMonth.netWorth)}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              +{formatCurrency(currentMonth.netWorth - previousMonth.netWorth)} {t("screen.reports.thisMonth")}
+              {formatCurrency(currentMonth.netWorth - previousMonth.netWorth)} {t("screen.reports.thisMonth")}
             </p>
           </CardContent>
         </Card>
@@ -163,7 +318,14 @@ export function ReportsScreen() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {[t("screen.reports.month"), t("common.income"), t("common.expense"), t("common.saving"), t("screen.reports.netWorth")].map((heading, index) => (
+                  {[
+                    t("screen.reports.month"),
+                    t("common.income"),
+                    t("common.expense"),
+                    t("common.saving"),
+                    t("screen.reports.excessExpenses"),
+                    t("screen.reports.netWorth"),
+                  ].map((heading, index) => (
                     <th key={heading} className={cn("p-4 text-sm font-medium text-muted-foreground", index === 0 ? "text-left" : "text-right")}>
                       {heading}
                     </th>
@@ -172,11 +334,12 @@ export function ReportsScreen() {
               </thead>
               <tbody>
                 {monthlyReports.map((report) => (
-                  <tr key={`${report.monthKey}-${report.year}`} className="border-b border-border last:border-0 hover:bg-accent/50">
+                  <tr key={report.month} className="border-b border-border last:border-0 hover:bg-accent/50">
                     <td className="p-4 font-medium text-foreground">{t(report.monthKey)} {report.year}</td>
                     <td className="p-4 text-right text-income">{formatCurrency(report.income)}</td>
                     <td className="p-4 text-right text-expense">{formatCurrency(report.expenses)}</td>
                     <td className="p-4 text-right text-savings">{formatCurrency(report.savings)}</td>
+                    <td className="p-4 text-right text-destructive">{formatCurrency(report.excessExpenses)}</td>
                     <td className="p-4 text-right font-semibold text-foreground">{formatCurrency(report.netWorth)}</td>
                   </tr>
                 ))}
@@ -188,4 +351,3 @@ export function ReportsScreen() {
     </>
   )
 }
-

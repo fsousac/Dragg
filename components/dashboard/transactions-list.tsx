@@ -53,7 +53,9 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
           {latestTransactions.map((transaction) => (
             <div
               key={transaction.id}
-              className="flex items-center gap-3 lg:gap-4 px-4 lg:px-6 py-3 lg:py-4 hover:bg-accent/50 transition-colors"
+              className={`flex items-center gap-3 lg:gap-4 px-4 lg:px-6 py-3 lg:py-4 hover:bg-accent/50 transition-colors ${
+                transaction.isPlanned ? "opacity-70" : ""
+              }`}
             >
               <div className="flex items-center justify-center w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-accent text-xl lg:text-2xl">
                 {transaction.icon}

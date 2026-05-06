@@ -30,6 +30,7 @@ import {
   type UpdateCategoryInput,
 } from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 type NewCategoryDialogProps = {
   category?: UpdateCategoryInput & {
@@ -216,9 +217,15 @@ export function NewCategoryDialog({
                   <button
                     key={emoji}
                     type="button"
-                    className="flex size-8 items-center justify-center rounded-md border border-border bg-background text-lg transition-colors hover:bg-accent"
+                    className={cn(
+                      "flex size-8 items-center justify-center rounded-md border bg-background text-lg transition-colors hover:bg-accent",
+                      icon === emoji
+                        ? "border-primary bg-primary/10 ring-2 ring-primary/40"
+                        : "border-border",
+                    )}
                     onClick={() => setIcon(emoji)}
                     aria-label={emoji}
+                    aria-pressed={icon === emoji}
                   >
                     {emoji}
                   </button>

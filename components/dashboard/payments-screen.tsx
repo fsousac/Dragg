@@ -78,6 +78,7 @@ type PaymentsScreenProps = {
 
 type EditablePaymentMethod = {
   creditLimit: string;
+  dueDay: string;
   id: string;
   name: string;
   originalName: string;
@@ -142,6 +143,7 @@ export function PaymentsScreen({
     useState(false);
   const [paymentMethodForm, setPaymentMethodForm] = useState({
     creditLimit: "",
+    dueDay: "",
     name: "",
     type: "credit" as CreatePaymentMethodInput["type"],
   });
@@ -195,6 +197,10 @@ export function PaymentsScreen({
       try {
         await updatePaymentMethodAction({
           creditLimit: parseCurrencyInput(editingPaymentMethod.creditLimit),
+          dueDay:
+            editingPaymentMethod.type === "credit" && editingPaymentMethod.dueDay
+              ? Number(editingPaymentMethod.dueDay)
+              : null,
           id: editingPaymentMethod.id,
           name: submittedName,
           type: editingPaymentMethod.type,
@@ -212,6 +218,7 @@ export function PaymentsScreen({
   const resetPaymentMethodForm = () => {
     setPaymentMethodForm({
       creditLimit: "",
+      dueDay: "",
       name: "",
       type: "credit",
     });
@@ -227,6 +234,10 @@ export function PaymentsScreen({
       try {
         await createPaymentMethodAction({
           creditLimit: parseCurrencyInput(paymentMethodForm.creditLimit),
+          dueDay:
+            paymentMethodForm.type === "credit" && paymentMethodForm.dueDay
+              ? Number(paymentMethodForm.dueDay)
+              : null,
           name: paymentMethodForm.name,
           type: paymentMethodForm.type,
         });
@@ -399,6 +410,13 @@ export function PaymentsScreen({
                         ? `${t("payments.limit")}: ${formatCurrency(paymentMethod.creditLimit)}`
                         : t("payments.noLimit")}
                     </p>
+                    {paymentMethod.type === "credit" ? (
+                      <p className="text-xs text-muted-foreground">
+                        {paymentMethod.dueDay
+                          ? `${t("payments.dueDay")}: ${paymentMethod.dueDay}`
+                          : t("payments.noDueDay")}
+                      </p>
+                    ) : null}
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -417,6 +435,9 @@ export function PaymentsScreen({
                           setEditingPaymentMethod({
                             creditLimit: paymentMethod.creditLimit
                               ? String(paymentMethod.creditLimit).replace(".", ",")
+                              : "",
+                            dueDay: paymentMethod.dueDay
+                              ? String(paymentMethod.dueDay)
                               : "",
                             id: paymentMethod.id,
                             name:
@@ -592,6 +613,8 @@ export function PaymentsScreen({
                   onValueChange={(value) =>
                     setPaymentMethodForm({
                       ...paymentMethodForm,
+                      dueDay:
+                        value === "credit" ? paymentMethodForm.dueDay : "",
                       type: value as CreatePaymentMethodInput["type"],
                     })
                   }
@@ -634,6 +657,28 @@ export function PaymentsScreen({
                   placeholder="0,00"
                 />
               </div>
+              {paymentMethodForm.type === "credit" ? (
+                <div className="space-y-2">
+                  <Label htmlFor="new-payment-method-due-day">
+                    {t("payments.dueDay")}
+                  </Label>
+                  <Input
+                    id="new-payment-method-due-day"
+                    inputMode="numeric"
+                    min="1"
+                    max="31"
+                    type="number"
+                    value={paymentMethodForm.dueDay}
+                    onChange={(event) =>
+                      setPaymentMethodForm({
+                        ...paymentMethodForm,
+                        dueDay: event.target.value,
+                      })
+                    }
+                    placeholder="10"
+                  />
+                </div>
+              ) : null}
             </div>
           </div>
           <DialogFooter>
@@ -825,6 +870,8 @@ export function PaymentsScreen({
                     onValueChange={(value) =>
                       setEditingPaymentMethod({
                         ...editingPaymentMethod,
+                        dueDay:
+                          value === "credit" ? editingPaymentMethod.dueDay : "",
                         type: value as UpdatePaymentMethodInput["type"],
                       })
                     }
@@ -871,6 +918,28 @@ export function PaymentsScreen({
                     placeholder="0,00"
                   />
                 </div>
+                {editingPaymentMethod.type === "credit" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="payment-method-due-day">
+                      {t("payments.dueDay")}
+                    </Label>
+                    <Input
+                      id="payment-method-due-day"
+                      inputMode="numeric"
+                      min="1"
+                      max="31"
+                      type="number"
+                      value={editingPaymentMethod.dueDay}
+                      onChange={(event) =>
+                        setEditingPaymentMethod({
+                          ...editingPaymentMethod,
+                          dueDay: event.target.value,
+                        })
+                      }
+                      placeholder="10"
+                    />
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}

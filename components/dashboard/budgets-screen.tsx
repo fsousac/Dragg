@@ -1,6 +1,6 @@
 "use client";
 
-import { Minus, Settings, TrendingDown, TrendingUp } from "lucide-react";
+import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import {
   Cell,
   Legend,
@@ -11,7 +11,6 @@ import {
 } from "recharts";
 
 import { PageHeader } from "@/components/dashboard/page-header";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -78,12 +77,6 @@ export function BudgetsScreen({
       <PageHeader
         title={t("screen.budgets.title")}
         description={t("screen.budgets.track")}
-        actions={
-          <Button variant="outline" className="gap-2">
-            <Settings className="size-4" />
-            {t("screen.budgets.configureBudget")}
-          </Button>
-        }
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">

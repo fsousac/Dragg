@@ -38,14 +38,14 @@ export function CompactInput({
   inputClassName,
 }: CompactInputProps) {
   return (
-    <div className="space-y-1.5">
+    <div className="min-w-0 space-y-1.5">
       <Label
         htmlFor={id}
         className="text-xs font-medium text-foreground/70 uppercase tracking-wide"
       >
         {label}
       </Label>
-      <div className="relative group">
+      <div className="relative group min-w-0 overflow-hidden">
         {icon && (
           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40 group-focus-within:text-foreground/60 transition-colors">
             {icon}
