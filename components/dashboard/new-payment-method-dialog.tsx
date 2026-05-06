@@ -36,15 +36,7 @@ type NewPaymentMethodDialogProps = {
   onOpenChange?: (open: boolean) => void;
 };
 
-const paymentTypes = [
-  "pix",
-  "debit",
-  "credit",
-  "cash",
-  "bank",
-  "boleto",
-  "other",
-] as const;
+const paymentTypes = ["debit", "credit", "bank", "boleto", "other"] as const;
 
 export function NewPaymentMethodDialog({
   children,
@@ -58,7 +50,7 @@ export function NewPaymentMethodDialog({
   const [internalOpen, setInternalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState("");
-  const [type, setType] = useState<(typeof paymentTypes)[number]>("pix");
+  const [type, setType] = useState<CreatePaymentMethodInput["type"]>("debit");
   const [creditLimit, setCreditLimit] = useState("");
   const open = controlledOpen ?? internalOpen;
   const setOpen = (nextOpen: boolean) => {
@@ -69,7 +61,7 @@ export function NewPaymentMethodDialog({
   useEffect(() => {
     if (open) {
       setName("");
-      setType("pix");
+      setType("debit");
       setCreditLimit("");
     }
   }, [open]);
@@ -145,7 +137,12 @@ export function NewPaymentMethodDialog({
 
           <div className="space-y-2">
             <Label>{t("paymentMethod.type")}</Label>
-            <Select value={type} onValueChange={(v) => setType(v as any)}>
+            <Select
+              value={type}
+              onValueChange={(v) =>
+                setType(v as CreatePaymentMethodInput["type"])
+              }
+            >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>

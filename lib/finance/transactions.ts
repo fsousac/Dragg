@@ -136,7 +136,7 @@ export type UpdatePaymentMethodInput = {
   dueDay?: number | null;
   id: string;
   name: string;
-  type: Exclude<PaymentMethodRow["type"], "cash" | "pix">;
+  type: Exclude<PaymentMethodRow["type"], "cash" | "pix" | "boleto">;
 };
 
 export type SummaryData = {
