@@ -44,12 +44,45 @@ type TransactionRow = {
   payment_methods: PaymentMethodRow | null;
 };
 
+type GoalRow = {
+  color: string;
+  current_amount: number | string;
+  deadline: string;
+  icon: string;
+  id: string;
+  name: string;
+  target_amount: number | string;
+};
+
 export type TransactionFormCategory = {
   group: DbCategoryGroup;
   id: string;
   icon: string;
   label: string;
   monthlyLimit: number;
+};
+
+export type GoalOverviewItem = {
+  color: string;
+  currentAmount: number;
+  deadline: string;
+  icon: string;
+  id: string;
+  name: string;
+  targetAmount: number;
+};
+
+export type CreateGoalInput = {
+  color: string;
+  currentAmount?: number;
+  deadline: string;
+  icon: string;
+  name: string;
+  targetAmount: number;
+};
+
+export type UpdateGoalInput = CreateGoalInput & {
+  id: string;
 };
 
 export type TransactionFormPaymentMethod = {
@@ -447,6 +480,12 @@ function assertValidIsoDate(value: string) {
     date.toISOString().slice(0, 10) !== value
   ) {
     throw new Error("Transaction date is invalid.");
+  }
+}
+
+function assertValidColor(value: string) {
+  if (!value.match(/^#[0-9a-f]{6}$/i)) {
+    throw new Error("Color is invalid.");
   }
 }
 
@@ -1159,6 +1198,34 @@ export async function listSubscriptionOverview(): Promise<
   );
 }
 
+export async function listGoals(): Promise<GoalOverviewItem[]> {
+  const { supabase, userId } = await getUserContext();
+  const { data, error } = await supabase
+    .from("goals")
+    .select("id, name, icon, target_amount, current_amount, deadline, color")
+    .eq("user_id", userId)
+    .order("deadline", { ascending: true })
+    .order("created_at", { ascending: false });
+
+  if (error?.code === "42P01") {
+    return [];
+  }
+
+  if (error) {
+    throw new Error(`Unable to load goals: ${error.message}`);
+  }
+
+  return ((data ?? []) as GoalRow[]).map((goal) => ({
+    color: goal.color,
+    currentAmount: Number(goal.current_amount),
+    deadline: goal.deadline,
+    icon: goal.icon,
+    id: goal.id,
+    name: goal.name,
+    targetAmount: Number(goal.target_amount),
+  }));
+}
+
 async function getPaymentMethodForMutation(paymentMethodId: string) {
   assertUuid(paymentMethodId, "Payment method");
 
@@ -1725,6 +1792,120 @@ export async function deletePaymentMethod(paymentMethodId: string) {
 
   if (error) {
     throw new Error(`Unable to delete payment method: ${error.message}`);
+  }
+}
+
+export async function createGoal(input: CreateGoalInput) {
+  const { createdAt, supabase, userId } = await getUserContext();
+  const name = assertNonEmptyString(input.name, "Goal name");
+  const icon = assertNonEmptyString(input.icon, "Goal icon", 32);
+  const targetAmount = Number(input.targetAmount);
+  const currentAmount = Number(input.currentAmount ?? 0);
+  const deadline = toIsoDate(input.deadline);
+
+  assertPositiveFiniteAmount(targetAmount, "Target amount");
+  if (!Number.isFinite(currentAmount) || currentAmount < 0) {
+    throw new Error("Current amount is invalid.");
+  }
+  assertValidIsoDate(deadline);
+  assertDateNotBeforeUserCreated(deadline, createdAt);
+  assertValidColor(input.color);
+
+  const { error } = await supabase.from("goals").insert({
+    color: input.color,
+    current_amount: Math.min(currentAmount, targetAmount),
+    deadline,
+    icon,
+    name,
+    target_amount: targetAmount,
+    user_id: userId,
+  });
+
+  if (error) {
+    throw new Error(`Unable to save goal: ${error.message}`);
+  }
+}
+
+export async function updateGoal(input: UpdateGoalInput) {
+  assertUuid(input.id, "Goal");
+  const { createdAt, supabase, userId } = await getUserContext();
+  const name = assertNonEmptyString(input.name, "Goal name");
+  const icon = assertNonEmptyString(input.icon, "Goal icon", 32);
+  const targetAmount = Number(input.targetAmount);
+  const currentAmount = Number(input.currentAmount ?? 0);
+  const deadline = toIsoDate(input.deadline);
+
+  assertPositiveFiniteAmount(targetAmount, "Target amount");
+  if (!Number.isFinite(currentAmount) || currentAmount < 0) {
+    throw new Error("Current amount is invalid.");
+  }
+  assertValidIsoDate(deadline);
+  assertDateNotBeforeUserCreated(deadline, createdAt);
+  assertValidColor(input.color);
+
+  const { error } = await supabase
+    .from("goals")
+    .update({
+      color: input.color,
+      current_amount: Math.min(currentAmount, targetAmount),
+      deadline,
+      icon,
+      name,
+      target_amount: targetAmount,
+    })
+    .eq("id", input.id)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(`Unable to update goal: ${error.message}`);
+  }
+}
+
+export async function addGoalFunds(goalId: string, amount: number) {
+  assertUuid(goalId, "Goal");
+  assertPositiveFiniteAmount(amount, "Amount");
+  const { supabase, userId } = await getUserContext();
+  const { data, error: loadError } = await supabase
+    .from("goals")
+    .select("current_amount, target_amount")
+    .eq("id", goalId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (loadError) {
+    throw new Error(`Unable to load goal: ${loadError.message}`);
+  }
+
+  if (!data) {
+    throw new Error("Goal not found.");
+  }
+
+  const currentAmount = Number(data.current_amount ?? 0);
+  const targetAmount = Number(data.target_amount);
+  const { error } = await supabase
+    .from("goals")
+    .update({
+      current_amount: Math.min(currentAmount + amount, targetAmount),
+    })
+    .eq("id", goalId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(`Unable to add goal funds: ${error.message}`);
+  }
+}
+
+export async function deleteGoal(goalId: string) {
+  assertUuid(goalId, "Goal");
+  const { supabase, userId } = await getUserContext();
+  const { error } = await supabase
+    .from("goals")
+    .delete()
+    .eq("id", goalId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(`Unable to delete goal: ${error.message}`);
   }
 }
 
