@@ -22,6 +22,7 @@ type CategoryRow = {
 };
 
 type PaymentMethodRow = {
+  closing_day?: number | string | null;
   credit_limit: number | string | null;
   due_day?: number | string | null;
   id: string;
@@ -59,6 +60,7 @@ export type TransactionFormPaymentMethod = {
 
 export type PaymentMethodOverviewItem = TransactionFormPaymentMethod & {
   canModify: boolean;
+  closingDay: number | null;
   creditLimit: number;
   dueDay: number | null;
   isDefault: boolean;
@@ -68,14 +70,16 @@ export type PaymentMethodOverviewItem = TransactionFormPaymentMethod & {
 
 export type SubscriptionOverviewItem = {
   amount: number;
+  categoryId?: string | null;
   categoryKey: string;
   frequency: "monthly";
   icon: string;
   id: string;
   name: string;
   nextDate: string;
+  paymentMethodId?: string | null;
   paymentMethodKey?: string | null;
-  status: "active";
+  status: "active" | "paused";
 };
 
 export type TransactionFormOptions = {
@@ -113,7 +117,12 @@ export type CreateSubscriptionInput = {
   paymentMethod: string;
 };
 
+export type UpdateSubscriptionInput = CreateSubscriptionInput & {
+  id: string;
+};
+
 export type CreatePaymentMethodInput = {
+  closingDay?: number | null;
   creditLimit?: number;
   dueDay?: number | null;
   name: string;
@@ -132,11 +141,12 @@ export type UpdateTransactionInput = {
 };
 
 export type UpdatePaymentMethodInput = {
+  closingDay?: number | null;
   creditLimit?: number;
   dueDay?: number | null;
   id: string;
   name: string;
-  type: Exclude<PaymentMethodRow["type"], "cash" | "pix" | "boleto">;
+  type: Exclude<PaymentMethodRow["type"], "cash" | "pix">;
 };
 
 export type SummaryData = {
@@ -336,6 +346,8 @@ const transactionSelectWithoutCategoryIcon = `
   payment_methods (
     id,
     name,
+    closing_day,
+    due_day,
     type
   )
 `;
@@ -414,6 +426,15 @@ function isTransactionKind(value: string): value is DbTransactionKind {
 function assertPositiveFiniteAmount(value: number, label: string) {
   if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`${label} must be greater than zero.`);
+  }
+}
+
+function assertValidMonthDay(value: number | null, label: string) {
+  if (
+    value !== null &&
+    (!Number.isInteger(value) || value < 1 || value > 31)
+  ) {
+    throw new Error(`${label} is invalid.`);
   }
 }
 
@@ -610,6 +631,14 @@ function toIsoDate(dateValue: string) {
   return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 }
 
+function toDateValue(date: Date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
 function addMonthsClamped(date: Date, monthOffset: number) {
   const year = date.getFullYear();
   const month = date.getMonth() + monthOffset;
@@ -631,15 +660,17 @@ function getPreviousMonthValue(month: string) {
 function getFinancialMonth(transaction: Transaction) {
   if (
     transaction.paymentMethodType !== "credit" ||
-    !transaction.paymentMethodDueDay
+    (!transaction.paymentMethodClosingDay && !transaction.paymentMethodDueDay)
   ) {
     return transaction.date.slice(0, 7);
   }
 
   const [year, month, day] = transaction.date.split("-").map(Number);
   const transactionMonth = new Date(year, month - 1, 1);
+  const closingDay =
+    transaction.paymentMethodClosingDay ?? transaction.paymentMethodDueDay;
 
-  if (day > transaction.paymentMethodDueDay) {
+  if (closingDay && day > closingDay) {
     return toMonthValue(addMonthsClamped(transactionMonth, 1));
   }
 
@@ -655,6 +686,29 @@ function filterByFinancialMonth(
     const financialMonth = getFinancialMonth(transaction);
     return includePrevious ? financialMonth <= month : financialMonth === month;
   });
+}
+
+function filterByTransactionMonth(
+  transactions: Transaction[],
+  month: string,
+  includePrevious = false,
+) {
+  return transactions.filter((transaction) => {
+    const transactionMonth = transaction.date.slice(0, 7);
+    return includePrevious
+      ? transactionMonth <= month
+      : transactionMonth === month;
+  });
+}
+
+function markPlannedTransactions(transactions: Transaction[]) {
+  const today = getTodayValue();
+
+  return transactions.map((transaction) =>
+    transaction.date > today
+      ? { ...transaction, isPlanned: true }
+      : transaction,
+  );
 }
 
 function toTransaction(row: TransactionRow): Transaction {
@@ -689,6 +743,10 @@ function toTransaction(row: TransactionRow): Transaction {
         : toCategoryIcon(rawCategoryName, row.categories?.icon),
     notes: row.notes,
     paymentMethodId: row.payment_method_id,
+    paymentMethodClosingDay:
+      row.payment_methods?.closing_day == null
+        ? null
+        : Number(row.payment_methods.closing_day),
     paymentMethodDueDay:
       row.payment_methods?.due_day == null
         ? null
@@ -915,7 +973,7 @@ async function listPaymentMethods() {
   const { supabase, userId } = await getUserContext();
   const { data, error } = await supabase
     .from("payment_methods")
-    .select("id, name, type, is_default, credit_limit, due_day")
+    .select("id, name, type, is_default, credit_limit, due_day, closing_day")
     .eq("user_id", userId)
     .order("is_default", { ascending: false })
     .order("name", { ascending: true });
@@ -929,7 +987,7 @@ async function listPaymentMethods() {
     const { data: limitFallbackData, error: limitFallbackError } =
       await supabase
         .from("payment_methods")
-        .select("id, name, type, credit_limit")
+        .select("id, name, type, credit_limit, due_day")
         .eq("user_id", userId)
         .order("name", { ascending: true });
 
@@ -938,7 +996,7 @@ async function listPaymentMethods() {
         (limitFallbackData ?? []) as Omit<PaymentMethodRow, "is_default">[]
       ).map((paymentMethod) => ({
         ...paymentMethod,
-        due_day: null,
+        closing_day: null,
         is_default: null,
       }));
     }
@@ -968,6 +1026,7 @@ async function listPaymentMethods() {
       >[]
     ).map((paymentMethod) => ({
       ...paymentMethod,
+      closing_day: null,
       credit_limit: null,
       due_day: null,
       is_default: null,
@@ -1017,6 +1076,10 @@ export async function listPaymentMethodOverview(
 
   return paymentMethods.map((paymentMethod) => ({
     canModify: !isProtectedPaymentMethod(paymentMethod),
+    closingDay:
+      paymentMethod.closing_day == null
+        ? null
+        : Number(paymentMethod.closing_day),
     creditLimit: Number(paymentMethod.credit_limit ?? 0),
     dueDay:
       paymentMethod.due_day == null ? null : Number(paymentMethod.due_day),
@@ -1061,16 +1124,26 @@ export async function listSubscriptionOverview(): Promise<
     if (!existingSubscription) {
       groupedSubscriptions.set(groupKey, {
         amount: Math.abs(transaction.amount),
+        categoryId: transaction.categoryId,
         categoryKey: transaction.categoryKey,
         frequency: "monthly",
         icon: transaction.icon,
-        id: groupKey,
+        id: transaction.id,
         name: transaction.descriptionKey,
         nextDate: transaction.date,
+        paymentMethodId: transaction.paymentMethodId,
         paymentMethodKey: transaction.paymentMethodKey,
-        status: "active",
+        status: transaction.notes?.includes("paused") ? "paused" : "active",
       });
       continue;
+    }
+
+    if (
+      isFutureOrToday &&
+      transaction.notes?.includes("paused") &&
+      existingSubscription.status === "active"
+    ) {
+      existingSubscription.status = "paused";
     }
 
     if (
@@ -1081,7 +1154,9 @@ export async function listSubscriptionOverview(): Promise<
     }
   }
 
-  return [...groupedSubscriptions.values()];
+  return [...groupedSubscriptions.values()].filter(
+    (subscription) => subscription.nextDate >= today,
+  );
 }
 
 async function getPaymentMethodForMutation(paymentMethodId: string) {
@@ -1090,7 +1165,7 @@ async function getPaymentMethodForMutation(paymentMethodId: string) {
   const { supabase, userId } = await getUserContext();
   const paymentMethodResult = await supabase
     .from("payment_methods")
-    .select("id, name, type, is_default, credit_limit, due_day")
+    .select("id, name, type, is_default, credit_limit, due_day, closing_day")
     .eq("id", paymentMethodId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -1100,7 +1175,7 @@ async function getPaymentMethodForMutation(paymentMethodId: string) {
   if (error?.code === "42703") {
     const fallbackWithLimit = await supabase
       .from("payment_methods")
-      .select("id, name, type, is_default, credit_limit")
+      .select("id, name, type, is_default, credit_limit, due_day")
       .eq("id", paymentMethodId)
       .eq("user_id", userId)
       .maybeSingle();
@@ -1108,16 +1183,16 @@ async function getPaymentMethodForMutation(paymentMethodId: string) {
       fallbackWithLimit.error?.code === "42703"
         ? await supabase
             .from("payment_methods")
-            .select("id, name, type, credit_limit")
+            .select("id, name, type, credit_limit, due_day")
             .eq("id", paymentMethodId)
             .eq("user_id", userId)
             .maybeSingle()
         : fallbackWithLimit;
 
     data = fallback.data
-      ? ({
+        ? ({
           ...fallback.data,
-          due_day: null,
+          closing_day: null,
           is_default:
             "is_default" in fallback.data ? fallback.data.is_default : null,
         } as PaymentMethodRow)
@@ -1338,11 +1413,169 @@ export async function createSubscription(input: CreateSubscriptionInput) {
   }
 }
 
+type SubscriptionReferenceRow = {
+  category_id: string | null;
+  description: string;
+  id: string;
+  notes: string | null;
+  payment_method_id: string | null;
+};
+
+type SubscriptionOccurrenceRow = {
+  date: string;
+  id: string;
+};
+
+async function getSubscriptionOccurrences(subscriptionId: string) {
+  assertUuid(subscriptionId, "Subscription");
+  const { supabase, userId } = await getUserContext();
+  const { data: reference, error: referenceError } = await supabase
+    .from("transactions")
+    .select("id, description, category_id, payment_method_id, notes")
+    .eq("id", subscriptionId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (referenceError) {
+    throw new Error(
+      `Unable to load subscription: ${referenceError.message}`,
+    );
+  }
+
+  const subscription = reference as SubscriptionReferenceRow | null;
+
+  if (!subscription?.notes?.startsWith("subscription")) {
+    throw new Error("Subscription is invalid.");
+  }
+
+  let query = supabase
+    .from("transactions")
+    .select("id, date")
+    .eq("user_id", userId)
+    .eq("description", subscription.description)
+    .like("notes", "subscription%")
+    .gte("date", getTodayValue())
+    .order("date", { ascending: true });
+
+  query = subscription.category_id
+    ? query.eq("category_id", subscription.category_id)
+    : query.is("category_id", null);
+
+  query = subscription.payment_method_id
+    ? query.eq("payment_method_id", subscription.payment_method_id)
+    : query.is("payment_method_id", null);
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(`Unable to load subscription charges: ${error.message}`);
+  }
+
+  const occurrences = (data ?? []) as SubscriptionOccurrenceRow[];
+
+  if (!occurrences.length) {
+    throw new Error("No future subscription charges found.");
+  }
+
+  return { occurrences, subscription, supabase, userId };
+}
+
+export async function updateSubscription(input: UpdateSubscriptionInput) {
+  const { createdAt } = await getUserContext();
+  const description = assertNonEmptyString(input.description, "Subscription");
+  const amount = Math.abs(input.amount);
+  assertPositiveFiniteAmount(amount, "Amount");
+
+  const categoryId = normalizeNullableId(input.category, "Category");
+  const paymentMethodId = normalizeNullableId(
+    input.paymentMethod,
+    "Payment method",
+  );
+  const date = toIsoDate(input.nextDate);
+
+  assertValidIsoDate(date);
+  assertDateNotBeforeUserCreated(date, createdAt);
+
+  const { occurrences, supabase, userId } = await getSubscriptionOccurrences(
+    input.id,
+  );
+
+  await Promise.all([
+    assertUserCategory(supabase, userId, categoryId),
+    assertUserPaymentMethod(supabase, userId, paymentMethodId),
+  ]);
+
+  const [year, month, day] = date.split("-").map(Number);
+  const baseDate = new Date(year, month - 1, day);
+  const updates = occurrences.map((occurrence, index) =>
+    supabase
+      .from("transactions")
+      .update({
+        amount,
+        category_id: categoryId,
+        date: toDateValue(addMonthsClamped(baseDate, index)),
+        description,
+        notes: `subscription ${index + 1}/12`,
+        payment_method_id: paymentMethodId,
+      })
+      .eq("id", occurrence.id)
+      .eq("user_id", userId),
+  );
+  const results = await Promise.all(updates);
+  const error = results.find((result) => result.error)?.error;
+
+  if (error) {
+    throw new Error(`Unable to update subscription: ${error.message}`);
+  }
+}
+
+export async function setSubscriptionPaused(
+  subscriptionId: string,
+  paused: boolean,
+) {
+  const { occurrences, supabase, userId } =
+    await getSubscriptionOccurrences(subscriptionId);
+  const updates = occurrences.map((occurrence, index) =>
+    supabase
+      .from("transactions")
+      .update({
+        notes: paused
+          ? `subscription paused ${index + 1}/12`
+          : `subscription ${index + 1}/12`,
+      })
+      .eq("id", occurrence.id)
+      .eq("user_id", userId),
+  );
+  const results = await Promise.all(updates);
+  const error = results.find((result) => result.error)?.error;
+
+  if (error) {
+    throw new Error(`Unable to update subscription status: ${error.message}`);
+  }
+}
+
+export async function deleteSubscription(subscriptionId: string) {
+  const { occurrences, supabase, userId } =
+    await getSubscriptionOccurrences(subscriptionId);
+  const occurrenceIds = occurrences.map((occurrence) => occurrence.id);
+  const { error } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("user_id", userId)
+    .in("id", occurrenceIds);
+
+  if (error) {
+    throw new Error(`Unable to delete subscription: ${error.message}`);
+  }
+}
+
 export async function createPaymentMethod(input: CreatePaymentMethodInput) {
   const { supabase, userId } = await getUserContext();
   const name = assertNonEmptyString(input.name, "Payment method name");
   const creditLimit = Number(input.creditLimit ?? 0);
   const dueDay = input.type === "credit" ? (input.dueDay ?? null) : null;
+  const closingDay =
+    input.type === "credit" ? (input.closingDay ?? null) : null;
 
   if (!isEditablePaymentMethodType(input.type)) {
     throw new Error("Payment method type is invalid.");
@@ -1352,14 +1585,11 @@ export async function createPaymentMethod(input: CreatePaymentMethodInput) {
     throw new Error("Payment method credit limit is invalid.");
   }
 
-  if (
-    dueDay !== null &&
-    (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31)
-  ) {
-    throw new Error("Payment method due day is invalid.");
-  }
+  assertValidMonthDay(dueDay, "Payment method due day");
+  assertValidMonthDay(closingDay, "Payment method closing day");
 
   const { error } = await supabase.from("payment_methods").insert({
+    closing_day: closingDay,
     credit_limit: creditLimit,
     due_day: dueDay,
     name,
@@ -1370,6 +1600,7 @@ export async function createPaymentMethod(input: CreatePaymentMethodInput) {
   if (error?.code === "42703") {
     const fallbackWithLimit = await supabase.from("payment_methods").insert({
       credit_limit: creditLimit,
+      due_day: dueDay,
       name,
       type: input.type,
       user_id: userId,
@@ -1404,6 +1635,8 @@ export async function updatePaymentMethod(input: UpdatePaymentMethodInput) {
   const name = assertNonEmptyString(input.name, "Payment method name");
   const creditLimit = Number(input.creditLimit ?? 0);
   const dueDay = input.type === "credit" ? (input.dueDay ?? null) : null;
+  const closingDay =
+    input.type === "credit" ? (input.closingDay ?? null) : null;
 
   if (!isEditablePaymentMethodType(input.type)) {
     throw new Error("Payment method type is invalid.");
@@ -1413,12 +1646,8 @@ export async function updatePaymentMethod(input: UpdatePaymentMethodInput) {
     throw new Error("Payment method credit limit is invalid.");
   }
 
-  if (
-    dueDay !== null &&
-    (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31)
-  ) {
-    throw new Error("Payment method due day is invalid.");
-  }
+  assertValidMonthDay(dueDay, "Payment method due day");
+  assertValidMonthDay(closingDay, "Payment method closing day");
 
   const { paymentMethod, supabase, userId } = await getPaymentMethodForMutation(
     input.id,
@@ -1431,6 +1660,7 @@ export async function updatePaymentMethod(input: UpdatePaymentMethodInput) {
   const { error } = await supabase
     .from("payment_methods")
     .update({
+      closing_day: closingDay,
       credit_limit: creditLimit,
       due_day: dueDay,
       name,
@@ -1444,6 +1674,7 @@ export async function updatePaymentMethod(input: UpdatePaymentMethodInput) {
       .from("payment_methods")
       .update({
         credit_limit: creditLimit,
+        due_day: dueDay,
         name,
         type: input.type,
       })
@@ -1671,18 +1902,25 @@ export async function listTransactions(options?: {
   includePrevious?: boolean;
   includeFuture?: boolean;
   month?: string;
+  useFinancialMonth?: boolean;
 }) {
   const { supabase, userId } = await getUserContext();
   const includePrevious = options?.includePrevious ?? false;
   const includeFuture = options?.includeFuture ?? false;
+  const useFinancialMonth = options?.useFinancialMonth ?? true;
   const monthRange = options?.month
     ? includeFuture
       ? getMonthRange(options.month)
       : getCollectedMonthRange(options.month)
     : null;
   const queryStart = monthRange
-    ? `${getPreviousMonthValue(monthRange.month)}-01`
+    ? useFinancialMonth
+      ? `${getPreviousMonthValue(monthRange.month)}-01`
+      : monthRange.start
     : null;
+  const filterByMonth = useFinancialMonth
+    ? filterByFinancialMonth
+    : filterByTransactionMonth;
 
   let query = supabase
     .from("transactions")
@@ -1706,9 +1944,13 @@ export async function listTransactions(options?: {
     const transactions = ((data ?? []) as unknown as TransactionRow[]).map(
       toTransaction,
     );
-    return monthRange
-      ? filterByFinancialMonth(transactions, monthRange.month, includePrevious)
+    const filteredTransactions = monthRange
+      ? filterByMonth(transactions, monthRange.month, includePrevious)
       : transactions;
+
+    return includeFuture
+      ? markPlannedTransactions(filteredTransactions)
+      : filteredTransactions;
   }
 
   if (error.code === "42703") {
@@ -1737,9 +1979,13 @@ export async function listTransactions(options?: {
     const transactions = (
       (fallbackData ?? []) as unknown as TransactionRow[]
     ).map(toTransaction);
-    return monthRange
-      ? filterByFinancialMonth(transactions, monthRange.month, includePrevious)
+    const filteredTransactions = monthRange
+      ? filterByMonth(transactions, monthRange.month, includePrevious)
       : transactions;
+
+    return includeFuture
+      ? markPlannedTransactions(filteredTransactions)
+      : filteredTransactions;
   }
 
   throw new Error(`Unable to load transactions: ${error.message}`);
@@ -1885,7 +2131,7 @@ export async function getDashboardData(month?: string): Promise<DashboardData> {
     // marking scheduled ones with `isPlanned` so the UI can render them faded.
     latestTransactions: (() => {
       const today = getTodayValue();
-      const byId = new Map<string, any>();
+      const byId = new Map<string, Transaction>();
 
       for (const tx of transactions) {
         byId.set(tx.id, tx);

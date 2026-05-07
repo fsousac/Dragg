@@ -4,15 +4,16 @@ export function getMonthFromSearchParams(searchParams: URLSearchParams) {
   return month?.match(/^\d{4}-\d{2}$/) ? month : null;
 }
 
+export function getCurrentMonthValue() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export function withSelectedMonth(
   href: string,
   searchParams: URLSearchParams,
 ) {
-  const month = getMonthFromSearchParams(searchParams);
-
-  if (!month) {
-    return href;
-  }
+  const month = getMonthFromSearchParams(searchParams) ?? getCurrentMonthValue();
 
   const [pathname, query = ""] = href.split("?");
   const nextSearchParams = new URLSearchParams(query);

@@ -124,9 +124,9 @@ export function TransactionsScreen({
   const { formatCurrency, formatDate, t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const searchQuery = "";
+  const typeFilter = "all";
+  const categoryFilter = "all";
   const [sortOption, setSortOption] = useState<SortOption>("date-desc");
   const [isNewTransactionOpen, setIsNewTransactionOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] =
@@ -162,13 +162,6 @@ export function TransactionsScreen({
         value: paymentMethod.id,
       })),
     [paymentMethods, t],
-  );
-
-  const uniqueCategories = useMemo(
-    () => [
-      ...new Set(transactions.map((transaction) => transaction.categoryKey)),
-    ],
-    [transactions],
   );
 
   const filteredTransactions = useMemo(() => {
@@ -300,19 +293,6 @@ export function TransactionsScreen({
               {filteredTransactions.length} {t("screen.transactions.count")}
             </CardTitle>
             <div className="flex items-center gap-1">
-              <Button asChild size="sm" variant="outline">
-                <Link
-                  href={
-                    showPrevious
-                      ? withSelectedMonth("/transactions", searchParams)
-                      : previousTransactionsHref
-                  }
-                >
-                  {showPrevious
-                    ? t("screen.transactions.hidePrevious")
-                    : t("screen.transactions.showPrevious")}
-                </Link>
-              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -357,117 +337,144 @@ export function TransactionsScreen({
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y divide-border">
-            {filteredTransactions.map((transaction) => (
-              <div
-                key={transaction.id}
-                className={`flex items-center gap-2 p-4 ${
-                  (transaction as any).isPlanned ? "opacity-70" : ""
-                }`}
-              >
-                <button
-                  type="button"
-                  className="flex min-w-0 flex-1 items-center gap-4 rounded-md text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  onClick={() => openTransactionDialog(transaction)}
+            {filteredTransactions.map((transaction) => {
+              const isPlanned = Boolean(transaction.isPlanned);
+
+              return (
+                <div
+                  key={transaction.id}
+                  className={cn(
+                    "flex items-center gap-2 p-4",
+                    isPlanned && "bg-muted/20",
+                  )}
                 >
-                  <div className="flex size-12 items-center justify-center rounded-lg bg-accent text-2xl">
-                    {transaction.icon}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate font-medium text-foreground">
-                        {t(transaction.descriptionKey)}
-                      </p>
-                      {transaction.type === "income" && (
-                        <ArrowUpRight className="size-4 shrink-0 text-income" />
-                      )}
-                      {transaction.type === "expense" && (
-                        <ArrowDownRight className="size-4 shrink-0 text-expense" />
-                      )}
-                      {transaction.type === "saving" && (
-                        <Wallet className="size-4 shrink-0 text-savings" />
-                      )}
-                    </div>
-                    <div className="mt-1 flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">
-                        {t(transaction.categoryKey)}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDate(transaction.date, {
-                          day: "numeric",
-                          month: "short",
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                  <p
-                    className={cn(
-                      "tabular-nums font-semibold",
-                      transaction.amount > 0
-                        ? "text-income"
-                        : "text-foreground",
-                    )}
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-4 rounded-md text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => openTransactionDialog(transaction)}
                   >
-                    {transaction.amount > 0 ? "+" : ""}
-                    {formatCurrency(Math.abs(transaction.amount))}
-                  </p>
-                </button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-9 shrink-0 text-muted-foreground"
+                    <div
+                      className={cn(
+                        "flex size-12 items-center justify-center rounded-lg bg-accent text-2xl",
+                        isPlanned && "grayscale opacity-55",
+                      )}
                     >
-                      <MoreHorizontal className="size-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        openTransactionDialog(transaction);
-                      }}
+                      {transaction.icon}
+                    </div>
+                    <div
+                      className={cn(
+                        "min-w-0 flex-1",
+                        isPlanned && "opacity-65",
+                      )}
                     >
-                      <Pencil className="size-4" />
-                      {t("common.edit")}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      variant="destructive"
-                      disabled={
-                        isPending && pendingTransactionId === transaction.id
-                      }
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleDeleteTransaction(transaction);
-                      }}
+                      <div className="flex items-center gap-2">
+                        <p
+                          className={cn(
+                            "truncate font-medium text-foreground",
+                            isPlanned && "text-muted-foreground",
+                          )}
+                        >
+                          {t(transaction.descriptionKey)}
+                        </p>
+                        {isPlanned ? (
+                          <Badge
+                            variant="secondary"
+                            className="shrink-0 border-border bg-muted px-2 py-0 text-[10px] font-medium text-muted-foreground"
+                          >
+                            {t("screen.transactions.planned")}
+                          </Badge>
+                        ) : null}
+                        {transaction.type === "income" && (
+                          <ArrowUpRight className="size-4 shrink-0 text-income" />
+                        )}
+                        {transaction.type === "expense" && (
+                          <ArrowDownRight className="size-4 shrink-0 text-expense" />
+                        )}
+                        {transaction.type === "saving" && (
+                          <Wallet className="size-4 shrink-0 text-savings" />
+                        )}
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">
+                          {t(transaction.categoryKey)}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDate(transaction.date, {
+                            day: "numeric",
+                            month: "short",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                    <p
+                      className={cn(
+                        "tabular-nums font-semibold",
+                        transaction.amount > 0
+                          ? "text-income"
+                          : "text-foreground",
+                      )}
                     >
-                      <Trash2 className="size-4" />
-                      {t("common.delete")}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))}
+                      {transaction.amount > 0 ? "+" : ""}
+                      {formatCurrency(Math.abs(transaction.amount))}
+                    </p>
+                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-9 shrink-0 text-muted-foreground"
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openTransactionDialog(transaction);
+                        }}
+                      >
+                        <Pencil className="size-4" />
+                        {t("common.edit")}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        variant="destructive"
+                        disabled={
+                          isPending && pendingTransactionId === transaction.id
+                        }
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleDeleteTransaction(transaction);
+                        }}
+                      >
+                        <Trash2 className="size-4" />
+                        {t("common.delete")}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              );
+            })}
+            <div className="flex justify-center p-4">
+              <Button asChild size="sm" variant="outline">
+                <Link
+                  href={
+                    showPrevious
+                      ? withSelectedMonth("/transactions", searchParams)
+                      : previousTransactionsHref
+                  }
+                >
+                  {showPrevious
+                    ? t("screen.transactions.hidePrevious")
+                    : t("screen.transactions.showPrevious")}
+                </Link>
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
-
-      <div className="mt-4 flex justify-end">
-        <Button asChild size="sm" variant="outline">
-          <Link
-            href={
-              showPrevious
-                ? withSelectedMonth("/transactions", searchParams)
-                : previousTransactionsHref
-            }
-          >
-            {showPrevious
-              ? t("screen.transactions.hidePrevious")
-              : t("screen.transactions.showPrevious")}
-          </Link>
-        </Button>
-      </div>
 
       <Dialog
         open={Boolean(selectedTransaction)}

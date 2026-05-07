@@ -48,18 +48,22 @@ type CategoryGroup = CreateCategoryInput["group"];
 
 const groupOptions: CategoryGroup[] = ["needs", "wants", "savings"];
 const emojiOptions = [
-  "🏠",
-  "🛒",
-  "🚗",
-  "🏥",
-  "📚",
-  "🧾",
-  "🎮",
-  "🎬",
-  "🛍️",
-  "📈",
-  "💼",
-  "🏷️",
+  { emoji: "🏠", label: "Moradia" },
+  { emoji: "🛒", label: "Mercado" },
+  { emoji: "🍽️", label: "Alimentação" },
+  { emoji: "🚗", label: "Transporte" },
+  { emoji: "🏥", label: "Saúde" },
+  { emoji: "🏋️", label: "Academia" },
+  { emoji: "📚", label: "Educação" },
+  { emoji: "🧾", label: "Contas" },
+  { emoji: "💡", label: "Serviços" },
+  { emoji: "🎬", label: "Assinaturas" },
+  { emoji: "🎮", label: "Lazer" },
+  { emoji: "🛍️", label: "Compras" },
+  { emoji: "✈️", label: "Viagem" },
+  { emoji: "🎁", label: "Presentes" },
+  { emoji: "📈", label: "Investimentos" },
+  { emoji: "🏷️", label: "Outros" },
 ];
 
 function sanitizeCurrencyInput(value: string) {
@@ -213,7 +217,7 @@ export function NewCategoryDialog({
             <Label htmlFor="category-icon">{t("category.icon")}</Label>
             <div className="flex items-center gap-2">
               <div className="flex flex-wrap gap-1.5">
-                {emojiOptions.map((emoji) => (
+                {emojiOptions.map(({ emoji, label }) => (
                   <button
                     key={emoji}
                     type="button"
@@ -224,7 +228,7 @@ export function NewCategoryDialog({
                         : "border-border",
                     )}
                     onClick={() => setIcon(emoji)}
-                    aria-label={emoji}
+                    aria-label={label}
                     aria-pressed={icon === emoji}
                   >
                     {emoji}

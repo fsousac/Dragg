@@ -250,6 +250,7 @@ const messages = {
     "payments.editMethodDescription":
       "Update the name and type used when recording transactions.",
     "payments.limit": "Limit",
+    "payments.closingDay": "Closing day",
     "payments.dueDay": "Due day",
     "payments.methodCreateError": "Failed to create payment method.",
     "payments.methodCreateSuccess": "Payment method created successfully.",
@@ -264,8 +265,15 @@ const messages = {
     "payments.methodUpdateSuccess": "Payment method updated successfully.",
     "payments.methodsTitle": "Payment methods",
     "payments.noLimit": "No absolute limit",
+    "payments.noClosingDay": "No closing day",
     "payments.noDueDay": "No due day",
     "payments.protectedMethod": "Default",
+    "payments.deleteSubscription": "Delete subscription?",
+    "payments.deleteSubscriptionDescription":
+      "Future charges for this subscription will be removed.",
+    "payments.editSubscription": "Edit subscription",
+    "payments.editSubscriptionDescription":
+      "Update future charges for this subscription.",
     "payments.totalLimit": "Absolute limits",
     "payments.totalLimitDescription": "Configured payment capacity",
     "payments.totalSpent": "Total spent",
@@ -277,9 +285,19 @@ const messages = {
     "payments.subscriptionCreateSuccess":
       "Subscription scheduled successfully.",
     "payments.subscriptionCreating": "Scheduling...",
+    "payments.subscriptionDeleteError": "Failed to delete subscription.",
+    "payments.subscriptionDeleteSuccess":
+      "Subscription deleted successfully.",
     "payments.subscriptionName": "Subscription",
     "payments.subscriptionNamePlaceholder": "E.g., Netflix, gym, software...",
     "payments.subscriptionNameRequired": "Enter a subscription name.",
+    "payments.subscriptionPauseSuccess": "Subscription paused.",
+    "payments.subscriptionResumeSuccess": "Subscription resumed.",
+    "payments.subscriptionStatusError":
+      "Failed to update subscription status.",
+    "payments.subscriptionUpdateError": "Failed to update subscription.",
+    "payments.subscriptionUpdateSuccess":
+      "Subscription updated successfully.",
     "payments.type.boleto": "Bill",
     "payments.type.other": "Other",
     "payments.type.cash": "Payment",
@@ -362,6 +380,7 @@ const messages = {
     "screen.transactions.description": "View and manage all your transactions",
     "screen.transactions.search": "Search transactions...",
     "screen.transactions.hidePrevious": "Hide previous",
+    "screen.transactions.planned": "Planned",
     "screen.transactions.showPrevious": "Show previous",
     "screen.transactions.sort": "Sort",
     "screen.transactions.sortAmountAsc": "Amount: low to high",
@@ -669,6 +688,7 @@ const messages = {
     "payments.editMethodDescription":
       "Atualize o nome e o tipo usados ao registrar transações.",
     "payments.limit": "Limite",
+    "payments.closingDay": "Dia de fechamento",
     "payments.dueDay": "Dia de vencimento",
     "payments.methodCreateError":
       "Não foi possível criar a forma de pagamento.",
@@ -687,8 +707,15 @@ const messages = {
       "Forma de pagamento atualizada com sucesso.",
     "payments.methodsTitle": "Formas de pagamento",
     "payments.noLimit": "Sem limite absoluto",
+    "payments.noClosingDay": "Sem fechamento",
     "payments.noDueDay": "Sem vencimento",
     "payments.protectedMethod": "Padrão",
+    "payments.deleteSubscription": "Excluir assinatura?",
+    "payments.deleteSubscriptionDescription":
+      "As próximas cobranças desta assinatura serão removidas.",
+    "payments.editSubscription": "Editar assinatura",
+    "payments.editSubscriptionDescription":
+      "Atualize as próximas cobranças desta assinatura.",
     "payments.totalLimit": "Limites absolutos",
     "payments.totalLimitDescription": "Capacidade configurada de pagamento",
     "payments.totalSpent": "Total gasto",
@@ -699,10 +726,21 @@ const messages = {
     "payments.subscriptionCreateError": "Não foi possível criar a assinatura.",
     "payments.subscriptionCreateSuccess": "Assinatura agendada com sucesso.",
     "payments.subscriptionCreating": "Agendando...",
+    "payments.subscriptionDeleteError":
+      "Não foi possível excluir a assinatura.",
+    "payments.subscriptionDeleteSuccess": "Assinatura excluída com sucesso.",
     "payments.subscriptionName": "Assinatura",
     "payments.subscriptionNamePlaceholder":
       "Ex.: Netflix, academia, software...",
     "payments.subscriptionNameRequired": "Informe o nome da assinatura.",
+    "payments.subscriptionPauseSuccess": "Assinatura pausada.",
+    "payments.subscriptionResumeSuccess": "Assinatura retomada.",
+    "payments.subscriptionStatusError":
+      "Não foi possível atualizar o status da assinatura.",
+    "payments.subscriptionUpdateError":
+      "Não foi possível atualizar a assinatura.",
+    "payments.subscriptionUpdateSuccess":
+      "Assinatura atualizada com sucesso.",
     "payments.type.boleto": "Boleto",
     "payments.type.other": "Outro",
     "payments.type.cash": "Pagamento",
@@ -787,6 +825,7 @@ const messages = {
       "Veja e gerencie todas as suas transações",
     "screen.transactions.search": "Buscar transações...",
     "screen.transactions.hidePrevious": "Ocultar anteriores",
+    "screen.transactions.planned": "Prevista",
     "screen.transactions.showPrevious": "Mostrar anteriores",
     "screen.transactions.sort": "Ordenar",
     "screen.transactions.sortAmountAsc": "Valor: menor primeiro",
@@ -911,7 +950,13 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         setLocaleState(nextLocale);
       },
       t(key: string) {
-        return messages[locale][key as keyof Messages] ?? key;
+        return (
+          messages[locale][key as keyof Messages] ??
+          messages[locale][`data.category.${key}` as keyof Messages] ??
+          messages[locale][`data.group.${key}` as keyof Messages] ??
+          messages[locale][`common.${key}` as keyof Messages] ??
+          key
+        );
       },
     }),
     [locale],

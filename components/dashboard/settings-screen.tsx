@@ -74,7 +74,11 @@ export function SettingsScreen({ profile }: SettingsScreenProps) {
           <div className="flex items-center gap-4">
             <Avatar className="size-16 border-2 border-primary">
               {profile.avatarUrl ? (
-                <AvatarImage src={profile.avatarUrl} alt={profile.fullName} />
+                <AvatarImage
+                  src={profile.avatarUrl}
+                  alt={profile.fullName}
+                  referrerPolicy="no-referrer"
+                />
               ) : null}
               <AvatarFallback className="bg-gradient-to-br from-primary to-emerald-400 text-xl font-bold text-primary-foreground">
                 {getInitials(profile.fullName)}

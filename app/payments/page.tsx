@@ -4,7 +4,11 @@ import {
   createPaymentMethodAction,
   createSubscriptionAction,
   deletePaymentMethodAction,
+  deleteSubscriptionAction,
+  pauseSubscriptionAction,
+  resumeSubscriptionAction,
   updatePaymentMethodAction,
+  updateSubscriptionAction,
 } from "@/app/transactions/actions"
 import {
   getTransactionFormOptions,
@@ -36,10 +40,14 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
         createPaymentMethodAction={createPaymentMethodAction}
         createSubscriptionAction={createSubscriptionAction}
         deletePaymentMethodAction={deletePaymentMethodAction}
+        deleteSubscriptionAction={deleteSubscriptionAction}
+        pauseSubscriptionAction={pauseSubscriptionAction}
         paymentMethods={paymentMethods}
+        resumeSubscriptionAction={resumeSubscriptionAction}
         subscriptions={subscriptions}
         transactionPaymentMethods={transactionFormOptions.paymentMethods}
         updatePaymentMethodAction={updatePaymentMethodAction}
+        updateSubscriptionAction={updateSubscriptionAction}
       />
     </AppShell>
   )

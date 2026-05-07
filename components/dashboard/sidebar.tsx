@@ -106,7 +106,11 @@ export function Sidebar({
         >
           <Avatar className="size-8">
             {userAvatarUrl ? (
-              <AvatarImage src={userAvatarUrl} alt={userName} />
+              <AvatarImage
+                src={userAvatarUrl}
+                alt={userName}
+                referrerPolicy="no-referrer"
+              />
             ) : null}
             <AvatarFallback className="bg-gradient-to-br from-primary to-emerald-400 text-xs font-bold text-primary-foreground">
               {initials}

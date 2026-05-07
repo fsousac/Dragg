@@ -3,7 +3,11 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { withSelectedMonth } from "@/components/dashboard/month-route";
+import {
+  getCurrentMonthValue,
+  getMonthFromSearchParams,
+  withSelectedMonth,
+} from "@/components/dashboard/month-route";
 
 export const sidebarRoutes = [
   "/dashboard",
@@ -21,6 +25,18 @@ export function NavigationPrefetcher() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const didMount = useRef(false);
+
+  useEffect(() => {
+    if (getMonthFromSearchParams(searchParams)) {
+      return;
+    }
+
+    const nextSearchParams = new URLSearchParams(searchParams.toString());
+    nextSearchParams.set("month", getCurrentMonthValue());
+    router.replace(`${pathname}?${nextSearchParams.toString()}`, {
+      scroll: false,
+    });
+  }, [pathname, router, searchParams]);
 
   useEffect(() => {
     const prefetchRoutes = () => {

@@ -15,6 +15,7 @@ export interface Transaction {
   paymentMethodId?: string | null;
   paymentMethodKey?: string | null;
   paymentMethodDueDay?: number | null;
+  paymentMethodClosingDay?: number | null;
   paymentMethodType?: string | null;
   isPlanned?: boolean;
 }

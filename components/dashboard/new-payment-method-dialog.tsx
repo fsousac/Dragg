@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Plus, CreditCard } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -51,7 +51,9 @@ export function NewPaymentMethodDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<CreatePaymentMethodInput["type"]>("debit");
+  const [closingDay, setClosingDay] = useState("");
   const [creditLimit, setCreditLimit] = useState("");
+  const [dueDay, setDueDay] = useState("");
   const open = controlledOpen ?? internalOpen;
   const setOpen = (nextOpen: boolean) => {
     onOpenChange?.(nextOpen);
@@ -62,7 +64,9 @@ export function NewPaymentMethodDialog({
     if (open) {
       setName("");
       setType("debit");
+      setClosingDay("");
       setCreditLimit("");
+      setDueDay("");
     }
   }, [open]);
 
@@ -98,6 +102,9 @@ export function NewPaymentMethodDialog({
         type: type,
         creditLimit:
           type === "credit" ? parseCurrencyInput(creditLimit) : undefined,
+        closingDay:
+          type === "credit" && closingDay ? Number(closingDay) : undefined,
+        dueDay: type === "credit" && dueDay ? Number(dueDay) : undefined,
       });
 
       toast.success(t("paymentMethod.createSuccess"));
@@ -157,20 +164,50 @@ export function NewPaymentMethodDialog({
           </div>
 
           {type === "credit" ? (
-            <div className="space-y-2">
-              <Label htmlFor="credit-limit">
-                {t("paymentMethod.creditLimit")}
-              </Label>
-              <Input
-                id="credit-limit"
-                inputMode="decimal"
-                pattern="[0-9]*[,.]?[0-9]*"
-                placeholder="0,00"
-                value={creditLimit}
-                onChange={(e) =>
-                  setCreditLimit(sanitizeCurrencyInput(e.target.value))
-                }
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="credit-limit">
+                  {t("paymentMethod.creditLimit")}
+                </Label>
+                <Input
+                  id="credit-limit"
+                  inputMode="decimal"
+                  pattern="[0-9]*[,.]?[0-9]*"
+                  placeholder="0,00"
+                  value={creditLimit}
+                  onChange={(e) =>
+                    setCreditLimit(sanitizeCurrencyInput(e.target.value))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="credit-closing-day">
+                  {t("payments.closingDay")}
+                </Label>
+                <Input
+                  id="credit-closing-day"
+                  inputMode="numeric"
+                  max="31"
+                  min="1"
+                  placeholder="7"
+                  type="number"
+                  value={closingDay}
+                  onChange={(e) => setClosingDay(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="credit-due-day">{t("payments.dueDay")}</Label>
+                <Input
+                  id="credit-due-day"
+                  inputMode="numeric"
+                  max="31"
+                  min="1"
+                  placeholder="14"
+                  type="number"
+                  value={dueDay}
+                  onChange={(e) => setDueDay(e.target.value)}
+                />
+              </div>
             </div>
           ) : null}
 

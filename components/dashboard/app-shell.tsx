@@ -23,13 +23,69 @@ function getInitials(name: string) {
 }
 
 function getMetadataValue(
-  metadata: Record<string, unknown>,
+  metadata: Array<Record<string, unknown> | undefined | null>,
   keys: string[],
 ) {
-  for (const key of keys) {
-    const value = metadata[key];
-    if (typeof value === "string" && value.trim()) {
-      return value;
+  for (const source of metadata) {
+    if (!source) continue;
+
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === "string" && value.trim()) {
+        return value;
+      }
+    }
+  }
+
+  return null;
+}
+
+function getAvatarUrl(metadata: Array<Record<string, unknown> | undefined | null>) {
+  const directValue = getMetadataValue(metadata, [
+    "avatar_url",
+    "avatarUrl",
+    "picture",
+    "photo_url",
+    "photoUrl",
+  ]);
+
+  if (directValue) {
+    return directValue;
+  }
+
+  const queue: unknown[] = [...metadata];
+
+  while (queue.length) {
+    const value = queue.shift();
+
+    if (Array.isArray(value)) {
+      queue.push(...value);
+      continue;
+    }
+
+    if (!value || typeof value !== "object") {
+      continue;
+    }
+
+    for (const [key, nestedValue] of Object.entries(value)) {
+      if (typeof nestedValue === "string") {
+        const lowerKey = key.toLowerCase();
+        const looksLikeAvatarKey =
+          lowerKey.includes("avatar") ||
+          lowerKey.includes("picture") ||
+          lowerKey.includes("photo");
+        const looksLikeImageUrl =
+          /^https?:\/\//.test(nestedValue) &&
+          /(googleusercontent|gravatar|avatar|photo|picture|image)/i.test(
+            nestedValue,
+          );
+
+        if (looksLikeAvatarKey || looksLikeImageUrl) {
+          return nestedValue;
+        }
+      } else if (nestedValue && typeof nestedValue === "object") {
+        queue.push(nestedValue);
+      }
     }
   }
 
@@ -60,10 +116,14 @@ export async function AppShell({ children }: AppShellProps) {
     user.user_metadata?.name ??
     getDisplayName(userEmail);
   const initials = getInitials(userName);
-  const avatarUrl = getMetadataValue(user.user_metadata ?? {}, [
-    "avatar_url",
-    "picture",
-    "photo_url",
+  const identityMetadata = user.identities
+    ?.map((identity) => identity.identity_data as Record<string, unknown>)
+    .filter(Boolean);
+  const avatarUrl = getAvatarUrl([
+    user.user_metadata ?? {},
+    user.app_metadata ?? {},
+    claims as Record<string, unknown>,
+    ...(identityMetadata ?? []),
   ]);
 
   async function signOut() {

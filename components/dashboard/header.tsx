@@ -12,7 +12,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { withSelectedMonth } from "@/components/dashboard/month-route";
+import {
+  getCurrentMonthValue,
+  withSelectedMonth,
+} from "@/components/dashboard/month-route";
 import { useI18n } from "@/lib/i18n";
 
 interface HeaderProps {
@@ -20,11 +23,6 @@ interface HeaderProps {
   initials?: string;
   userAvatarUrl?: string | null;
   userName?: string;
-}
-
-function getCurrentMonthValue() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function isMonthValue(value: string | null) {
@@ -136,7 +134,11 @@ export function Header({
           >
             <Avatar className="w-10 h-10 border-2 border-primary">
               {userAvatarUrl ? (
-                <AvatarImage src={userAvatarUrl} alt={userName} />
+                <AvatarImage
+                  src={userAvatarUrl}
+                  alt={userName}
+                  referrerPolicy="no-referrer"
+                />
               ) : null}
               <AvatarFallback className="bg-linear-to-br from-primary to-emerald-400 text-primary-foreground font-bold">
                 {initials}
@@ -182,7 +184,11 @@ export function Header({
           >
             <Avatar className="size-9 border-2 border-primary">
               {userAvatarUrl ? (
-                <AvatarImage src={userAvatarUrl} alt={userName} />
+                <AvatarImage
+                  src={userAvatarUrl}
+                  alt={userName}
+                  referrerPolicy="no-referrer"
+                />
               ) : null}
               <AvatarFallback className="bg-linear-to-br from-primary to-emerald-400 text-xs font-bold text-primary-foreground">
                 {initials}

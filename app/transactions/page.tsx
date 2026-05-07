@@ -34,6 +34,7 @@ export default async function TransactionsPage({
       includePrevious: showPrevious,
       includeFuture: true,
       month: selectedMonth,
+      useFinancialMonth: false,
     }),
     getTransactionFormOptions(),
   ]);
