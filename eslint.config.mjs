@@ -13,7 +13,9 @@ export default defineConfig([
   },
   globalIgnores([
     ".v0-export/**",
+    ".agents/**",
     ".next/**",
+    "coverage/**",
     "next-env.d.ts",
     "node_modules/**",
     "out/**",

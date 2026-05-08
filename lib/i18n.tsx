@@ -2,11 +2,15 @@
 
 import * as React from "react";
 
+import { formatCurrencyValue, resolveCurrency } from "@/lib/i18n-currency";
+
 export type Locale = "en" | "pt-BR";
+export type Currency = "BRL" | "USD" | "EUR";
 
 type Messages = typeof messages.en;
 
 const localeStorageKey = "dragg-locale";
+const currencyStorageKey = "dragg-currency";
 
 const messages = {
   en: {
@@ -24,6 +28,7 @@ const messages = {
     "common.viewAll": "View All",
     "common.ofBudget": "of budget",
     "common.ofTotal": "of total",
+    "common.planned": "Planned",
     "common.used": "used",
     "common.active": "active",
     "common.addFunds": "Add funds",
@@ -152,12 +157,16 @@ const messages = {
     "data.frequency.monthly": "Monthly",
     "data.frequency.weekly": "Weekly",
     "data.frequency.yearly": "Yearly",
-    "dashboard.budgetProgress.description": "Monthly spending by 50/30/20 group",
+    "dashboard.budgetProgress.description":
+      "Monthly spending by 50/30/20 group",
     "dashboard.budgetProgress.title": "Budget Progress",
     "dashboard.budgetSplit.description": "Planned budget and spending by group",
+    "dashboard.budgetSplit.incomeBase": "Monthly income base",
+    "dashboard.budgetSplit.ofIncomeBase": "of income",
     "dashboard.budgetSplit.title": "50/30/20 by Group",
-    "dashboard.expensesByCategory.description": "Spending grouped by 50/30/20",
-    "dashboard.expensesByCategory.title": "Expenses by Group",
+    "dashboard.expensesByCategory.description":
+      "Category spending grouped by 50/30/20",
+    "dashboard.expensesByCategory.title": "Expenses by Category",
     "dashboard.expensesOverTime.description": "Monthly expense trend",
     "dashboard.expensesOverTime.title": "Expenses Over Time",
     "dashboard.greeting": "Good evening",
@@ -308,18 +317,15 @@ const messages = {
       "Subscription scheduled successfully.",
     "payments.subscriptionCreating": "Scheduling...",
     "payments.subscriptionDeleteError": "Failed to delete subscription.",
-    "payments.subscriptionDeleteSuccess":
-      "Subscription deleted successfully.",
+    "payments.subscriptionDeleteSuccess": "Subscription deleted successfully.",
     "payments.subscriptionName": "Subscription",
     "payments.subscriptionNamePlaceholder": "E.g., Netflix, gym, software...",
     "payments.subscriptionNameRequired": "Enter a subscription name.",
     "payments.subscriptionPauseSuccess": "Subscription paused.",
     "payments.subscriptionResumeSuccess": "Subscription resumed.",
-    "payments.subscriptionStatusError":
-      "Failed to update subscription status.",
+    "payments.subscriptionStatusError": "Failed to update subscription status.",
     "payments.subscriptionUpdateError": "Failed to update subscription.",
-    "payments.subscriptionUpdateSuccess":
-      "Subscription updated successfully.",
+    "payments.subscriptionUpdateSuccess": "Subscription updated successfully.",
     "payments.type.boleto": "Bill",
     "payments.type.other": "Other",
     "payments.type.cash": "Payment",
@@ -346,57 +352,24 @@ const messages = {
     "screen.reports.title": "Reports",
     "screen.reports.thisMonth": "this month",
     "screen.reports.vsLastMonth": "vs last month",
-    "screen.settings.account": "Account",
-    "screen.settings.activeSessions": "Active Sessions",
     "screen.settings.appearance": "Appearance",
-    "screen.settings.budgetAlerts": "Budget Alerts",
-    "screen.settings.changeAvatar": "Change Avatar",
-    "screen.settings.changePassword": "Change Password",
-    "screen.settings.compactMode": "Compact Mode",
-    "screen.settings.contactSupport": "Contact Support",
     "screen.settings.currency": "Currency",
-    "screen.settings.dangerZone": "Danger Zone",
-    "screen.settings.dateFormat": "Date Format",
-    "screen.settings.deleteAccount": "Delete Account",
     "screen.settings.description": "Manage your account and preferences",
     "screen.settings.email": "Email",
-    "screen.settings.emailNotifications": "Email Notifications",
-    "screen.settings.exportData": "Export Data",
-    "screen.settings.firstDayOfWeek": "First Day of Week",
     "screen.settings.firstName": "First Name",
-    "screen.settings.goalProgress": "Goal Progress",
-    "screen.settings.helpCenter": "Help Center",
-    "screen.settings.helpSupport": "Help & Support",
     "screen.settings.language": "Language",
     "screen.settings.lastName": "Last Name",
-    "screen.settings.notifications": "Notifications",
-    "screen.settings.paymentReminders": "Payment Reminders",
-    "screen.settings.phone": "Phone",
-    "screen.settings.privacyPolicy": "Privacy Policy",
     "screen.settings.profile": "Profile",
     "screen.settings.profileDescription": "Manage your personal information",
     "screen.settings.regional": "Regional Settings",
     "screen.settings.regionalDescription":
       "Configure currency and locale preferences",
-    "screen.settings.saveChanges": "Save Changes",
-    "screen.settings.security": "Security",
-    "screen.settings.securityDescription": "Manage your security settings",
     "screen.settings.appearanceDescription": "Customize how Dragg looks",
-    "screen.settings.compactDescription":
-      "Show more content with smaller spacing",
-    "screen.settings.helpDescription": "Get help with Dragg",
-    "screen.settings.notificationsDescription":
-      "Configure your notification preferences",
     "screen.settings.themeDescription": "Switch between light and dark mode",
-    "screen.settings.terms": "Terms of Service",
     "screen.settings.theme": "Theme",
     "screen.settings.title": "Settings",
-    "screen.settings.twoFactor": "Two-Factor Authentication",
     "settings.createdAt": "Account created",
-    "settings.lastSignInAt": "Last sign in",
-    "settings.linkedProviders": "Linked providers",
     "settings.notAvailable": "Not available",
-    "settings.primaryProvider": "Primary provider",
     "screen.transactions.add": "Add Transaction",
     "screen.transactions.count": "Transactions",
     "screen.transactions.description": "View and manage all your transactions",
@@ -480,6 +453,7 @@ const messages = {
     "common.viewAll": "Ver tudo",
     "common.ofBudget": "do orçamento",
     "common.ofTotal": "do total",
+    "common.planned": "Planejado",
     "common.used": "usado",
     "common.active": "ativos",
     "common.addFunds": "Adicionar valor",
@@ -499,7 +473,7 @@ const messages = {
     "common.export": "Exportar",
     "common.income": "Renda",
     "common.expense": "Gasto",
-    "common.left": "Restante",
+    "common.left": "a menos",
     "common.month": "mês",
     "common.noDataForPeriod": "Ainda não há dados para este período.",
     "common.next": "Próximo",
@@ -610,10 +584,14 @@ const messages = {
     "data.frequency.yearly": "Anual",
     "dashboard.budgetProgress.description": "Gastos mensais por grupo 50/30/20",
     "dashboard.budgetProgress.title": "Progresso do orçamento",
-    "dashboard.budgetSplit.description": "Orçamento previsto e gastos por grupo",
+    "dashboard.budgetSplit.description":
+      "Orçamento previsto e gastos por grupo",
+    "dashboard.budgetSplit.incomeBase": "Entradas do mês",
+    "dashboard.budgetSplit.ofIncomeBase": "das entradas",
     "dashboard.budgetSplit.title": "50/30/20 por grupo",
-    "dashboard.expensesByCategory.description": "Gastos agrupados pelo 50/30/20",
-    "dashboard.expensesByCategory.title": "Gastos por grupo",
+    "dashboard.expensesByCategory.description":
+      "Gastos por categoria agrupados pelo 50/30/20",
+    "dashboard.expensesByCategory.title": "Gastos por categoria",
     "dashboard.expensesOverTime.description": "Tendência mensal de gastos",
     "dashboard.expensesOverTime.title": "Gastos ao longo do tempo",
     "dashboard.greeting": "Boa noite",
@@ -648,8 +626,7 @@ const messages = {
     "goals.emptyDescription":
       "Crie uma meta para acompanhar sua reserva, viagem, compra ou investimento.",
     "goals.emptyTitle": "Nenhuma meta ainda",
-    "goals.formDescription":
-      "Defina alvo, prazo, ícone e saldo inicial.",
+    "goals.formDescription": "Defina alvo, prazo, ícone e saldo inicial.",
     "goals.fundError": "Não foi possível adicionar valor.",
     "goals.fundSuccess": "Valor adicionado com sucesso.",
     "goals.fundValidationError": "Informe um valor maior que zero.",
@@ -783,8 +760,7 @@ const messages = {
       "Não foi possível atualizar o status da assinatura.",
     "payments.subscriptionUpdateError":
       "Não foi possível atualizar a assinatura.",
-    "payments.subscriptionUpdateSuccess":
-      "Assinatura atualizada com sucesso.",
+    "payments.subscriptionUpdateSuccess": "Assinatura atualizada com sucesso.",
     "payments.type.boleto": "Boleto",
     "payments.type.other": "Outro",
     "payments.type.cash": "Pagamento",
@@ -811,58 +787,24 @@ const messages = {
     "screen.reports.title": "Relatórios",
     "screen.reports.thisMonth": "este mês",
     "screen.reports.vsLastMonth": "vs mês anterior",
-    "screen.settings.account": "Conta",
-    "screen.settings.activeSessions": "Sessões ativas",
     "screen.settings.appearance": "Aparência",
-    "screen.settings.budgetAlerts": "Alertas de orçamento",
-    "screen.settings.changeAvatar": "Alterar avatar",
-    "screen.settings.changePassword": "Alterar senha",
-    "screen.settings.compactMode": "Modo compacto",
-    "screen.settings.contactSupport": "Falar com suporte",
     "screen.settings.currency": "Moeda",
-    "screen.settings.dangerZone": "Zona de risco",
-    "screen.settings.dateFormat": "Formato da data",
-    "screen.settings.deleteAccount": "Excluir conta",
     "screen.settings.description": "Gerencie sua conta e preferências",
     "screen.settings.email": "E-mail",
-    "screen.settings.emailNotifications": "Notificações por e-mail",
-    "screen.settings.exportData": "Exportar dados",
-    "screen.settings.firstDayOfWeek": "Primeiro dia da semana",
     "screen.settings.firstName": "Nome",
-    "screen.settings.goalProgress": "Progresso das metas",
-    "screen.settings.helpCenter": "Central de ajuda",
-    "screen.settings.helpSupport": "Ajuda e suporte",
     "screen.settings.language": "Idioma",
     "screen.settings.lastName": "Sobrenome",
-    "screen.settings.notifications": "Notificações",
-    "screen.settings.paymentReminders": "Lembretes de pagamento",
-    "screen.settings.phone": "Telefone",
-    "screen.settings.privacyPolicy": "Política de privacidade",
     "screen.settings.profile": "Perfil",
     "screen.settings.profileDescription": "Gerencie suas informações pessoais",
     "screen.settings.regional": "Configurações regionais",
     "screen.settings.regionalDescription":
       "Configure moeda e preferências de localidade",
-    "screen.settings.saveChanges": "Salvar alterações",
-    "screen.settings.security": "Segurança",
-    "screen.settings.securityDescription":
-      "Gerencie suas configurações de segurança",
     "screen.settings.appearanceDescription": "Personalize a aparência do Dragg",
-    "screen.settings.compactDescription":
-      "Mostre mais conteúdo com espaçamento menor",
-    "screen.settings.helpDescription": "Obtenha ajuda com o Dragg",
-    "screen.settings.notificationsDescription":
-      "Configure suas preferências de notificação",
     "screen.settings.themeDescription": "Alterne entre modo claro e escuro",
-    "screen.settings.terms": "Termos de serviço",
     "screen.settings.theme": "Tema",
     "screen.settings.title": "Configurações",
-    "screen.settings.twoFactor": "Autenticação em dois fatores",
     "settings.createdAt": "Conta criada",
-    "settings.lastSignInAt": "Último login",
-    "settings.linkedProviders": "Provedores vinculados",
     "settings.notAvailable": "Não disponível",
-    "settings.primaryProvider": "Provedor principal",
     "screen.transactions.add": "Adicionar transação",
     "screen.transactions.count": "Transações",
     "screen.transactions.description":
@@ -936,6 +878,7 @@ const messages = {
 } as const;
 
 const LocaleContext = React.createContext<{
+  currency: Currency;
   formatCurrency: (value: number) => string;
   formatDate: (
     date: string | Date,
@@ -943,6 +886,7 @@ const LocaleContext = React.createContext<{
   ) => string;
   formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string;
   locale: Locale;
+  setCurrency: (currency: Currency) => void;
   setLocale: (locale: Locale) => void;
   t: (key: string) => string;
 } | null>(null);
@@ -953,14 +897,17 @@ function resolveLocale(value?: string | null): Locale {
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = React.useState<Locale>("en");
+  const [currency, setCurrencyState] = React.useState<Currency>("USD");
 
   React.useEffect(() => {
     const storedLocale = window.localStorage.getItem(localeStorageKey);
     const nextLocale = storedLocale
       ? resolveLocale(storedLocale)
       : resolveLocale(window.navigator.language);
+    const storedCurrency = window.localStorage.getItem(currencyStorageKey);
 
     setLocaleState(nextLocale);
+    setCurrencyState(resolveCurrency(storedCurrency, nextLocale));
   }, []);
 
   React.useEffect(() => {
@@ -968,15 +915,15 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     window.localStorage.setItem(localeStorageKey, locale);
   }, [locale]);
 
+  React.useEffect(() => {
+    window.localStorage.setItem(currencyStorageKey, currency);
+  }, [currency]);
+
   const value = React.useMemo(
     () => ({
+      currency,
       formatCurrency(value: number) {
-        return new Intl.NumberFormat(locale, {
-          currency: locale === "pt-BR" ? "BRL" : "USD",
-          maximumFractionDigits: 2,
-          minimumFractionDigits: 2,
-          style: "currency",
-        }).format(value);
+        return formatCurrencyValue(value, locale, currency);
       },
       formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions) {
         const value =
@@ -990,6 +937,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         return new Intl.NumberFormat(locale, options).format(value);
       },
       locale,
+      setCurrency(nextCurrency: Currency) {
+        setCurrencyState(resolveCurrency(nextCurrency, locale));
+      },
       setLocale(nextLocale: Locale) {
         setLocaleState(nextLocale);
       },
@@ -1003,7 +953,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         );
       },
     }),
-    [locale],
+    [currency, locale],
   );
 
   return (

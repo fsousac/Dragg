@@ -89,15 +89,29 @@ export function TransactionForm({
     setFormData((currentFormData) => ({
       ...currentFormData,
       category:
-        currentFormData.category !== "none"
-          ? currentFormData.category
-          : (categories[0]?.id ?? "none"),
+        currentFormData.type === "income"
+          ? "none"
+          : currentFormData.category !== "none"
+            ? currentFormData.category
+            : (categories[0]?.id ?? "none"),
       paymentMethod:
         currentFormData.paymentMethod !== "none"
           ? currentFormData.paymentMethod
           : (paymentMethods[0]?.id ?? "none"),
     }));
   }, [categories, paymentMethods]);
+
+  useEffect(() => {
+    setFormData((currentFormData) => ({
+      ...currentFormData,
+      category:
+        currentFormData.type === "income"
+          ? "none"
+          : currentFormData.category !== "none"
+          ? currentFormData.category
+          : (categories[0]?.id ?? "none"),
+    }));
+  }, [categories]);
 
   const parseDateValue = (dateValue: string) =>
     parse(dateValue, "dd/MM/yyyy", new Date());
@@ -199,6 +213,16 @@ export function TransactionForm({
         })),
     [categories, t],
   );
+  const displayedCategoryOptions =
+    formData.type === "income"
+      ? [
+          {
+            value: "none",
+            label: t("data.category.receipts"),
+            icon: "💼",
+          },
+        ]
+      : categoryOptions;
 
   const paymentMethodOptions = paymentMethods.map((paymentMethod) => ({
     value: paymentMethod.id,
@@ -264,7 +288,16 @@ export function TransactionForm({
                     ? "border-rose-400/60 bg-rose-300/70 text-rose-900 shadow-sm hover:bg-rose-400/70 dark:border-rose-400/50 dark:bg-rose-500/20 dark:text-rose-100 dark:hover:bg-rose-500/30"
                     : "border-border/40 text-foreground/80 hover:bg-foreground/5"
                 }`}
-                onClick={() => setFormData({ ...formData, type: "expense" })}
+                onClick={() =>
+                  setFormData({
+                    ...formData,
+                    category:
+                      formData.category === "none"
+                        ? (categories[0]?.id ?? "none")
+                        : formData.category,
+                    type: "expense",
+                  })
+                }
               >
                 {t("transaction.typeExpense")}
               </Button>
@@ -279,6 +312,7 @@ export function TransactionForm({
                 onClick={() =>
                   setFormData({
                     ...formData,
+                    category: "none",
                     installmentCount: 1,
                     type: "income",
                   })
@@ -338,11 +372,18 @@ export function TransactionForm({
               onChange={(value) =>
                 setFormData({ ...formData, category: value })
               }
-              options={categoryOptions}
+              options={displayedCategoryOptions}
+              disabled={formData.type === "income"}
               icon={<Tag className="w-4 h-4" />}
-              addActionLabel={t("transaction.addCategory")}
+              addActionLabel={
+                formData.type === "income"
+                  ? undefined
+                  : t("transaction.addCategory")
+              }
               onAddAction={
-                createCategoryAction
+                formData.type === "income"
+                  ? undefined
+                  : createCategoryAction
                   ? () => setIsCategoryDialogOpen(true)
                   : () =>
                       router.push(

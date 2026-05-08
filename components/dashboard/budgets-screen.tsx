@@ -39,7 +39,7 @@ export function BudgetsScreen({
     budgetData.savings.budget;
   const totalSpent =
     budgetData.needs.spent + budgetData.wants.spent + budgetData.savings.spent;
-  const remaining = totalBudget - totalSpent;
+  const left = totalBudget - totalSpent;
   const chartData = budgetSplitData.map((item) => ({
     ...item,
     name: t(item.nameKey),
@@ -92,8 +92,8 @@ export function BudgetsScreen({
             `${Math.round((totalSpent / totalBudget) * 100)}% ${t("common.ofBudget")}`,
           ],
           [
-            t("common.remaining"),
-            formatCurrency(remaining),
+            t("common.left"),
+            formatCurrency(left),
             t("screen.budgets.leftToSpend"),
           ],
         ].map(([label, value, note]) => (
@@ -128,7 +128,11 @@ export function BudgetsScreen({
                     dataKey="value"
                   >
                     {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.color}
+                        className="stroke-card stroke-2"
+                      />
                     ))}
                   </Pie>
                   <Tooltip

@@ -218,6 +218,8 @@ export type CategoryOverviewItem = {
 };
 
 export type ExpensesByCategoryItem = {
+  group: DbCategoryGroup;
+  groupKey: string;
   nameKey: string;
   value: number;
   color: string;
@@ -2233,14 +2235,21 @@ export async function getDashboardData(month?: string): Promise<DashboardData> {
   const expensesByCategory = expenseTransactions
     .reduce((acc, transaction) => {
       const group = transaction.group as DbCategoryGroup;
-      const nameKey = `data.group.${group}`;
-      const existing = acc.find((item) => item.nameKey === nameKey);
+      const nameKey = transaction.categoryKey;
+      const existing = acc.find(
+        (item) =>
+          item.nameKey === nameKey &&
+          item.group === group &&
+          item.groupKey === `data.group.${group}`,
+      );
 
       if (existing) {
         existing.value += Math.abs(transaction.amount);
       } else {
         acc.push({
           color: groupColors[group] ?? "#64748B",
+          group,
+          groupKey: `data.group.${group}`,
           nameKey,
           value: Math.abs(transaction.amount),
         });
@@ -2250,15 +2259,15 @@ export async function getDashboardData(month?: string): Promise<DashboardData> {
     }, [] as ExpensesByCategoryItem[])
     .sort((left, right) => {
       const order = {
-        "data.group.needs": 0,
-        "data.group.wants": 1,
-        "data.group.savings": 2,
+        needs: 0,
+        wants: 1,
+        savings: 2,
       };
+      const groupOrder =
+        (order[left.group as keyof typeof order] ?? 99) -
+        (order[right.group as keyof typeof order] ?? 99);
 
-      return (
-        (order[left.nameKey as keyof typeof order] ?? 99) -
-        (order[right.nameKey as keyof typeof order] ?? 99)
-      );
+      return groupOrder || right.value - left.value;
     });
 
   const expensesOverTime = monthBuckets.map((monthBucket) => ({

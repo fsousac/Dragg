@@ -17,6 +17,7 @@ interface CompactSelectProps {
   value: string;
   onChange: (value: string) => void;
   options: Array<{ value: string; label: string; icon?: string }>;
+  disabled?: boolean;
   error?: string;
   icon?: ReactNode;
   addActionLabel?: string;
@@ -29,6 +30,7 @@ export function CompactSelect({
   value,
   onChange,
   options,
+  disabled = false,
   error,
   icon,
   addActionLabel,
@@ -43,7 +45,7 @@ export function CompactSelect({
         {icon}
         {label}
       </Label>
-      <Select value={value} onValueChange={onChange}>
+      <Select value={value} onValueChange={onChange} disabled={disabled}>
         <SelectTrigger
           id={id}
           className={`
@@ -52,6 +54,7 @@ export function CompactSelect({
             transition-all duration-200 rounded-lg
             w-full
             ${error ? "border-destructive/60" : ""}
+            ${disabled ? "opacity-80" : ""}
           `}
         >
           <SelectValue />

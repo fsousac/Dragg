@@ -1,17 +1,15 @@
 "use client"
 
-import { Bell, Globe, HelpCircle, Palette, Shield, User } from "lucide-react"
+import { Globe, Palette, User } from "lucide-react"
 
 import { PageHeader } from "@/components/dashboard/page-header"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { Switch } from "@/components/ui/switch"
 import { type OAuthProfile } from "@/lib/auth/profile"
 import { useI18n } from "@/lib/i18n"
 
@@ -58,7 +56,7 @@ function getInitials(name: string) {
 }
 
 export function SettingsScreen({ profile }: SettingsScreenProps) {
-  const { formatDate, locale, setLocale, t } = useI18n()
+  const { currency, formatDate, locale, setCurrency, setLocale, t } = useI18n()
   const fallbackValue = t("settings.notAvailable")
 
   return (
@@ -136,32 +134,6 @@ export function SettingsScreen({ profile }: SettingsScreenProps) {
             </div>
             <ThemeToggle />
           </div>
-          <Separator />
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-medium text-foreground">{t("screen.settings.compactMode")}</p>
-              <p className="text-sm text-muted-foreground">{t("screen.settings.compactDescription")}</p>
-            </div>
-            <Switch />
-          </div>
-        </SettingsCard>
-
-        <SettingsCard
-          icon={Bell}
-          title={t("screen.settings.notifications")}
-          description={t("screen.settings.notificationsDescription")}
-        >
-          {[
-            ["screen.settings.budgetAlerts", true],
-            ["screen.settings.paymentReminders", true],
-            ["screen.settings.goalProgress", false],
-            ["screen.settings.emailNotifications", true],
-          ].map(([key, checked]) => (
-            <div key={String(key)} className="flex items-center justify-between gap-4 border-b border-border pb-4 last:border-0 last:pb-0">
-              <p className="font-medium text-foreground">{t(String(key))}</p>
-              <Switch defaultChecked={Boolean(checked)} />
-            </div>
-          ))}
         </SettingsCard>
 
         <SettingsCard
@@ -172,13 +144,14 @@ export function SettingsScreen({ profile }: SettingsScreenProps) {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>{t("screen.settings.currency")}</Label>
-              <Select defaultValue={locale === "pt-BR" ? "brl" : "usd"}>
+              <Select value={currency} onValueChange={(value) => setCurrency(value === "EUR" ? "EUR" : value === "BRL" ? "BRL" : "USD")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="usd">USD ($)</SelectItem>
-                  <SelectItem value="brl">BRL (R$)</SelectItem>
+                  <SelectItem value="BRL">BRL (R$)</SelectItem>
+                  <SelectItem value="USD">USD ($)</SelectItem>
+                  <SelectItem value="EUR">EUR (€)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -195,34 +168,6 @@ export function SettingsScreen({ profile }: SettingsScreenProps) {
               </Select>
             </div>
           </div>
-        </SettingsCard>
-
-        <SettingsCard
-          icon={Shield}
-          title={t("screen.settings.security")}
-          description={t("screen.settings.securityDescription")}
-        >
-          <div className="flex items-center justify-between gap-4">
-            <p className="font-medium text-foreground">{t("screen.settings.twoFactor")}</p>
-            <Button variant="outline" size="sm">{t("common.enable")}</Button>
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between gap-4">
-            <p className="font-medium text-foreground">{t("screen.settings.changePassword")}</p>
-            <Button variant="outline" size="sm">{t("common.change")}</Button>
-          </div>
-        </SettingsCard>
-
-        <SettingsCard
-          icon={HelpCircle}
-          title={t("screen.settings.helpSupport")}
-          description={t("screen.settings.helpDescription")}
-        >
-          {["screen.settings.helpCenter", "screen.settings.contactSupport", "screen.settings.privacyPolicy", "screen.settings.terms"].map((key) => (
-            <Button key={key} variant="ghost" className="w-full justify-start">
-              {t(key)}
-            </Button>
-          ))}
         </SettingsCard>
       </div>
     </main>
