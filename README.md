@@ -12,6 +12,9 @@
 	<a href="https://github.com/fsousac/Dragg/actions/workflows/ci.yml">
 		<img src="https://github.com/fsousac/Dragg/actions/workflows/ci.yml/badge.svg" alt="CI" />
 	</a>
+	<a href="https://github.com/fsousac/Dragg/actions/workflows/codeql-analysis.yml">
+		<img src="https://github.com/fsousac/Dragg/actions/workflows/codeql-analysis.yml/badge.svg" alt="CodeQL" />
+	</a>
 	<a href="https://github.com/fsousac/Dragg/blob/main/LICENSE">
 		<img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" />
 	</a>
