@@ -97,7 +97,6 @@ interface AppShellProps {
 }
 
 export async function AppShell({ children }: AppShellProps) {
-  const isProduction = process.env.NODE_ENV === "production";
   const supabase = await createClient();
   const [{ data: claimsData }, { data: userData }] = await Promise.all([
     supabase.auth.getClaims(),

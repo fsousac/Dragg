@@ -277,8 +277,14 @@ export function ReportsScreen({ reportsData }: ReportsScreenProps) {
             <CardTitle className="text-lg">{t("screen.reports.incomeVsExpenses")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-72 min-h-0 min-w-0">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                minWidth={0}
+                minHeight={0}
+                initialDimension={{ width: 1, height: 288 }}
+              >
                 <BarChart data={incomeVsExpensesData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="month" stroke="var(--muted-foreground)" fontSize={12} />
@@ -298,8 +304,14 @@ export function ReportsScreen({ reportsData }: ReportsScreenProps) {
             <CardTitle className="text-lg">{t("screen.reports.netWorthTrend")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-72 min-h-0 min-w-0">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                minWidth={0}
+                minHeight={0}
+                initialDimension={{ width: 1, height: 288 }}
+              >
                 <AreaChart data={netWorthData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="month" stroke="var(--muted-foreground)" fontSize={12} />

@@ -43,9 +43,15 @@ export function ExpensesOverTimeChart({
         </p>
       </CardHeader>
       <CardContent>
-        <div className="h-[200px] lg:h-[240px]">
+        <div className="h-[200px] min-h-0 min-w-0 lg:h-[240px]">
           {hasData ? (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minWidth={0}
+              minHeight={0}
+              initialDimension={{ width: 1, height: 200 }}
+            >
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient

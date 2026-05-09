@@ -75,8 +75,14 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="grid grid-cols-1 gap-4">
-          <div className="h-[170px] min-w-0">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[170px] min-h-0 min-w-0">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minWidth={0}
+              minHeight={0}
+              initialDimension={{ width: 1, height: 170 }}
+            >
               <PieChart>
                 <Pie
                   data={chartData}
