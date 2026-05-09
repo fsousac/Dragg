@@ -1,12 +1,11 @@
 name: Dragg CI
 
 on:
-  push:
-    paths-ignore:
-      - "docs/**"
-  pull_request:
-    paths-ignore:
-      - "docs/**"
+  workflow_run:
+    workflows:
+      - CodeQL
+    types:
+      - completed
 
 permissions:
   contents: read
