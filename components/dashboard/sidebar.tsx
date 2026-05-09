@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { withSelectedMonth } from "@/components/dashboard/month-route";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +48,7 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useI18n();
 
   return (
@@ -65,13 +67,14 @@ export function Sidebar({
           {navigationItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
+            const href = withSelectedMonth(item.href, searchParams);
             return (
               <li key={item.nameKey}>
                 <Link
-                  href={item.href}
+                  href={href}
                   prefetch
-                  onMouseEnter={() => router.prefetch(item.href)}
-                  onFocus={() => router.prefetch(item.href)}
+                  onMouseEnter={() => router.prefetch(href)}
+                  onFocus={() => router.prefetch(href)}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
                     isActive
@@ -90,10 +93,24 @@ export function Sidebar({
 
       {/* Footer */}
       <div className="px-6 py-6 border-t border-border">
-        <div className="flex items-center gap-3">
+        <Link
+          href={withSelectedMonth("/settings", searchParams)}
+          prefetch
+          onMouseEnter={() =>
+            router.prefetch(withSelectedMonth("/settings", searchParams))
+          }
+          onFocus={() =>
+            router.prefetch(withSelectedMonth("/settings", searchParams))
+          }
+          className="flex items-center gap-3 rounded-xl transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        >
           <Avatar className="size-8">
             {userAvatarUrl ? (
-              <AvatarImage src={userAvatarUrl} alt={userName} />
+              <AvatarImage
+                src={userAvatarUrl}
+                alt={userName}
+                referrerPolicy="no-referrer"
+              />
             ) : null}
             <AvatarFallback className="bg-gradient-to-br from-primary to-emerald-400 text-xs font-bold text-primary-foreground">
               {initials}
@@ -107,7 +124,7 @@ export function Sidebar({
               {userEmail}
             </p>
           </div>
-        </div>
+        </Link>
         <form action={signOutAction} className="mt-4 cursor-pointer">
           <Button
             className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"

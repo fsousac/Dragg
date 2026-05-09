@@ -191,3 +191,35 @@
 .card-shadow {
   box-shadow: var(--card-shadow);
 }
+
+.dragg-loading-loader {
+  box-shadow: 0 0 0 0 rgb(34 197 94 / 0.28);
+  position: relative;
+  z-index: 0;
+  animation: dragg-loading-ripple 1.5s infinite linear;
+}
+
+.dragg-loading-loader::before,
+.dragg-loading-loader::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 rgb(34 197 94 / 0.28);
+  animation: inherit;
+  z-index: -1;
+}
+
+.dragg-loading-loader::before {
+  animation-delay: -0.5s;
+}
+
+.dragg-loading-loader::after {
+  animation-delay: -1s;
+}
+
+@keyframes dragg-loading-ripple {
+  100% {
+    box-shadow: 0 0 0 42px rgb(34 197 94 / 0);
+  }
+}

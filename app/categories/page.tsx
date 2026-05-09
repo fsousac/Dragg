@@ -7,8 +7,20 @@ import {
 } from "@/app/transactions/actions"
 import { listCategoryOverview } from "@/lib/finance/transactions"
 
-export default async function CategoriesPage() {
-  const categories = await listCategoryOverview()
+type CategoriesPageProps = {
+  searchParams?: Promise<{
+    month?: string | string[];
+  }>;
+};
+
+export default async function CategoriesPage({
+  searchParams,
+}: CategoriesPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const selectedMonth = Array.isArray(resolvedSearchParams?.month)
+    ? resolvedSearchParams.month[0]
+    : resolvedSearchParams?.month;
+  const categories = await listCategoryOverview(selectedMonth)
 
   return (
     <AppShell>

@@ -1,14 +1,25 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
-  LayoutDashboard,
   ArrowLeftRight,
-  PieChart,
   BarChart3,
-  MoreHorizontal
+  CreditCard,
+  Folder,
+  LayoutDashboard,
+  MoreHorizontal,
+  PieChart,
+  Settings,
+  Target,
 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { withSelectedMonth } from "@/components/dashboard/month-route"
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
@@ -16,13 +27,20 @@ const mobileNavItems = [
   { nameKey: "nav.overview", icon: LayoutDashboard, href: "/dashboard" },
   { nameKey: "nav.transactions", icon: ArrowLeftRight, href: "/transactions" },
   { nameKey: "nav.budgets", icon: PieChart, href: "/budgets" },
+  { nameKey: "nav.payments", icon: CreditCard, href: "/payments" },
+]
+
+const moreNavItems = [
+  { nameKey: "nav.categories", icon: Folder, href: "/categories" },
+  { nameKey: "nav.goals", icon: Target, href: "/goals" },
   { nameKey: "nav.reports", icon: BarChart3, href: "/reports" },
-  { nameKey: "nav.more", icon: MoreHorizontal, href: "/more" }
+  { nameKey: "nav.settings", icon: Settings, href: "/settings" }
 ]
 
 export function MobileNav() {
   const pathname = usePathname()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { t } = useI18n()
 
   return (
@@ -31,12 +49,13 @@ export function MobileNav() {
         {mobileNavItems.map((item) => {
           const Icon = item.icon
           const isActive = pathname === item.href
+          const href = withSelectedMonth(item.href, searchParams)
           return (
             <Link
               key={item.nameKey}
-              href={item.href}
+              href={href}
               prefetch
-              onTouchStart={() => router.prefetch(item.href)}
+              onTouchStart={() => router.prefetch(href)}
               className={cn(
                 "flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-200 min-w-[60px]",
                 isActive
@@ -49,6 +68,52 @@ export function MobileNav() {
             </Link>
           )
         })}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className={cn(
+                "flex min-w-[60px] flex-col items-center gap-1 rounded-xl px-3 py-2 transition-all duration-200",
+                moreNavItems.some((item) => item.href === pathname)
+                  ? "text-primary"
+                  : "text-muted-foreground"
+              )}
+              aria-label={t("nav.more")}
+            >
+              <MoreHorizontal className="h-5 w-5" />
+              <span className="text-[10px] font-medium">{t("nav.more")}</span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="mb-2 w-56 rounded-xl border-border bg-popover p-2 shadow-xl"
+            side="top"
+            sideOffset={10}
+          >
+            {moreNavItems.map((item) => {
+              const Icon = item.icon
+              const isActive = pathname === item.href
+              const href = withSelectedMonth(item.href, searchParams)
+
+              return (
+                <DropdownMenuItem key={item.nameKey} asChild>
+                  <Link
+                    href={href}
+                    prefetch
+                    onTouchStart={() => router.prefetch(href)}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm",
+                      isActive && "bg-primary/10 text-primary"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {t(item.nameKey)}
+                  </Link>
+                </DropdownMenuItem>
+              )
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </nav>
   )

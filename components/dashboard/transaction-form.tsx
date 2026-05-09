@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { format, isValid, parse } from "date-fns";
 import {
   Calendar,
@@ -17,6 +17,7 @@ import { NewCategoryDialog } from "@/components/dashboard/new-category-dialog";
 import { CompactInput } from "@/components/dashboard/form-inputs/compact-input";
 import { CompactSelect } from "@/components/dashboard/form-inputs/compact-select";
 import { CompactTextarea } from "@/components/dashboard/form-inputs/compact-textarea";
+import { withSelectedMonth } from "@/components/dashboard/month-route";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -24,7 +25,9 @@ import {
   type CreateCategoryInput,
   type TransactionFormCategory,
   type TransactionFormPaymentMethod,
+  type CreatePaymentMethodInput,
 } from "@/lib/finance/transactions";
+import { NewPaymentMethodDialog } from "@/components/dashboard/new-payment-method-dialog";
 import { useI18n } from "@/lib/i18n";
 
 export interface TransactionFormData {
@@ -41,6 +44,7 @@ export interface TransactionFormData {
 type TransactionFormProps = {
   categories: TransactionFormCategory[];
   createCategoryAction?: (data: CreateCategoryInput) => Promise<void>;
+  createPaymentMethodAction?: (data: CreatePaymentMethodInput) => Promise<void>;
   onSubmit: (data: TransactionFormData) => Promise<void>;
   paymentMethods: TransactionFormPaymentMethod[];
 };
@@ -48,11 +52,13 @@ type TransactionFormProps = {
 export function TransactionForm({
   categories,
   createCategoryAction,
+  createPaymentMethodAction,
   onSubmit,
   paymentMethods,
 }: TransactionFormProps) {
   const { t } = useI18n();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const today = format(new Date(), "dd/MM/yyyy");
   const todayDateInputValue = format(new Date(), "yyyy-MM-dd");
 
@@ -64,15 +70,61 @@ export function TransactionForm({
     type: "expense",
     date: today,
     amount: 0,
-    category: categories[0]?.id ?? "none",
+    category:
+      categories.find(
+        (category) => category.id !== "none" && category.group !== "income",
+      )?.id ?? "none",
     paymentMethod: paymentMethods[0]?.id ?? "none",
     installmentCount: 1,
     description: "",
     notes: "",
   });
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const expenseCategories = useMemo(
+    () =>
+      categories.filter(
+        (category) => category.id !== "none" && category.group !== "income",
+      ),
+    [categories],
+  );
+  const incomeCategory = useMemo(
+    () => categories.find((category) => category.group === "income"),
+    [categories],
+  );
+  const fallbackExpenseCategoryId = expenseCategories[0]?.id ?? "none";
+  const incomeCategoryOption = useMemo(
+    () => ({
+      value: incomeCategory?.id ?? "none",
+      label: t(incomeCategory?.label ?? "data.category.receipts"),
+      icon: incomeCategory?.icon ?? "💼",
+    }),
+    [incomeCategory, t],
+  );
+  const incomeCategoryId = incomeCategoryOption.value;
+
+  const categoryOptions = useMemo(
+    () =>
+      [...expenseCategories]
+        .sort((left, right) => {
+          const order = { needs: 0, wants: 1, savings: 2 };
+          return (
+            order[left.group as keyof typeof order] -
+            order[right.group as keyof typeof order]
+          );
+        })
+        .map((category) => ({
+          value: category.id,
+          label: t(category.label),
+          group: category.group,
+          icon: category.icon,
+        })),
+    [expenseCategories, t],
+  );
+  const displayedCategoryOptions =
+    formData.type === "income" ? [incomeCategoryOption] : categoryOptions;
 
   useEffect(() => {
     setMounted(true);
@@ -82,15 +134,24 @@ export function TransactionForm({
     setFormData((currentFormData) => ({
       ...currentFormData,
       category:
-        currentFormData.category !== "none"
-          ? currentFormData.category
-          : (categories[0]?.id ?? "none"),
+        currentFormData.type === "income"
+          ? incomeCategoryId
+          : expenseCategories.some(
+                (category) => category.id === currentFormData.category,
+              )
+            ? currentFormData.category
+            : fallbackExpenseCategoryId,
       paymentMethod:
         currentFormData.paymentMethod !== "none"
           ? currentFormData.paymentMethod
           : (paymentMethods[0]?.id ?? "none"),
     }));
-  }, [categories, paymentMethods]);
+  }, [
+    expenseCategories,
+    fallbackExpenseCategoryId,
+    incomeCategoryId,
+    paymentMethods,
+  ]);
 
   const parseDateValue = (dateValue: string) =>
     parse(dateValue, "dd/MM/yyyy", new Date());
@@ -150,7 +211,7 @@ export function TransactionForm({
       type: "expense",
       date: today,
       amount: 0,
-      category: categories[0]?.id ?? "none",
+      category: fallbackExpenseCategoryId,
       paymentMethod: paymentMethods[0]?.id ?? "none",
       installmentCount: 1,
       description: "",
@@ -177,26 +238,13 @@ export function TransactionForm({
     }
   };
 
-  const categoryOptions = useMemo(
-    () =>
-      [...categories]
-        .sort((left, right) => {
-          const order = { needs: 0, wants: 1, savings: 2, income: 3 };
-          return order[left.group] - order[right.group];
-        })
-        .map((category) => ({
-          value: category.id,
-          label: t(category.label),
-          group: category.group,
-          icon: category.icon,
-        })),
-    [categories, t],
+  const paymentMethodOptions = useMemo(
+    () => paymentMethods.map((paymentMethod) => ({
+      value: paymentMethod.id,
+      label: t(paymentMethod.label),
+    })),
+    [paymentMethods, t],
   );
-
-  const paymentMethodOptions = paymentMethods.map((paymentMethod) => ({
-    value: paymentMethod.id,
-    label: t(paymentMethod.label),
-  }));
 
   const selectedPaymentMethod = paymentMethods.find(
     (paymentMethod) => paymentMethod.id === formData.paymentMethod,
@@ -257,7 +305,17 @@ export function TransactionForm({
                     ? "border-rose-400/60 bg-rose-300/70 text-rose-900 shadow-sm hover:bg-rose-400/70 dark:border-rose-400/50 dark:bg-rose-500/20 dark:text-rose-100 dark:hover:bg-rose-500/30"
                     : "border-border/40 text-foreground/80 hover:bg-foreground/5"
                 }`}
-                onClick={() => setFormData({ ...formData, type: "expense" })}
+                onClick={() =>
+                  setFormData({
+                    ...formData,
+                    category: expenseCategories.some(
+                      (category) => category.id === formData.category,
+                    )
+                      ? formData.category
+                      : fallbackExpenseCategoryId,
+                    type: "expense",
+                  })
+                }
               >
                 {t("transaction.typeExpense")}
               </Button>
@@ -272,6 +330,7 @@ export function TransactionForm({
                 onClick={() =>
                   setFormData({
                     ...formData,
+                    category: incomeCategoryId,
                     installmentCount: 1,
                     type: "income",
                   })
@@ -325,19 +384,29 @@ export function TransactionForm({
             </div>
 
             <CompactSelect
+              key={`category-${formData.type}`}
               label={t("transaction.category")}
               id="category"
               value={formData.category}
               onChange={(value) =>
                 setFormData({ ...formData, category: value })
               }
-              options={categoryOptions}
+              options={displayedCategoryOptions}
               icon={<Tag className="w-4 h-4" />}
-              addActionLabel={t("transaction.addCategory")}
+              addActionLabel={
+                formData.type === "income"
+                  ? undefined
+                  : t("transaction.addCategory")
+              }
               onAddAction={
-                createCategoryAction
-                  ? () => setIsCategoryDialogOpen(true)
-                  : () => router.push("/categories")
+                formData.type === "income"
+                  ? undefined
+                  : createCategoryAction
+                    ? () => setIsCategoryDialogOpen(true)
+                    : () =>
+                        router.push(
+                          withSelectedMonth("/categories", searchParams),
+                        )
               }
             />
 
@@ -377,8 +446,21 @@ export function TransactionForm({
               error={errors.paymentMethod}
               icon={<CreditCard className="w-4 h-4" />}
               addActionLabel={t("transaction.addPaymentMethod")}
-              onAddAction={() => router.push("/payments")}
+              onAddAction={() =>
+                createPaymentMethodAction
+                  ? setIsPaymentDialogOpen(true)
+                  : router.push(withSelectedMonth("/payments", searchParams))
+              }
             />
+
+            {createPaymentMethodAction ? (
+              <NewPaymentMethodDialog
+                createPaymentMethodAction={createPaymentMethodAction}
+                open={isPaymentDialogOpen}
+                onOpenChange={setIsPaymentDialogOpen}
+                onCreated={() => setIsPaymentDialogOpen(false)}
+              />
+            ) : null}
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-4 lg:gap-4">
@@ -397,6 +479,7 @@ export function TransactionForm({
                 }
                 icon={<Calendar className="w-4 h-4" />}
                 error={errors.date}
+                inputClassName="max-w-full min-w-0 appearance-none overflow-hidden pr-3 [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left"
               />
             </div>
 

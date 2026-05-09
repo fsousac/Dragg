@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -17,6 +18,7 @@ import {
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/dashboard/page-header";
+import { withSelectedMonth } from "@/components/dashboard/month-route";
 import { type TransactionFormData } from "@/components/dashboard/transaction-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,6 +54,7 @@ import {
   type CreateCategoryInput,
   type NewTransactionInput,
   type UpdateTransactionInput,
+  type CreatePaymentMethodInput,
 } from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -72,17 +75,25 @@ type EditableTransaction = {
 type TransactionsScreenProps = {
   categories: TransactionFormCategory[];
   createCategoryAction: (data: CreateCategoryInput) => Promise<void>;
+  createPaymentMethodAction?: (data: CreatePaymentMethodInput) => Promise<void>;
   createTransactionAction: (data: NewTransactionInput) => Promise<void>;
   deleteTransactionAction: (transactionId: string) => Promise<void>;
   paymentMethods: TransactionFormPaymentMethod[];
+  showPrevious: boolean;
   transactions: Transaction[];
   updateTransactionAction: (data: UpdateTransactionInput) => Promise<void>;
 };
 
-function getInitialFormState(transaction: Transaction): EditableTransaction {
+function getInitialFormState(
+  transaction: Transaction,
+  incomeCategoryId: string,
+): EditableTransaction {
   return {
     amount: Math.abs(transaction.amount).toFixed(2),
-    category: transaction.categoryId ?? "none",
+    category:
+      transaction.type === "income"
+        ? incomeCategoryId
+        : (transaction.categoryId ?? "none"),
     date: transaction.date,
     description: transaction.descriptionKey,
     notes: transaction.notes ?? "",
@@ -108,17 +119,20 @@ function sanitizeAmountInput(value: string) {
 export function TransactionsScreen({
   categories,
   createCategoryAction,
+  createPaymentMethodAction,
   createTransactionAction,
   deleteTransactionAction,
   paymentMethods,
+  showPrevious,
   transactions,
   updateTransactionAction,
 }: TransactionsScreenProps) {
   const { formatCurrency, formatDate, t } = useI18n();
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const searchParams = useSearchParams();
+  const searchQuery = "";
+  const typeFilter = "all";
+  const categoryFilter = "all";
   const [sortOption, setSortOption] = useState<SortOption>("date-desc");
   const [isNewTransactionOpen, setIsNewTransactionOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] =
@@ -128,13 +142,23 @@ export function TransactionsScreen({
     string | null
   >(null);
   const [isPending, startTransition] = useTransition();
+  const transactionsHref = withSelectedMonth("/transactions", searchParams);
+  const previousTransactionsHref = `${transactionsHref}${
+    transactionsHref.includes("?") ? "&" : "?"
+  }history=1`;
 
   const categoryOptions = useMemo(
     () =>
       [...categories]
+        .filter(
+          (category) => category.id !== "none" && category.group !== "income",
+        )
         .sort((left, right) => {
           const order = { needs: 0, wants: 1, savings: 2 };
-          return order[left.group] - order[right.group];
+          return (
+            order[left.group as keyof typeof order] -
+            order[right.group as keyof typeof order]
+          );
         })
         .map((category) => ({
           label: t(category.label),
@@ -143,6 +167,19 @@ export function TransactionsScreen({
     [categories, t],
   );
 
+  const incomeCategory = useMemo(
+    () => categories.find((category) => category.group === "income"),
+    [categories],
+  );
+  const incomeCategoryOption = useMemo(
+    () => ({
+      label: t(incomeCategory?.label ?? "data.category.receipts"),
+      value: incomeCategory?.id ?? "none",
+    }),
+    [incomeCategory, t],
+  );
+  const incomeCategoryId = incomeCategoryOption.value;
+
   const paymentMethodOptions = useMemo(
     () =>
       paymentMethods.map((paymentMethod) => ({
@@ -150,13 +187,6 @@ export function TransactionsScreen({
         value: paymentMethod.id,
       })),
     [paymentMethods, t],
-  );
-
-  const uniqueCategories = useMemo(
-    () => [
-      ...new Set(transactions.map((transaction) => transaction.categoryKey)),
-    ],
-    [transactions],
   );
 
   const filteredTransactions = useMemo(() => {
@@ -192,7 +222,7 @@ export function TransactionsScreen({
 
   const openTransactionDialog = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
-    setFormData(getInitialFormState(transaction));
+    setFormData(getInitialFormState(transaction, incomeCategoryId));
   };
 
   const closeTransactionDialog = () => {
@@ -332,93 +362,141 @@ export function TransactionsScreen({
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y divide-border">
-            {filteredTransactions.map((transaction) => (
-              <div key={transaction.id} className="flex items-center gap-2 p-4">
-                <button
-                  type="button"
-                  className="flex min-w-0 flex-1 items-center gap-4 rounded-md text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  onClick={() => openTransactionDialog(transaction)}
+            {filteredTransactions.map((transaction) => {
+              const isPlanned = Boolean(transaction.isPlanned);
+
+              return (
+                <div
+                  key={transaction.id}
+                  className={cn(
+                    "flex items-center gap-2 p-4",
+                    isPlanned && "bg-muted/20",
+                  )}
                 >
-                  <div className="flex size-12 items-center justify-center rounded-lg bg-accent text-2xl">
-                    {transaction.icon}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate font-medium text-foreground">
-                        {t(transaction.descriptionKey)}
-                      </p>
-                      {transaction.type === "income" && (
-                        <ArrowUpRight className="size-4 shrink-0 text-income" />
-                      )}
-                      {transaction.type === "expense" && (
-                        <ArrowDownRight className="size-4 shrink-0 text-expense" />
-                      )}
-                      {transaction.type === "saving" && (
-                        <Wallet className="size-4 shrink-0 text-savings" />
-                      )}
-                    </div>
-                    <div className="mt-1 flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">
-                        {t(transaction.categoryKey)}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDate(transaction.date, {
-                          day: "numeric",
-                          month: "short",
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                  <p
-                    className={cn(
-                      "tabular-nums font-semibold",
-                      transaction.amount > 0
-                        ? "text-income"
-                        : "text-foreground",
-                    )}
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-4 rounded-md text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => openTransactionDialog(transaction)}
                   >
-                    {transaction.amount > 0 ? "+" : ""}
-                    {formatCurrency(Math.abs(transaction.amount))}
-                  </p>
-                </button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-9 shrink-0 text-muted-foreground"
+                    <div
+                      className={cn(
+                        "flex size-12 items-center justify-center rounded-lg bg-accent text-2xl",
+                        isPlanned && "grayscale opacity-55",
+                      )}
                     >
-                      <MoreHorizontal className="size-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        openTransactionDialog(transaction);
-                      }}
+                      {transaction.icon}
+                    </div>
+                    <div
+                      className={cn(
+                        "min-w-0 flex-1",
+                        isPlanned && "opacity-65",
+                      )}
                     >
-                      <Pencil className="size-4" />
-                      {t("common.edit")}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      variant="destructive"
-                      disabled={
-                        isPending && pendingTransactionId === transaction.id
-                      }
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleDeleteTransaction(transaction);
-                      }}
+                      <div className="flex items-center gap-2">
+                        <p
+                          className={cn(
+                            "truncate font-medium text-foreground",
+                            isPlanned && "text-muted-foreground",
+                          )}
+                        >
+                          {t(transaction.descriptionKey)}
+                        </p>
+                        {isPlanned ? (
+                          <Badge
+                            variant="secondary"
+                            className="shrink-0 border-border bg-muted px-2 py-0 text-[10px] font-medium text-muted-foreground"
+                          >
+                            {t("screen.transactions.planned")}
+                          </Badge>
+                        ) : null}
+                        {transaction.type === "income" && (
+                          <ArrowUpRight className="size-4 shrink-0 text-income" />
+                        )}
+                        {transaction.type === "expense" && (
+                          <ArrowDownRight className="size-4 shrink-0 text-expense" />
+                        )}
+                        {transaction.type === "saving" && (
+                          <Wallet className="size-4 shrink-0 text-savings" />
+                        )}
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">
+                          {t(transaction.categoryKey)}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDate(transaction.date, {
+                            day: "numeric",
+                            month: "short",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                    <p
+                      className={cn(
+                        "tabular-nums font-semibold",
+                        transaction.amount > 0
+                          ? "text-income"
+                          : "text-foreground",
+                      )}
                     >
-                      <Trash2 className="size-4" />
-                      {t("common.delete")}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))}
+                      {transaction.amount > 0 ? "+" : ""}
+                      {formatCurrency(Math.abs(transaction.amount))}
+                    </p>
+                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-9 shrink-0 text-muted-foreground"
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openTransactionDialog(transaction);
+                        }}
+                      >
+                        <Pencil className="size-4" />
+                        {t("common.edit")}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        variant="destructive"
+                        disabled={
+                          isPending && pendingTransactionId === transaction.id
+                        }
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleDeleteTransaction(transaction);
+                        }}
+                      >
+                        <Trash2 className="size-4" />
+                        {t("common.delete")}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              );
+            })}
+            <div className="flex justify-center p-4">
+              <Button asChild size="sm" variant="outline">
+                <Link
+                  href={
+                    showPrevious
+                      ? withSelectedMonth("/transactions", searchParams)
+                      : previousTransactionsHref
+                  }
+                >
+                  {showPrevious
+                    ? t("screen.transactions.hidePrevious")
+                    : t("screen.transactions.showPrevious")}
+                </Link>
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -450,7 +528,14 @@ export function TransactionsScreen({
                       setFormData({
                         ...formData,
                         category:
-                          value === "income" ? "none" : formData.category,
+                          value === "income"
+                            ? incomeCategoryId
+                            : categoryOptions.some(
+                                  (category) =>
+                                    category.value === formData.category,
+                                )
+                              ? formData.category
+                              : (categoryOptions[0]?.value ?? "none"),
                         type: value as TransactionType,
                       })
                     }
@@ -525,7 +610,6 @@ export function TransactionsScreen({
                   </Label>
                   <Select
                     value={formData.category}
-                    disabled={formData.type === "income"}
                     onValueChange={(value) =>
                       setFormData({ ...formData, category: value })
                     }
@@ -534,10 +618,10 @@ export function TransactionsScreen({
                       <SelectValue placeholder={t("common.category")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">
-                        {t("data.category.receipts")}
-                      </SelectItem>
-                      {categoryOptions.map((category) => (
+                      {(formData.type === "income"
+                        ? [incomeCategoryOption]
+                        : categoryOptions
+                      ).map((category) => (
                         <SelectItem key={category.value} value={category.value}>
                           {category.label}
                         </SelectItem>
@@ -631,21 +715,24 @@ export function TransactionsScreen({
         onOpenChange={setIsNewTransactionOpen}
       >
         <DialogContent
-          className="sm:max-w-[90%]"
+          className="sm:max-w-[90dvw]"
           aria-describedby="add transaction"
         >
-          <DialogHeader>
+          <DialogHeader className="not-sm:hidden">
             <DialogTitle>{t("transaction.addTitle")}</DialogTitle>
             <DialogDescription>
               {t("transaction.addDescription")}
             </DialogDescription>
           </DialogHeader>
-          <TransactionForm
-            categories={categories}
-            createCategoryAction={createCategoryAction}
-            paymentMethods={paymentMethods}
-            onSubmit={handleNewTransactionSubmit}
-          />
+          <div className="pt-[1dvh]">
+            <TransactionForm
+              categories={categories}
+              createCategoryAction={createCategoryAction}
+              createPaymentMethodAction={createPaymentMethodAction}
+              paymentMethods={paymentMethods}
+              onSubmit={handleNewTransactionSubmit}
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </>

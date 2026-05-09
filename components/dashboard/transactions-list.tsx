@@ -6,6 +6,9 @@ import { ArrowRight } from "lucide-react";
 import { type Transaction, type TransactionGroup } from "@/lib/data";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { withSelectedMonth } from "./month-route";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 const groupColors: Record<TransactionGroup, string> = {
   needs: "bg-[#F97316]/10 text-[#F97316]",
@@ -27,6 +30,8 @@ type TransactionsListProps = {
 export function TransactionsList({ transactions }: TransactionsListProps) {
   const { formatCurrency, formatDate, t } = useI18n();
   const latestTransactions = transactions.slice(0, 5);
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   return (
     <Card className="bg-card border-border card-shadow">
@@ -39,21 +44,35 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
             {t("dashboard.latestTransactions.description")}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-primary hover:text-primary/80"
+        <Link
+          href={withSelectedMonth("/transactions", searchParams)}
+          prefetch
+          onMouseEnter={() =>
+            router.prefetch(withSelectedMonth("/transactions", searchParams))
+          }
+          onFocus={() =>
+            router.prefetch(withSelectedMonth("/transactions", searchParams))
+          }
+          className="flex items-center gap-3 rounded-xl transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
-          {t("common.viewAll")}
-          <ArrowRight className="w-4 h-4 ml-1" />
-        </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-primary hover:text-primary/80"
+          >
+            {t("common.viewAll")}
+            <ArrowRight className="w-4 h-4 ml-1" />
+          </Button>
+        </Link>
       </CardHeader>
       <CardContent className="p-0">
         <div className="divide-y divide-border">
           {latestTransactions.map((transaction) => (
             <div
               key={transaction.id}
-              className="flex items-center gap-3 lg:gap-4 px-4 lg:px-6 py-3 lg:py-4 hover:bg-accent/50 transition-colors"
+              className={`flex items-center gap-3 lg:gap-4 px-4 lg:px-6 py-3 lg:py-4 hover:bg-accent/50 transition-colors ${
+                transaction.isPlanned ? "opacity-70" : ""
+              }`}
             >
               <div className="flex items-center justify-center w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-accent text-xl lg:text-2xl">
                 {transaction.icon}

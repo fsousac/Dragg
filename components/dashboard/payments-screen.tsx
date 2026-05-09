@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2,
@@ -61,6 +61,7 @@ import {
   type TransactionFormCategory,
   type TransactionFormPaymentMethod,
   type UpdatePaymentMethodInput,
+  type UpdateSubscriptionInput,
 } from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -70,18 +71,33 @@ type PaymentsScreenProps = {
   createPaymentMethodAction: (data: CreatePaymentMethodInput) => Promise<void>;
   createSubscriptionAction: (data: CreateSubscriptionInput) => Promise<void>;
   deletePaymentMethodAction: (paymentMethodId: string) => Promise<void>;
+  deleteSubscriptionAction: (subscriptionId: string) => Promise<void>;
+  pauseSubscriptionAction: (subscriptionId: string) => Promise<void>;
   paymentMethods: PaymentMethodOverviewItem[];
+  resumeSubscriptionAction: (subscriptionId: string) => Promise<void>;
   subscriptions: SubscriptionOverviewItem[];
   transactionPaymentMethods: TransactionFormPaymentMethod[];
   updatePaymentMethodAction: (data: UpdatePaymentMethodInput) => Promise<void>;
+  updateSubscriptionAction: (data: UpdateSubscriptionInput) => Promise<void>;
 };
 
 type EditablePaymentMethod = {
+  closingDay: string;
   creditLimit: string;
+  dueDay: string;
   id: string;
   name: string;
   originalName: string;
   type: UpdatePaymentMethodInput["type"];
+};
+
+type EditableSubscription = {
+  amount: string;
+  category: string;
+  description: string;
+  id: string;
+  nextDate: string;
+  paymentMethod: string;
 };
 
 const paymentTypeIcons = {
@@ -129,10 +145,14 @@ export function PaymentsScreen({
   createPaymentMethodAction,
   createSubscriptionAction,
   deletePaymentMethodAction,
+  deleteSubscriptionAction,
+  pauseSubscriptionAction,
   paymentMethods,
+  resumeSubscriptionAction,
   subscriptions,
   transactionPaymentMethods,
   updatePaymentMethodAction,
+  updateSubscriptionAction,
 }: PaymentsScreenProps) {
   const router = useRouter();
   const { formatCurrency, formatDate, t } = useI18n();
@@ -141,7 +161,9 @@ export function PaymentsScreen({
   const [isPaymentMethodDialogOpen, setIsPaymentMethodDialogOpen] =
     useState(false);
   const [paymentMethodForm, setPaymentMethodForm] = useState({
+    closingDay: "",
     creditLimit: "",
+    dueDay: "",
     name: "",
     type: "credit" as CreatePaymentMethodInput["type"],
   });
@@ -158,26 +180,35 @@ export function PaymentsScreen({
     useState<EditablePaymentMethod | null>(null);
   const [deletingPaymentMethod, setDeletingPaymentMethod] =
     useState<PaymentMethodOverviewItem | null>(null);
+  const [editingSubscription, setEditingSubscription] =
+    useState<EditableSubscription | null>(null);
+  const [deletingSubscription, setDeletingSubscription] =
+    useState<SubscriptionOverviewItem | null>(null);
 
-  const activeSubscriptions = subscriptions.filter(
-    (subscription) => subscription.status === "active",
+  const activeSubscriptions = useMemo(
+    () => subscriptions.filter((subscription) => subscription.status === "active"),
+    [subscriptions],
   );
-  const monthlyTotal = activeSubscriptions
-    .filter((subscription) => subscription.frequency === "monthly")
-    .reduce((acc, subscription) => acc + subscription.amount, 0);
+  const monthlyTotal = useMemo(
+    () =>
+      activeSubscriptions
+        .filter((subscription) => subscription.frequency === "monthly")
+        .reduce((acc, subscription) => acc + subscription.amount, 0),
+    [activeSubscriptions],
+  );
 
   const statusColor = {
     active: "bg-income text-white",
     cancelled: "bg-destructive text-white",
     paused: "bg-yellow text-black",
   };
-  const totalSpentByPaymentMethod = paymentMethods.reduce(
-    (sum, paymentMethod) => sum + paymentMethod.spent,
-    0,
+  const totalSpentByPaymentMethod = useMemo(
+    () => paymentMethods.reduce((sum, paymentMethod) => sum + paymentMethod.spent, 0),
+    [paymentMethods],
   );
-  const totalCreditLimit = paymentMethods.reduce(
-    (sum, paymentMethod) => sum + paymentMethod.creditLimit,
-    0,
+  const totalCreditLimit = useMemo(
+    () => paymentMethods.reduce((sum, paymentMethod) => sum + paymentMethod.creditLimit, 0),
+    [paymentMethods],
   );
 
   const handleUpdatePaymentMethod = () => {
@@ -194,7 +225,16 @@ export function PaymentsScreen({
     startTransition(async () => {
       try {
         await updatePaymentMethodAction({
+          closingDay:
+            editingPaymentMethod.type === "credit" &&
+            editingPaymentMethod.closingDay
+              ? Number(editingPaymentMethod.closingDay)
+              : null,
           creditLimit: parseCurrencyInput(editingPaymentMethod.creditLimit),
+          dueDay:
+            editingPaymentMethod.type === "credit" && editingPaymentMethod.dueDay
+              ? Number(editingPaymentMethod.dueDay)
+              : null,
           id: editingPaymentMethod.id,
           name: submittedName,
           type: editingPaymentMethod.type,
@@ -211,7 +251,9 @@ export function PaymentsScreen({
 
   const resetPaymentMethodForm = () => {
     setPaymentMethodForm({
+      closingDay: "",
       creditLimit: "",
+      dueDay: "",
       name: "",
       type: "credit",
     });
@@ -226,7 +268,15 @@ export function PaymentsScreen({
     startTransition(async () => {
       try {
         await createPaymentMethodAction({
+          closingDay:
+            paymentMethodForm.type === "credit" && paymentMethodForm.closingDay
+              ? Number(paymentMethodForm.closingDay)
+              : null,
           creditLimit: parseCurrencyInput(paymentMethodForm.creditLimit),
+          dueDay:
+            paymentMethodForm.type === "credit" && paymentMethodForm.dueDay
+              ? Number(paymentMethodForm.dueDay)
+              : null,
           name: paymentMethodForm.name,
           type: paymentMethodForm.type,
         });
@@ -292,6 +342,96 @@ export function PaymentsScreen({
     });
   };
 
+  const openSubscriptionDialog = (subscription?: SubscriptionOverviewItem) => {
+    if (subscription) {
+      setEditingSubscription({
+        amount: String(subscription.amount).replace(".", ","),
+        category: subscription.categoryId ?? "none",
+        description: subscription.name,
+        id: subscription.id,
+        nextDate: subscription.nextDate,
+        paymentMethod: subscription.paymentMethodId ?? "none",
+      });
+      setSubscriptionForm({
+        amount: String(subscription.amount).replace(".", ","),
+        category: subscription.categoryId ?? "none",
+        description: subscription.name,
+        nextDate: subscription.nextDate,
+        paymentMethod: subscription.paymentMethodId ?? "none",
+      });
+      setIsSubscriptionDialogOpen(true);
+      return;
+    }
+
+    setEditingSubscription(null);
+    resetSubscriptionForm();
+    setIsSubscriptionDialogOpen(true);
+  };
+
+  const handleUpdateSubscription = () => {
+    if (!editingSubscription) return;
+
+    if (!subscriptionForm.description.trim()) {
+      toast.error(t("payments.subscriptionNameRequired"));
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await updateSubscriptionAction({
+          amount: parseCurrencyInput(subscriptionForm.amount),
+          category: subscriptionForm.category,
+          description: subscriptionForm.description,
+          id: editingSubscription.id,
+          nextDate: subscriptionForm.nextDate,
+          paymentMethod: subscriptionForm.paymentMethod,
+        });
+        toast.success(t("payments.subscriptionUpdateSuccess"));
+        setEditingSubscription(null);
+        resetSubscriptionForm();
+        setIsSubscriptionDialogOpen(false);
+        router.refresh();
+      } catch (error) {
+        console.error("Error updating subscription:", error);
+        toast.error(t("payments.subscriptionUpdateError"));
+      }
+    });
+  };
+
+  const handleToggleSubscriptionStatus = (subscription: SubscriptionOverviewItem) => {
+    startTransition(async () => {
+      try {
+        if (subscription.status === "paused") {
+          await resumeSubscriptionAction(subscription.id);
+          toast.success(t("payments.subscriptionResumeSuccess"));
+        } else {
+          await pauseSubscriptionAction(subscription.id);
+          toast.success(t("payments.subscriptionPauseSuccess"));
+        }
+        router.refresh();
+      } catch (error) {
+        console.error("Error updating subscription status:", error);
+        toast.error(t("payments.subscriptionStatusError"));
+      }
+    });
+  };
+
+  const handleDeleteSubscription = () => {
+    if (!deletingSubscription) return;
+
+    startTransition(async () => {
+      try {
+        await deleteSubscriptionAction(deletingSubscription.id);
+        toast.success(t("payments.subscriptionDeleteSuccess"));
+        setDeletingSubscription(null);
+        router.refresh();
+      } catch (error) {
+        console.error("Error deleting subscription:", error);
+        toast.error(t("payments.subscriptionDeleteError"));
+      }
+    });
+  };
+
   return (
     <>
       <PageHeader
@@ -302,7 +442,7 @@ export function PaymentsScreen({
             className="gap-2"
             onClick={() => {
               if (activeTab === "subscriptions") {
-                setIsSubscriptionDialogOpen(true);
+                openSubscriptionDialog();
               } else {
                 setIsPaymentMethodDialogOpen(true);
               }
@@ -399,6 +539,20 @@ export function PaymentsScreen({
                         ? `${t("payments.limit")}: ${formatCurrency(paymentMethod.creditLimit)}`
                         : t("payments.noLimit")}
                     </p>
+                    {paymentMethod.type === "credit" ? (
+                      <>
+                        <p className="text-xs text-muted-foreground">
+                          {paymentMethod.closingDay
+                            ? `${t("payments.closingDay")}: ${paymentMethod.closingDay}`
+                            : t("payments.noClosingDay")}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {paymentMethod.dueDay
+                            ? `${t("payments.dueDay")}: ${paymentMethod.dueDay}`
+                            : t("payments.noDueDay")}
+                        </p>
+                      </>
+                    ) : null}
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -415,8 +569,14 @@ export function PaymentsScreen({
                       <DropdownMenuItem
                         onClick={() =>
                           setEditingPaymentMethod({
+                            closingDay: paymentMethod.closingDay
+                              ? String(paymentMethod.closingDay)
+                              : "",
                             creditLimit: paymentMethod.creditLimit
                               ? String(paymentMethod.creditLimit).replace(".", ",")
+                              : "",
+                            dueDay: paymentMethod.dueDay
+                              ? String(paymentMethod.dueDay)
                               : "",
                             id: paymentMethod.id,
                             name:
@@ -492,11 +652,11 @@ export function PaymentsScreen({
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y divide-border">
-            {activeSubscriptions.map((payment) => (
-              <div
-                key={payment.id}
-                className="flex items-center gap-4 p-4 transition-colors hover:bg-accent/50"
-              >
+            {subscriptions.map((payment) => (
+                <div
+                  key={payment.id}
+                  className="flex items-center gap-4 p-4 transition-colors hover:bg-accent/50"
+                >
                 <div className="flex size-12 items-center justify-center rounded-lg bg-accent text-2xl">
                   {payment.icon}
                 </div>
@@ -538,13 +698,25 @@ export function PaymentsScreen({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>
-                      <Pause className="mr-2 size-4" />
-                      {t("common.pause")}
+                    <DropdownMenuItem onClick={() => openSubscriptionDialog(payment)}>
+                      <Pencil className="mr-2 size-4" />
+                      {t("common.edit")}
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive">
+                    <DropdownMenuItem
+                      disabled={isPending}
+                      onClick={() => handleToggleSubscriptionStatus(payment)}
+                    >
+                      <Pause className="mr-2 size-4" />
+                      {payment.status === "paused"
+                        ? t("common.resume")
+                        : t("common.pause")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => setDeletingSubscription(payment)}
+                    >
                       <Trash2 className="mr-2 size-4" />
-                      {t("common.cancel")}
+                      {t("common.delete")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -592,6 +764,10 @@ export function PaymentsScreen({
                   onValueChange={(value) =>
                     setPaymentMethodForm({
                       ...paymentMethodForm,
+                      closingDay:
+                        value === "credit" ? paymentMethodForm.closingDay : "",
+                      dueDay:
+                        value === "credit" ? paymentMethodForm.dueDay : "",
                       type: value as CreatePaymentMethodInput["type"],
                     })
                   }
@@ -634,6 +810,50 @@ export function PaymentsScreen({
                   placeholder="0,00"
                 />
               </div>
+              {paymentMethodForm.type === "credit" ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-payment-method-closing-day">
+                      {t("payments.closingDay")}
+                    </Label>
+                    <Input
+                      id="new-payment-method-closing-day"
+                      inputMode="numeric"
+                      min="1"
+                      max="31"
+                      type="number"
+                      value={paymentMethodForm.closingDay}
+                      onChange={(event) =>
+                        setPaymentMethodForm({
+                          ...paymentMethodForm,
+                          closingDay: event.target.value,
+                        })
+                      }
+                      placeholder="7"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-payment-method-due-day">
+                      {t("payments.dueDay")}
+                    </Label>
+                    <Input
+                      id="new-payment-method-due-day"
+                      inputMode="numeric"
+                      min="1"
+                      max="31"
+                      type="number"
+                      value={paymentMethodForm.dueDay}
+                      onChange={(event) =>
+                        setPaymentMethodForm({
+                          ...paymentMethodForm,
+                          dueDay: event.target.value,
+                        })
+                      }
+                      placeholder="14"
+                    />
+                  </div>
+                </>
+              ) : null}
             </div>
           </div>
           <DialogFooter>
@@ -653,13 +873,25 @@ export function PaymentsScreen({
 
       <Dialog
         open={isSubscriptionDialogOpen}
-        onOpenChange={setIsSubscriptionDialogOpen}
+        onOpenChange={(open) => {
+          setIsSubscriptionDialogOpen(open);
+          if (!open) {
+            setEditingSubscription(null);
+            resetSubscriptionForm();
+          }
+        }}
       >
         <DialogContent className="overflow-y-auto sm:h-[60vh] sm:w-[50vw] sm:max-w-none">
           <DialogHeader>
-            <DialogTitle>{t("screen.payments.addSubscription")}</DialogTitle>
+            <DialogTitle>
+              {editingSubscription
+                ? t("payments.editSubscription")
+                : t("screen.payments.addSubscription")}
+            </DialogTitle>
             <DialogDescription>
-              {t("payments.subscriptionCreateDescription")}
+              {editingSubscription
+                ? t("payments.editSubscriptionDescription")
+                : t("payments.subscriptionCreateDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -773,15 +1005,28 @@ export function PaymentsScreen({
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setIsSubscriptionDialogOpen(false)}
+              onClick={() => {
+                setIsSubscriptionDialogOpen(false);
+                setEditingSubscription(null);
+                resetSubscriptionForm();
+              }}
               disabled={isPending}
             >
               {t("common.cancel")}
             </Button>
-            <Button onClick={handleCreateSubscription} disabled={isPending}>
+            <Button
+              onClick={
+                editingSubscription
+                  ? handleUpdateSubscription
+                  : handleCreateSubscription
+              }
+              disabled={isPending}
+            >
               {isPending
                 ? t("payments.subscriptionCreating")
-                : t("screen.payments.addSubscription")}
+                : editingSubscription
+                  ? t("transaction.saveChanges")
+                  : t("screen.payments.addSubscription")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -825,6 +1070,12 @@ export function PaymentsScreen({
                     onValueChange={(value) =>
                       setEditingPaymentMethod({
                         ...editingPaymentMethod,
+                        closingDay:
+                          value === "credit"
+                            ? editingPaymentMethod.closingDay
+                            : "",
+                        dueDay:
+                          value === "credit" ? editingPaymentMethod.dueDay : "",
                         type: value as UpdatePaymentMethodInput["type"],
                       })
                     }
@@ -871,6 +1122,50 @@ export function PaymentsScreen({
                     placeholder="0,00"
                   />
                 </div>
+                {editingPaymentMethod.type === "credit" ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="payment-method-closing-day">
+                        {t("payments.closingDay")}
+                      </Label>
+                      <Input
+                        id="payment-method-closing-day"
+                        inputMode="numeric"
+                        min="1"
+                        max="31"
+                        type="number"
+                        value={editingPaymentMethod.closingDay}
+                        onChange={(event) =>
+                          setEditingPaymentMethod({
+                            ...editingPaymentMethod,
+                            closingDay: event.target.value,
+                          })
+                        }
+                        placeholder="7"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="payment-method-due-day">
+                        {t("payments.dueDay")}
+                      </Label>
+                      <Input
+                        id="payment-method-due-day"
+                        inputMode="numeric"
+                        min="1"
+                        max="31"
+                        type="number"
+                        value={editingPaymentMethod.dueDay}
+                        onChange={(event) =>
+                          setEditingPaymentMethod({
+                            ...editingPaymentMethod,
+                            dueDay: event.target.value,
+                          })
+                        }
+                        placeholder="14"
+                      />
+                    </div>
+                  </>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -912,6 +1207,36 @@ export function PaymentsScreen({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={isPending}
               onClick={handleDeletePaymentMethod}
+            >
+              {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(deletingSubscription)}
+        onOpenChange={(open) => {
+          if (!open) setDeletingSubscription(null);
+        }}
+      >
+        <AlertDialogContent className="sm:h-[50vh] sm:w-[50vw] sm:max-w-none">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("payments.deleteSubscription")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("payments.deleteSubscriptionDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isPending}
+              onClick={handleDeleteSubscription}
             >
               {t("common.delete")}
             </AlertDialogAction>

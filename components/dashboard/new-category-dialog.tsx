@@ -30,6 +30,7 @@ import {
   type UpdateCategoryInput,
 } from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 type NewCategoryDialogProps = {
   category?: UpdateCategoryInput & {
@@ -47,18 +48,22 @@ type CategoryGroup = CreateCategoryInput["group"];
 
 const groupOptions: CategoryGroup[] = ["needs", "wants", "savings"];
 const emojiOptions = [
-  "🏠",
-  "🛒",
-  "🚗",
-  "🏥",
-  "📚",
-  "🧾",
-  "🎮",
-  "🎬",
-  "🛍️",
-  "📈",
-  "💼",
-  "🏷️",
+  { emoji: "🏠", label: "Moradia" },
+  { emoji: "🛒", label: "Mercado" },
+  { emoji: "🍽️", label: "Alimentação" },
+  { emoji: "🚗", label: "Transporte" },
+  { emoji: "🏥", label: "Saúde" },
+  { emoji: "🏋️", label: "Academia" },
+  { emoji: "📚", label: "Educação" },
+  { emoji: "🧾", label: "Contas" },
+  { emoji: "💡", label: "Serviços" },
+  { emoji: "🎬", label: "Assinaturas" },
+  { emoji: "🎮", label: "Lazer" },
+  { emoji: "🛍️", label: "Compras" },
+  { emoji: "✈️", label: "Viagem" },
+  { emoji: "🎁", label: "Presentes" },
+  { emoji: "📈", label: "Investimentos" },
+  { emoji: "🏷️", label: "Outros" },
 ];
 
 function sanitizeCurrencyInput(value: string) {
@@ -212,13 +217,19 @@ export function NewCategoryDialog({
             <Label htmlFor="category-icon">{t("category.icon")}</Label>
             <div className="flex items-center gap-2">
               <div className="flex flex-wrap gap-1.5">
-                {emojiOptions.map((emoji) => (
+                {emojiOptions.map(({ emoji, label }) => (
                   <button
                     key={emoji}
                     type="button"
-                    className="flex size-8 items-center justify-center rounded-md border border-border bg-background text-lg transition-colors hover:bg-accent"
+                    className={cn(
+                      "flex size-8 items-center justify-center rounded-md border bg-background text-lg transition-colors hover:bg-accent",
+                      icon === emoji
+                        ? "border-primary bg-primary/10 ring-2 ring-primary/40"
+                        : "border-border",
+                    )}
                     onClick={() => setIcon(emoji)}
-                    aria-label={emoji}
+                    aria-label={label}
+                    aria-pressed={icon === emoji}
                   >
                     {emoji}
                   </button>

@@ -2,11 +2,15 @@
 
 import * as React from "react";
 
+import { formatCurrency, isSupportedCurrency } from "@/lib/i18n/currency";
+
 export type Locale = "en" | "pt-BR";
+export type Currency = import("@/lib/i18n/currency").CurrencyCode;
 
 type Messages = typeof messages.en;
 
 const localeStorageKey = "dragg-locale";
+const currencyStorageKey = "dragg-currency";
 
 const messages = {
   en: {
@@ -24,6 +28,7 @@ const messages = {
     "common.viewAll": "View All",
     "common.ofBudget": "of budget",
     "common.ofTotal": "of total",
+    "common.planned": "Planned",
     "common.used": "used",
     "common.active": "active",
     "common.addFunds": "Add funds",
@@ -152,11 +157,15 @@ const messages = {
     "data.frequency.monthly": "Monthly",
     "data.frequency.weekly": "Weekly",
     "data.frequency.yearly": "Yearly",
-    "dashboard.budgetProgress.description": "Monthly spending by category",
+    "dashboard.budgetProgress.description":
+      "Monthly spending by 50/30/20 group",
     "dashboard.budgetProgress.title": "Budget Progress",
-    "dashboard.budgetSplit.description": "Monthly allocation by category",
-    "dashboard.budgetSplit.title": "50/30/20 Budget Split",
-    "dashboard.expensesByCategory.description": "Where your money goes",
+    "dashboard.budgetSplit.description": "Planned budget and spending by group",
+    "dashboard.budgetSplit.incomeBase": "Monthly income base",
+    "dashboard.budgetSplit.ofIncomeBase": "of income",
+    "dashboard.budgetSplit.title": "50/30/20 by Group",
+    "dashboard.expensesByCategory.description":
+      "Category spending grouped by 50/30/20",
     "dashboard.expensesByCategory.title": "Expenses by Category",
     "dashboard.expensesOverTime.description": "Monthly expense trend",
     "dashboard.expensesOverTime.title": "Expenses Over Time",
@@ -175,9 +184,32 @@ const messages = {
     "dashboard.quickActions.addCategory": "Add Category",
     "dashboard.quickActions.viewReports": "View Reports",
     "dashboard.summary.currentBalance": "Current Balance",
+    "dashboard.summary.predictedExpenses": "Predicted",
     "dashboard.summary.totalExpenses": "Total Expenses",
     "dashboard.summary.totalIncome": "Total Income",
     "dashboard.summary.totalSaved": "Total Saved",
+    "goals.color": "Color",
+    "goals.createError": "Failed to create goal.",
+    "goals.createSuccess": "Goal created successfully.",
+    "goals.currentAmount": "Current amount",
+    "goals.deleteDescription":
+      "This goal will be permanently removed from your account.",
+    "goals.deleteError": "Failed to delete goal.",
+    "goals.deleteSuccess": "Goal deleted successfully.",
+    "goals.deleteTitle": "Delete goal?",
+    "goals.emptyDescription":
+      "Create a goal to track progress toward an emergency fund, trip, purchase, or investment.",
+    "goals.emptyTitle": "No goals yet",
+    "goals.formDescription":
+      "Set a target, deadline, icon, and starting balance.",
+    "goals.fundError": "Failed to add funds.",
+    "goals.fundSuccess": "Funds added successfully.",
+    "goals.fundValidationError": "Enter an amount greater than zero.",
+    "goals.namePlaceholder": "E.g., Emergency fund, vacation, new car...",
+    "goals.targetAmount": "Target amount",
+    "goals.updateError": "Failed to update goal.",
+    "goals.updateSuccess": "Goal updated successfully.",
+    "goals.validationError": "Enter a name and a target amount.",
     "nav.budgets": "Budgets",
     "nav.categories": "Categories",
     "nav.goals": "Goals",
@@ -249,6 +281,8 @@ const messages = {
     "payments.editMethodDescription":
       "Update the name and type used when recording transactions.",
     "payments.limit": "Limit",
+    "payments.closingDay": "Closing day",
+    "payments.dueDay": "Due day",
     "payments.methodCreateError": "Failed to create payment method.",
     "payments.methodCreateSuccess": "Payment method created successfully.",
     "payments.methodDeleteError": "Failed to delete payment method.",
@@ -262,7 +296,15 @@ const messages = {
     "payments.methodUpdateSuccess": "Payment method updated successfully.",
     "payments.methodsTitle": "Payment methods",
     "payments.noLimit": "No absolute limit",
+    "payments.noClosingDay": "No closing day",
+    "payments.noDueDay": "No due day",
     "payments.protectedMethod": "Default",
+    "payments.deleteSubscription": "Delete subscription?",
+    "payments.deleteSubscriptionDescription":
+      "Future charges for this subscription will be removed.",
+    "payments.editSubscription": "Edit subscription",
+    "payments.editSubscriptionDescription":
+      "Update future charges for this subscription.",
     "payments.totalLimit": "Absolute limits",
     "payments.totalLimitDescription": "Configured payment capacity",
     "payments.totalSpent": "Total spent",
@@ -274,9 +316,16 @@ const messages = {
     "payments.subscriptionCreateSuccess":
       "Subscription scheduled successfully.",
     "payments.subscriptionCreating": "Scheduling...",
+    "payments.subscriptionDeleteError": "Failed to delete subscription.",
+    "payments.subscriptionDeleteSuccess": "Subscription deleted successfully.",
     "payments.subscriptionName": "Subscription",
     "payments.subscriptionNamePlaceholder": "E.g., Netflix, gym, software...",
     "payments.subscriptionNameRequired": "Enter a subscription name.",
+    "payments.subscriptionPauseSuccess": "Subscription paused.",
+    "payments.subscriptionResumeSuccess": "Subscription resumed.",
+    "payments.subscriptionStatusError": "Failed to update subscription status.",
+    "payments.subscriptionUpdateError": "Failed to update subscription.",
+    "payments.subscriptionUpdateSuccess": "Subscription updated successfully.",
     "payments.type.boleto": "Bill",
     "payments.type.other": "Other",
     "payments.type.cash": "Payment",
@@ -284,8 +333,12 @@ const messages = {
     "payments.type.debit": "Debit card",
     "payments.type.pix": "PIX",
     "screen.reports.breakdown": "Monthly Breakdown",
+    "screen.reports.allExpenses": "All expenses",
     "screen.reports.description": "Analyze your financial performance",
     "screen.reports.export": "Export",
+    "screen.reports.exportCsv": "Export CSV",
+    "screen.reports.exportPdf": "Export PDF",
+    "screen.reports.excessExpenses": "Excess spending",
     "screen.reports.incomeVsExpenses": "Income vs Expenses",
     "screen.reports.lastMonth": "Last Month",
     "screen.reports.lastThreeMonths": "Last 3 Months",
@@ -294,65 +347,36 @@ const messages = {
     "screen.reports.month": "Month",
     "screen.reports.netWorth": "Net Worth",
     "screen.reports.netWorthTrend": "Net Worth Trend",
+    "screen.reports.noExpenses": "No expenses in this period.",
     "screen.reports.period": "Period",
     "screen.reports.title": "Reports",
     "screen.reports.thisMonth": "this month",
     "screen.reports.vsLastMonth": "vs last month",
-    "screen.settings.account": "Account",
-    "screen.settings.activeSessions": "Active Sessions",
     "screen.settings.appearance": "Appearance",
-    "screen.settings.budgetAlerts": "Budget Alerts",
-    "screen.settings.changeAvatar": "Change Avatar",
-    "screen.settings.changePassword": "Change Password",
-    "screen.settings.compactMode": "Compact Mode",
-    "screen.settings.contactSupport": "Contact Support",
     "screen.settings.currency": "Currency",
-    "screen.settings.dangerZone": "Danger Zone",
-    "screen.settings.dateFormat": "Date Format",
-    "screen.settings.deleteAccount": "Delete Account",
     "screen.settings.description": "Manage your account and preferences",
     "screen.settings.email": "Email",
-    "screen.settings.emailNotifications": "Email Notifications",
-    "screen.settings.exportData": "Export Data",
-    "screen.settings.firstDayOfWeek": "First Day of Week",
     "screen.settings.firstName": "First Name",
-    "screen.settings.goalProgress": "Goal Progress",
-    "screen.settings.helpCenter": "Help Center",
-    "screen.settings.helpSupport": "Help & Support",
     "screen.settings.language": "Language",
     "screen.settings.lastName": "Last Name",
-    "screen.settings.notifications": "Notifications",
-    "screen.settings.paymentReminders": "Payment Reminders",
-    "screen.settings.phone": "Phone",
-    "screen.settings.privacyPolicy": "Privacy Policy",
     "screen.settings.profile": "Profile",
     "screen.settings.profileDescription": "Manage your personal information",
     "screen.settings.regional": "Regional Settings",
     "screen.settings.regionalDescription":
       "Configure currency and locale preferences",
-    "screen.settings.saveChanges": "Save Changes",
-    "screen.settings.security": "Security",
-    "screen.settings.securityDescription": "Manage your security settings",
     "screen.settings.appearanceDescription": "Customize how Dragg looks",
-    "screen.settings.compactDescription":
-      "Show more content with smaller spacing",
-    "screen.settings.helpDescription": "Get help with Dragg",
-    "screen.settings.notificationsDescription":
-      "Configure your notification preferences",
     "screen.settings.themeDescription": "Switch between light and dark mode",
-    "screen.settings.terms": "Terms of Service",
     "screen.settings.theme": "Theme",
     "screen.settings.title": "Settings",
-    "screen.settings.twoFactor": "Two-Factor Authentication",
     "settings.createdAt": "Account created",
-    "settings.lastSignInAt": "Last sign in",
-    "settings.linkedProviders": "Linked providers",
     "settings.notAvailable": "Not available",
-    "settings.primaryProvider": "Primary provider",
     "screen.transactions.add": "Add Transaction",
     "screen.transactions.count": "Transactions",
     "screen.transactions.description": "View and manage all your transactions",
     "screen.transactions.search": "Search transactions...",
+    "screen.transactions.hidePrevious": "Hide previous",
+    "screen.transactions.planned": "Planned",
+    "screen.transactions.showPrevious": "Show previous",
     "screen.transactions.sort": "Sort",
     "screen.transactions.sortAmountAsc": "Amount: low to high",
     "screen.transactions.sortAmountDesc": "Amount: high to low",
@@ -429,6 +453,7 @@ const messages = {
     "common.viewAll": "Ver tudo",
     "common.ofBudget": "do orçamento",
     "common.ofTotal": "do total",
+    "common.planned": "Planejado",
     "common.used": "usado",
     "common.active": "ativos",
     "common.addFunds": "Adicionar valor",
@@ -448,7 +473,7 @@ const messages = {
     "common.export": "Exportar",
     "common.income": "Renda",
     "common.expense": "Gasto",
-    "common.left": "Restante",
+    "common.left": "a menos",
     "common.month": "mês",
     "common.noDataForPeriod": "Ainda não há dados para este período.",
     "common.next": "Próximo",
@@ -557,11 +582,15 @@ const messages = {
     "data.frequency.monthly": "Mensal",
     "data.frequency.weekly": "Semanal",
     "data.frequency.yearly": "Anual",
-    "dashboard.budgetProgress.description": "Gastos mensais por categoria",
+    "dashboard.budgetProgress.description": "Gastos mensais por grupo 50/30/20",
     "dashboard.budgetProgress.title": "Progresso do orçamento",
-    "dashboard.budgetSplit.description": "Alocação mensal por categoria",
-    "dashboard.budgetSplit.title": "Divisão 50/30/20 do orçamento",
-    "dashboard.expensesByCategory.description": "Para onde seu dinheiro vai",
+    "dashboard.budgetSplit.description":
+      "Orçamento previsto e gastos por grupo",
+    "dashboard.budgetSplit.incomeBase": "Entradas do mês",
+    "dashboard.budgetSplit.ofIncomeBase": "das entradas",
+    "dashboard.budgetSplit.title": "50/30/20 por grupo",
+    "dashboard.expensesByCategory.description":
+      "Gastos por categoria agrupados pelo 50/30/20",
     "dashboard.expensesByCategory.title": "Gastos por categoria",
     "dashboard.expensesOverTime.description": "Tendência mensal de gastos",
     "dashboard.expensesOverTime.title": "Gastos ao longo do tempo",
@@ -581,9 +610,31 @@ const messages = {
     "dashboard.quickActions.addCategory": "Adicionar Categoria",
     "dashboard.quickActions.viewReports": "Ver relatórios",
     "dashboard.summary.currentBalance": "Saldo atual",
+    "dashboard.summary.predictedExpenses": "Previsto",
     "dashboard.summary.totalExpenses": "Gastos totais",
     "dashboard.summary.totalIncome": "Renda total",
     "dashboard.summary.totalSaved": "Total economizado",
+    "goals.color": "Cor",
+    "goals.createError": "Não foi possível criar a meta.",
+    "goals.createSuccess": "Meta criada com sucesso.",
+    "goals.currentAmount": "Valor atual",
+    "goals.deleteDescription":
+      "Esta meta será removida permanentemente da sua conta.",
+    "goals.deleteError": "Não foi possível excluir a meta.",
+    "goals.deleteSuccess": "Meta excluída com sucesso.",
+    "goals.deleteTitle": "Excluir meta?",
+    "goals.emptyDescription":
+      "Crie uma meta para acompanhar sua reserva, viagem, compra ou investimento.",
+    "goals.emptyTitle": "Nenhuma meta ainda",
+    "goals.formDescription": "Defina alvo, prazo, ícone e saldo inicial.",
+    "goals.fundError": "Não foi possível adicionar valor.",
+    "goals.fundSuccess": "Valor adicionado com sucesso.",
+    "goals.fundValidationError": "Informe um valor maior que zero.",
+    "goals.namePlaceholder": "Ex.: Reserva, viagem, carro novo...",
+    "goals.targetAmount": "Valor alvo",
+    "goals.updateError": "Não foi possível atualizar a meta.",
+    "goals.updateSuccess": "Meta atualizada com sucesso.",
+    "goals.validationError": "Informe o nome e o valor alvo.",
     "nav.budgets": "Orçamentos",
     "nav.categories": "Categorias",
     "nav.goals": "Metas",
@@ -658,6 +709,8 @@ const messages = {
     "payments.editMethodDescription":
       "Atualize o nome e o tipo usados ao registrar transações.",
     "payments.limit": "Limite",
+    "payments.closingDay": "Dia de fechamento",
+    "payments.dueDay": "Dia de vencimento",
     "payments.methodCreateError":
       "Não foi possível criar a forma de pagamento.",
     "payments.methodCreateSuccess": "Forma de pagamento criada com sucesso.",
@@ -675,7 +728,15 @@ const messages = {
       "Forma de pagamento atualizada com sucesso.",
     "payments.methodsTitle": "Formas de pagamento",
     "payments.noLimit": "Sem limite absoluto",
+    "payments.noClosingDay": "Sem fechamento",
+    "payments.noDueDay": "Sem vencimento",
     "payments.protectedMethod": "Padrão",
+    "payments.deleteSubscription": "Excluir assinatura?",
+    "payments.deleteSubscriptionDescription":
+      "As próximas cobranças desta assinatura serão removidas.",
+    "payments.editSubscription": "Editar assinatura",
+    "payments.editSubscriptionDescription":
+      "Atualize as próximas cobranças desta assinatura.",
     "payments.totalLimit": "Limites absolutos",
     "payments.totalLimitDescription": "Capacidade configurada de pagamento",
     "payments.totalSpent": "Total gasto",
@@ -686,10 +747,20 @@ const messages = {
     "payments.subscriptionCreateError": "Não foi possível criar a assinatura.",
     "payments.subscriptionCreateSuccess": "Assinatura agendada com sucesso.",
     "payments.subscriptionCreating": "Agendando...",
+    "payments.subscriptionDeleteError":
+      "Não foi possível excluir a assinatura.",
+    "payments.subscriptionDeleteSuccess": "Assinatura excluída com sucesso.",
     "payments.subscriptionName": "Assinatura",
     "payments.subscriptionNamePlaceholder":
       "Ex.: Netflix, academia, software...",
     "payments.subscriptionNameRequired": "Informe o nome da assinatura.",
+    "payments.subscriptionPauseSuccess": "Assinatura pausada.",
+    "payments.subscriptionResumeSuccess": "Assinatura retomada.",
+    "payments.subscriptionStatusError":
+      "Não foi possível atualizar o status da assinatura.",
+    "payments.subscriptionUpdateError":
+      "Não foi possível atualizar a assinatura.",
+    "payments.subscriptionUpdateSuccess": "Assinatura atualizada com sucesso.",
     "payments.type.boleto": "Boleto",
     "payments.type.other": "Outro",
     "payments.type.cash": "Pagamento",
@@ -697,8 +768,12 @@ const messages = {
     "payments.type.debit": "Cartão de débito",
     "payments.type.pix": "PIX",
     "screen.reports.breakdown": "Detalhamento mensal",
+    "screen.reports.allExpenses": "Todos os gastos",
     "screen.reports.description": "Analise seu desempenho financeiro",
     "screen.reports.export": "Exportar",
+    "screen.reports.exportCsv": "Exportar CSV",
+    "screen.reports.exportPdf": "Exportar PDF",
+    "screen.reports.excessExpenses": "Gastos excedentes",
     "screen.reports.incomeVsExpenses": "Renda vs gastos",
     "screen.reports.lastMonth": "Último mês",
     "screen.reports.lastThreeMonths": "Últimos 3 meses",
@@ -707,67 +782,37 @@ const messages = {
     "screen.reports.month": "Mês",
     "screen.reports.netWorth": "Patrimônio líquido",
     "screen.reports.netWorthTrend": "Tendência do patrimônio",
+    "screen.reports.noExpenses": "Nenhum gasto neste período.",
     "screen.reports.period": "Período",
     "screen.reports.title": "Relatórios",
     "screen.reports.thisMonth": "este mês",
     "screen.reports.vsLastMonth": "vs mês anterior",
-    "screen.settings.account": "Conta",
-    "screen.settings.activeSessions": "Sessões ativas",
     "screen.settings.appearance": "Aparência",
-    "screen.settings.budgetAlerts": "Alertas de orçamento",
-    "screen.settings.changeAvatar": "Alterar avatar",
-    "screen.settings.changePassword": "Alterar senha",
-    "screen.settings.compactMode": "Modo compacto",
-    "screen.settings.contactSupport": "Falar com suporte",
     "screen.settings.currency": "Moeda",
-    "screen.settings.dangerZone": "Zona de risco",
-    "screen.settings.dateFormat": "Formato da data",
-    "screen.settings.deleteAccount": "Excluir conta",
     "screen.settings.description": "Gerencie sua conta e preferências",
     "screen.settings.email": "E-mail",
-    "screen.settings.emailNotifications": "Notificações por e-mail",
-    "screen.settings.exportData": "Exportar dados",
-    "screen.settings.firstDayOfWeek": "Primeiro dia da semana",
     "screen.settings.firstName": "Nome",
-    "screen.settings.goalProgress": "Progresso das metas",
-    "screen.settings.helpCenter": "Central de ajuda",
-    "screen.settings.helpSupport": "Ajuda e suporte",
     "screen.settings.language": "Idioma",
     "screen.settings.lastName": "Sobrenome",
-    "screen.settings.notifications": "Notificações",
-    "screen.settings.paymentReminders": "Lembretes de pagamento",
-    "screen.settings.phone": "Telefone",
-    "screen.settings.privacyPolicy": "Política de privacidade",
     "screen.settings.profile": "Perfil",
     "screen.settings.profileDescription": "Gerencie suas informações pessoais",
     "screen.settings.regional": "Configurações regionais",
     "screen.settings.regionalDescription":
       "Configure moeda e preferências de localidade",
-    "screen.settings.saveChanges": "Salvar alterações",
-    "screen.settings.security": "Segurança",
-    "screen.settings.securityDescription":
-      "Gerencie suas configurações de segurança",
     "screen.settings.appearanceDescription": "Personalize a aparência do Dragg",
-    "screen.settings.compactDescription":
-      "Mostre mais conteúdo com espaçamento menor",
-    "screen.settings.helpDescription": "Obtenha ajuda com o Dragg",
-    "screen.settings.notificationsDescription":
-      "Configure suas preferências de notificação",
     "screen.settings.themeDescription": "Alterne entre modo claro e escuro",
-    "screen.settings.terms": "Termos de serviço",
     "screen.settings.theme": "Tema",
     "screen.settings.title": "Configurações",
-    "screen.settings.twoFactor": "Autenticação em dois fatores",
     "settings.createdAt": "Conta criada",
-    "settings.lastSignInAt": "Último login",
-    "settings.linkedProviders": "Provedores vinculados",
     "settings.notAvailable": "Não disponível",
-    "settings.primaryProvider": "Provedor principal",
     "screen.transactions.add": "Adicionar transação",
     "screen.transactions.count": "Transações",
     "screen.transactions.description":
       "Veja e gerencie todas as suas transações",
     "screen.transactions.search": "Buscar transações...",
+    "screen.transactions.hidePrevious": "Ocultar anteriores",
+    "screen.transactions.planned": "Prevista",
+    "screen.transactions.showPrevious": "Mostrar anteriores",
     "screen.transactions.sort": "Ordenar",
     "screen.transactions.sortAmountAsc": "Valor: menor primeiro",
     "screen.transactions.sortAmountDesc": "Valor: maior primeiro",
@@ -833,6 +878,7 @@ const messages = {
 } as const;
 
 const LocaleContext = React.createContext<{
+  currency: Currency;
   formatCurrency: (value: number) => string;
   formatDate: (
     date: string | Date,
@@ -840,6 +886,7 @@ const LocaleContext = React.createContext<{
   ) => string;
   formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string;
   locale: Locale;
+  setCurrency: (currency: Currency) => void;
   setLocale: (locale: Locale) => void;
   t: (key: string) => string;
 } | null>(null);
@@ -850,14 +897,17 @@ function resolveLocale(value?: string | null): Locale {
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = React.useState<Locale>("en");
+  const [currency, setCurrencyState] = React.useState<Currency>("USD");
 
   React.useEffect(() => {
     const storedLocale = window.localStorage.getItem(localeStorageKey);
     const nextLocale = storedLocale
       ? resolveLocale(storedLocale)
       : resolveLocale(window.navigator.language);
+    const storedCurrency = window.localStorage.getItem(currencyStorageKey);
 
     setLocaleState(nextLocale);
+    setCurrencyState(isSupportedCurrency(storedCurrency) ? storedCurrency : (nextLocale === "pt-BR" ? "BRL" : "USD"));
   }, []);
 
   React.useEffect(() => {
@@ -865,31 +915,45 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     window.localStorage.setItem(localeStorageKey, locale);
   }, [locale]);
 
+  React.useEffect(() => {
+    window.localStorage.setItem(currencyStorageKey, currency);
+  }, [currency]);
+
   const value = React.useMemo(
     () => ({
+      currency,
       formatCurrency(value: number) {
-        return new Intl.NumberFormat(locale, {
-          currency: locale === "pt-BR" ? "BRL" : "USD",
-          maximumFractionDigits: 2,
-          minimumFractionDigits: 2,
-          style: "currency",
-        }).format(value);
+        return formatCurrency(value, locale, currency);
       },
       formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions) {
-        return new Intl.DateTimeFormat(locale, options).format(new Date(date));
+        const value =
+          typeof date === "string" && date.match(/^\d{4}-\d{2}-\d{2}$/)
+            ? new Date(`${date}T00:00:00`)
+            : new Date(date);
+
+        return new Intl.DateTimeFormat(locale, options).format(value);
       },
       formatNumber(value: number, options?: Intl.NumberFormatOptions) {
         return new Intl.NumberFormat(locale, options).format(value);
       },
       locale,
+      setCurrency(nextCurrency: Currency) {
+        setCurrencyState(isSupportedCurrency(nextCurrency) ? nextCurrency : (locale === "pt-BR" ? "BRL" : "USD"));
+      },
       setLocale(nextLocale: Locale) {
         setLocaleState(nextLocale);
       },
       t(key: string) {
-        return messages[locale][key as keyof Messages] ?? key;
+        return (
+          messages[locale][key as keyof Messages] ??
+          messages[locale][`data.category.${key}` as keyof Messages] ??
+          messages[locale][`data.group.${key}` as keyof Messages] ??
+          messages[locale][`common.${key}` as keyof Messages] ??
+          key
+        );
       },
     }),
-    [locale],
+    [currency, locale],
   );
 
   return (

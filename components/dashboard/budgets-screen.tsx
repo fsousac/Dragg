@@ -1,6 +1,8 @@
 "use client";
 
-import { Minus, Settings, TrendingDown, TrendingUp } from "lucide-react";
+import { useMemo } from "react";
+
+import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import {
   Cell,
   Legend,
@@ -11,7 +13,6 @@ import {
 } from "recharts";
 
 import { PageHeader } from "@/components/dashboard/page-header";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -40,50 +41,47 @@ export function BudgetsScreen({
     budgetData.savings.budget;
   const totalSpent =
     budgetData.needs.spent + budgetData.wants.spent + budgetData.savings.spent;
-  const remaining = totalBudget - totalSpent;
-  const chartData = budgetSplitData.map((item) => ({
-    ...item,
-    name: t(item.nameKey),
-  }));
+  const left = totalBudget - totalSpent;
+  const chartData = useMemo(
+    () => budgetSplitData.map((item) => ({ ...item, name: t(item.nameKey) })),
+    [budgetSplitData, t],
+  );
 
-  const budgetGroups = [
-    {
-      description: t("data.category.needs"),
-      icon: "🏠",
-      key: "needs" as const,
-      name: t("data.group.needs"),
-      color: "var(--needs)",
-      ...budgetData.needs,
-    },
-    {
-      description: t("data.category.leisure"),
-      icon: "🎉",
-      key: "wants" as const,
-      name: t("data.group.wants"),
-      color: "var(--wants)",
-      ...budgetData.wants,
-    },
-    {
-      description: t("data.category.investments"),
-      icon: "💰",
-      key: "savings" as const,
-      name: t("data.group.savings"),
-      color: "var(--savings)",
-      ...budgetData.savings,
-    },
-  ];
+  const budgetGroups = useMemo(
+    () => [
+      {
+        description: t("data.category.needs"),
+        icon: "🏠",
+        key: "needs" as const,
+        name: t("data.group.needs"),
+        color: "var(--needs)",
+        ...budgetData.needs,
+      },
+      {
+        description: t("data.category.leisure"),
+        icon: "🎉",
+        key: "wants" as const,
+        name: t("data.group.wants"),
+        color: "var(--wants)",
+        ...budgetData.wants,
+      },
+      {
+        description: t("data.category.investments"),
+        icon: "💰",
+        key: "savings" as const,
+        name: t("data.group.savings"),
+        color: "var(--savings)",
+        ...budgetData.savings,
+      },
+    ],
+    [budgetData, t],
+  );
 
   return (
     <>
       <PageHeader
         title={t("screen.budgets.title")}
         description={t("screen.budgets.track")}
-        actions={
-          <Button variant="outline" className="gap-2">
-            <Settings className="size-4" />
-            {t("screen.budgets.configureBudget")}
-          </Button>
-        }
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -99,8 +97,8 @@ export function BudgetsScreen({
             `${Math.round((totalSpent / totalBudget) * 100)}% ${t("common.ofBudget")}`,
           ],
           [
-            t("common.remaining"),
-            formatCurrency(remaining),
+            t("common.left"),
+            formatCurrency(left),
             t("screen.budgets.leftToSpend"),
           ],
         ].map(([label, value, note]) => (
@@ -135,11 +133,15 @@ export function BudgetsScreen({
                     dataKey="value"
                   >
                     {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.color}
+                        className="stroke-card stroke-2"
+                      />
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number) => [
+                    formatter={(value) => [
                       `${value}%`,
                       t("screen.budgets.monthlyAllocation"),
                     ]}

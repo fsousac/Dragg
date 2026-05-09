@@ -10,15 +10,19 @@ import {
   createTransaction,
   deleteCategory,
   deletePaymentMethod,
+  deleteSubscription,
   deleteTransaction,
+  setSubscriptionPaused,
   type CreateCategoryInput,
   type CreatePaymentMethodInput,
   type CreateSubscriptionInput,
   type NewTransactionInput,
   type UpdateCategoryInput,
   type UpdatePaymentMethodInput,
+  type UpdateSubscriptionInput,
   updateCategory,
   updatePaymentMethod,
+  updateSubscription,
   updateTransaction,
   type UpdateTransactionInput,
 } from "@/lib/finance/transactions";
@@ -86,6 +90,12 @@ const createSubscriptionActionSchema = z
   })
   .strict();
 
+const updateSubscriptionActionSchema = createSubscriptionActionSchema
+  .extend({
+    id: uuidSchema,
+  })
+  .strict();
+
 const updateCategoryActionSchema = createCategoryActionSchema
   .extend({
     id: uuidSchema,
@@ -95,6 +105,8 @@ const updateCategoryActionSchema = createCategoryActionSchema
 const updatePaymentMethodActionSchema = z
   .object({
     creditLimit: z.number().finite().min(0).max(1_000_000_000).optional(),
+    closingDay: z.number().int().min(1).max(31).nullable().optional(),
+    dueDay: z.number().int().min(1).max(31).nullable().optional(),
     id: uuidSchema,
     name: safeShortTextSchema,
     type: z.enum(["bank", "boleto", "credit", "debit", "other"]),
@@ -173,6 +185,50 @@ export async function createSubscriptionAction(data: CreateSubscriptionInput) {
     category: parsed.category || "none",
     paymentMethod: parsed.paymentMethod || "none",
   });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/payments");
+  revalidatePath("/transactions");
+}
+
+export async function updateSubscriptionAction(data: UpdateSubscriptionInput) {
+  const parsed = updateSubscriptionActionSchema.parse(data);
+
+  await updateSubscription({
+    ...parsed,
+    category: parsed.category || "none",
+    paymentMethod: parsed.paymentMethod || "none",
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/payments");
+  revalidatePath("/transactions");
+}
+
+export async function pauseSubscriptionAction(subscriptionId: string) {
+  const parsedSubscriptionId = uuidSchema.parse(subscriptionId);
+
+  await setSubscriptionPaused(parsedSubscriptionId, true);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/payments");
+  revalidatePath("/transactions");
+}
+
+export async function resumeSubscriptionAction(subscriptionId: string) {
+  const parsedSubscriptionId = uuidSchema.parse(subscriptionId);
+
+  await setSubscriptionPaused(parsedSubscriptionId, false);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/payments");
+  revalidatePath("/transactions");
+}
+
+export async function deleteSubscriptionAction(subscriptionId: string) {
+  const parsedSubscriptionId = uuidSchema.parse(subscriptionId);
+
+  await deleteSubscription(parsedSubscriptionId);
 
   revalidatePath("/dashboard");
   revalidatePath("/payments");
