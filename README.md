@@ -1,226 +1,151 @@
-# Dragg
+<h1 align="center">
+	<img width="120" src="public/icon.svg" alt="Dragg" />
+</h1>
 
-Dragg is an open-source personal finance web app for tracking income, expenses, savings, budgets, categories, payment methods, and monthly financial progress.
+<h3 align="center">Dragg</h3>
 
-The project is designed to be simple to self-host and inexpensive to operate. It uses Next.js for the app layer and Supabase for authentication, Postgres, and Row Level Security.
+<p align="center">
+	Open-source personal finance app built with Next.js and Supabase.
+</p>
 
-## Features
+<p align="center">
+	<a href="https://github.com/fsousac/Dragg/actions/workflows/ci.yml">
+		<img src="https://github.com/fsousac/Dragg/actions/workflows/ci.yml/badge.svg" alt="CI" />
+	</a>
+	<a href="https://github.com/fsousac/Dragg/blob/main/LICENSE">
+		<img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" />
+	</a>
+	<a href="https://github.com/fsousac/Dragg/blob/main/package.json">
+		<img src="https://img.shields.io/badge/next-16.2.4-black" alt="Next.js" />
+	</a>
+	<a href="https://github.com/fsousac/Dragg/blob/main/package.json">
+		<img src="https://img.shields.io/badge/react-19-149eca" alt="React" />
+	</a>
+</p>
 
-- Google OAuth login with Supabase Auth
-- User-owned finance data protected by Supabase Row Level Security
-- Monthly dashboard with 50/30/20 budget split
-- Transaction creation, listing, update, and delete flows
-- Spending categories grouped by Needs, Wants, and Savings
-- Category emoji icons and monthly limits
-- Payment method management
-- Pix and Payment/Cash protected as default payment methods
-- Read-only account settings populated from OAuth profile data
-- Charts and progress indicators
-- Responsive desktop and mobile experience
+Dragg is an open-source personal finance web app for tracking income, expenses, budgets, categories, payment methods, and monthly progress.
 
-## Tech Stack
+It is designed to be simple to self-host and inexpensive to operate, with Supabase handling authentication and data security through PostgreSQL + Row Level Security.
 
-- Next.js App Router
-- React
-- TypeScript
-- Tailwind CSS
-- shadcn/ui
-- Supabase Auth
-- Supabase Postgres
-- Supabase Row Level Security
-- Recharts
-- Vercel
+### 🔥 Features
 
-## Project Status
+- Google OAuth authentication with Supabase Auth
+- User-owned finance data isolated via Supabase Row Level Security
+- Dashboard with monthly financial summary and 50/30/20 split
+- Full transaction flow: create, list, update, and delete
+- Categories organized by Needs, Wants, and Savings
+- Category emoji icons and monthly spending limits
+- Payment methods management with protected defaults (Pix and Payment/Cash)
+- Goals and reports screens
+- Charts and progress indicators powered by Recharts
+- Responsive experience for desktop and mobile
 
-Dragg is in early development. APIs, database schema, and UI structure may change before the first stable release.
+### 👉 Getting Started
 
-## Repository Documentation
+Requirements:
 
-- [Architecture](./docs/architecture.md)
-- [Database notes](./docs/database.md)
-- [Security notes](./docs/security.md)
-- [Contributing guide](./CONTRIBUTING.md)
-- [Security policy](./SECURITY.md)
-- [Code of conduct](./CODE_OF_CONDUCT.md)
-- [Changelog](./CHANGELOG.md)
+- Node.js 22+
+- pnpm (recommended package manager)
+- Supabase project
+- Google OAuth provider configured in Supabase
 
-## Should Database Configuration Be Public?
-
-Yes, the project should include the database schema, migrations, constraints, triggers, and Row Level Security policies needed to reproduce the app.
-
-No, the project must never include credentials, service-role keys, production URLs that reveal private infrastructure, database dumps with real user data, OAuth client secrets, or any `.env.local` file.
-
-This repository includes reproducible database SQL under [`supabase/migrations`](./supabase/migrations). Users should create their own Supabase project and apply these migrations.
-
-## Requirements
-
-- Node.js 20 or newer
-- npm
-- A Supabase project
-- Google OAuth credentials configured in Supabase
-- Optional: Supabase CLI for local or remote migration workflows
-
-## Quick Start
-
-1. Clone the repository:
+Clone and run locally:
 
 ```bash
-git clone https://github.com/YOUR_ORG_OR_USER/dragg.git
-cd dragg
-```
-
-2. Install dependencies:
-
-```bash
-npm install
-```
-
-3. Create environment variables:
-
-```bash
+git clone https://github.com/fsousac/Dragg.git
+cd Dragg
+corepack enable
+pnpm install
 cp .env.example .env.local
 ```
 
-4. Fill `.env.local`:
+Set your environment variables in `.env.local`:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
 ```
 
-5. Apply database migrations:
+Apply migrations and start:
 
 ```bash
 supabase db push
+pnpm run dev
 ```
 
-If you do not use the Supabase CLI, open the Supabase SQL editor and apply the SQL files from [`supabase/migrations`](./supabase/migrations) in filename order.
+Open `http://localhost:3000`.
 
-6. Start the app:
+If you are not using Supabase CLI, apply SQL files from `supabase/migrations` in filename order through the Supabase SQL Editor.
+
+### 📖 Documentation
+
+- [Architecture](./docs/architecture.md)
+- [Database](./docs/database.md)
+- [Security Notes](./docs/security.md)
+- [Contributing Guide](./CONTRIBUTING.md)
+- [Security Policy](./SECURITY.md)
+- [Code of Conduct](./CODE_OF_CONDUCT.md)
+- [Changelog](./CHANGELOG.md)
+
+### 📌 Compatibility
+
+Dragg currently targets:
+
+- Next.js 16
+- React 19
+- TypeScript 5
+- Node.js 22+
+- Supabase Postgres
+
+### 🔐 Security
+
+Security is a core part of the project architecture.
+
+- Keep RLS enabled for all user-owned tables
+- Scope reads and writes by authenticated user ID
+- Validate Server Action payloads at runtime (recommended with Zod)
+- Never expose service-role keys or OAuth secrets in client code
+- Keep migrations reproducible and free of production data
+
+For vulnerability reports, follow [SECURITY.md](./SECURITY.md).
+
+### 🧪 Scripts
 
 ```bash
-npm run dev
+pnpm run dev            # Start local development server
+pnpm run build          # Production build
+pnpm run start          # Start built app
+pnpm run lint           # Run ESLint
+pnpm run test           # Run tests once
+pnpm run test:watch     # Run tests in watch mode
+pnpm run test:coverage  # Run tests with coverage
 ```
 
-7. Open:
+### 🚀 Deployment
 
-```text
-http://localhost:3000
-```
+Dragg is ready to deploy on Vercel.
 
-## Supabase Setup
-
-1. Create a Supabase project.
-2. Copy the project URL into `NEXT_PUBLIC_SUPABASE_URL`.
-3. Copy the publishable key into `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
-4. Apply all migrations in `supabase/migrations`.
-5. Enable Google as an Auth provider in Supabase.
-6. Add your local redirect URL:
-
-```text
-http://localhost:3000/auth/callback
-```
-
-7. Add production redirect URLs before deploying, for example:
-
-```text
-https://your-domain.com/auth/callback
-```
-
-## Database Schema
-
-The app currently uses these tables:
-
-- `categories`
-- `payment_methods`
-- `transactions`
-
-The migrations include:
-
-- table definitions
-- indexes
-- check constraints
-- Row Level Security policies
-- triggers for `updated_at`
-- defaults seeded for new users
-
-Default user data includes category presets and payment methods. Pix and Payment/Cash are protected by the application from edit and delete operations.
-
-## Environment Variables
-
-Only public Supabase browser-safe variables are required:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
-```
-
-Do not add these to the repository:
-
-- Supabase service-role key
-- OAuth client secret
-- `.env.local`
-- production database connection string
-- any real user data
-
-## Scripts
-
-```bash
-npm run dev       # Start local development
-npm run build     # Production build and type check
-npm run start     # Start built app
-npm run lint      # Run ESLint
-npm audit --audit-level=moderate
-```
-
-## Security Checks
-
-Before publishing changes, run:
-
-```bash
-npm run lint
-npm run build
-npm audit --audit-level=moderate
-```
-
-Security expectations:
-
-- Keep RLS enabled on user-owned tables.
-- Scope database reads and writes by authenticated user ID.
-- Validate Server Action input at runtime.
-- Never use `user_metadata` for authorization decisions.
-- Never expose service-role credentials to browser code.
-- Keep migrations reproducible and free of production data.
-
-See [Security notes](./docs/security.md) and [Security policy](./SECURITY.md).
-
-## Deployment
-
-The project is compatible with Vercel.
-
-1. Import the repository into Vercel.
-2. Set the same environment variables used locally.
-3. Add the production OAuth callback URL in Supabase.
-4. Apply migrations to the Supabase project used by production.
+1. Import repository into Vercel.
+2. Configure the same environment variables used locally.
+3. Add production auth callback URL in Supabase:
+   - `https://your-domain.com/auth/callback`
+4. Apply migrations to the production Supabase project.
 5. Deploy.
 
-## Contributing
+### 🙋 Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening an issue or pull request.
-
-Recommended flow:
+Contributions are welcome.
 
 1. Fork the repository.
 2. Create a feature branch.
-3. Make focused changes.
-4. Add migrations for schema changes.
-5. Update documentation when behavior changes.
-6. Run lint, build, and audit.
+3. Keep changes focused and include tests when possible.
+4. Add migrations for any schema change.
+5. Update docs when behavior changes.
+6. Run lint, test, and build.
 7. Open a pull request with a clear description.
 
-Issues and pull requests use templates under [`.github`](./.github).
+Issue and pull request templates are available under [`.github`](./.github).
 
-## License
+### 🔓 License
 
-Dragg is released under the MIT License. See [LICENSE](./LICENSE).
+Dragg is released under the [MIT License](./LICENSE).
