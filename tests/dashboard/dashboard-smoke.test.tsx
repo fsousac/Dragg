@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { BudgetProgress } from "@/components/dashboard/budget-progress";
 import {
@@ -21,10 +21,49 @@ import {
 import { PageHeader } from "@/components/dashboard/page-header";
 import { PlaceholderPage } from "@/components/dashboard/placeholder-page";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
-import { LanguageProvider } from "@/lib/i18n";
+
+const translations: Record<string, string> = {
+  "common.expense": "Expense",
+  "common.income": "Income",
+  "common.left": "Left",
+  "common.noDataForPeriod": "No data for this period yet.",
+  "common.ofTotal": "of total",
+  "common.overBudget": "over budget",
+  "common.planned": "Planned",
+  "common.predicted": "Predicted",
+  "common.spent": "Spent",
+  "common.used": "used",
+  "dashboard.budgetSplit.description": "Monthly budget split",
+  "dashboard.budgetSplit.incomeBase": "Monthly income base",
+  "dashboard.budgetSplit.title": "Budget Split",
+  "dashboard.expensesByCategory.description": "Spending by category",
+  "dashboard.expensesByCategory.title": "Expenses by Category",
+  "dashboard.summary.currentBalance": "Current Balance",
+  "dashboard.summary.predictedExpenses": "Predicted Expenses",
+  "dashboard.summary.totalExpenses": "Total Expenses",
+  "dashboard.summary.totalIncome": "Total Income",
+  "dashboard.summary.totalSaved": "Total Saved",
+  "data.category.health": "Health",
+  "data.category.shopping": "Shopping",
+  "data.group.needs": "Needs",
+  "data.group.savings": "Savings",
+  "data.group.wants": "Wants",
+  "page.settings.description": "Coming soon",
+};
+
+vi.mock("@/lib/i18n", () => ({
+  useI18n: () => ({
+    formatCurrency: (value: number) => `$${value}`,
+    formatDate: (value: string | Date) =>
+      value instanceof Date ? value.toISOString() : value,
+    formatNumber: (value: number) => String(value),
+    locale: "en",
+    t: (key: string) => translations[key] ?? key,
+  }),
+}));
 
 function renderWithI18n(node: React.ReactNode) {
-  return renderToStaticMarkup(<LanguageProvider>{node}</LanguageProvider>);
+  return renderToStaticMarkup(node);
 }
 
 describe("month route helpers", () => {

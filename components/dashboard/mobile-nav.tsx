@@ -45,7 +45,7 @@ export function MobileNav() {
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-xl border-t border-border safe-area-pb">
-      <div className="flex items-center justify-around px-2 py-2">
+      <div className="grid grid-cols-5 items-stretch px-2 py-2">
         {mobileNavItems.map((item) => {
           const Icon = item.icon
           const isActive = pathname === item.href
@@ -57,14 +57,18 @@ export function MobileNav() {
               prefetch
               onTouchStart={() => router.prefetch(href)}
               className={cn(
-                "flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-200 min-w-[60px]",
+                "flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-center transition-all duration-200",
                 isActive
                   ? "text-primary"
                   : "text-muted-foreground"
               )}
             >
-              <Icon className={cn("w-5 h-5", isActive && "text-primary")} />
-              <span className="text-[10px] font-medium">{t(item.nameKey)}</span>
+              <Icon
+                className={cn("h-5 w-5 shrink-0", isActive && "text-primary")}
+              />
+              <span className="block w-full whitespace-normal text-center text-[10px] font-medium leading-tight">
+                {t(item.nameKey)}
+              </span>
             </Link>
           )
         })}
@@ -73,15 +77,17 @@ export function MobileNav() {
             <button
               type="button"
               className={cn(
-                "flex min-w-[60px] flex-col items-center gap-1 rounded-xl px-3 py-2 transition-all duration-200",
+                "flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-center transition-all duration-200",
                 moreNavItems.some((item) => item.href === pathname)
                   ? "text-primary"
                   : "text-muted-foreground"
               )}
               aria-label={t("nav.more")}
             >
-              <MoreHorizontal className="h-5 w-5" />
-              <span className="text-[10px] font-medium">{t("nav.more")}</span>
+              <MoreHorizontal className="h-5 w-5 shrink-0" />
+              <span className="block w-full whitespace-normal text-center text-[10px] font-medium leading-tight">
+                {t("nav.more")}
+              </span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
