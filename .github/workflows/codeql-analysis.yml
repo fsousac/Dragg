@@ -1,9 +1,14 @@
-name: CodeQL Analysis (advanced manual)
+name: CodeQL
 
 on:
-  # GitHub CodeQL default setup is enabled for this repository.
-  # Keep this advanced configuration manual to avoid duplicate SARIF uploads.
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
 
 permissions:
   contents: read
