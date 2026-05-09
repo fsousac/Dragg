@@ -1,0 +1,8 @@
+# Code owners for Dragg
+
+* @fsousac
+
+.github/ @fsousac
+supabase/ @fsousac
+docs/ @fsousac
+SECURITY.md @fsousac
