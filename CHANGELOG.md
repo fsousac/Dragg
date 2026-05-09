@@ -6,7 +6,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
-## [0.1.0-alpha.1] - 2026-05-08
+## [0.1.0] - 2026-05-08
 
 ### Added
 
@@ -36,4 +36,4 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ### Notes
 
-This is an alpha release and is not considered production-ready.
+This is the first MVP release of Dragg.
