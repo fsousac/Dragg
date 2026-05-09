@@ -190,3 +190,12 @@ create index if not exists transactions_category_id_idx on public.transactions (
 create index if not exists transactions_payment_method_id_idx on public.transactions (payment_method_id);
 create index if not exists monthly_budgets_user_id_month_idx on public.monthly_budgets (user_id, month);
 create index if not exists goals_user_id_deadline_idx on public.goals (user_id, deadline);
+
+-- Add index for faster subscription lookups by user_id and description
+CREATE INDEX IF NOT EXISTS transactions_user_id_description_idx
+  ON public.transactions (user_id, description);
+
+-- Add index for subscription lookups by notes pattern (optional, depends on query patterns)
+CREATE INDEX IF NOT EXISTS transactions_user_id_notes_idx
+  ON public.transactions (user_id, notes)
+  WHERE notes LIKE 'subscription%';

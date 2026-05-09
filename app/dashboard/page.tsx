@@ -11,7 +11,7 @@ import {
   createCategoryAction,
   createTransactionAction,
 } from "@/app/transactions/actions";
-import { getDashboardData } from "@/lib/finance/transactions";
+import { getDashboardData, getUserContext } from "@/lib/finance/transactions";
 
 type DashboardPageProps = {
   searchParams?: Promise<{
@@ -26,7 +26,8 @@ export default async function DashboardPage({
   const selectedMonth = Array.isArray(resolvedSearchParams?.month)
     ? resolvedSearchParams.month[0]
     : resolvedSearchParams?.month;
-  const dashboardData = await getDashboardData(selectedMonth);
+  const userContext = await getUserContext();
+  const dashboardData = await getDashboardData(selectedMonth, userContext);
 
   return (
     <AppShell>

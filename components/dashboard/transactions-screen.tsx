@@ -84,10 +84,16 @@ type TransactionsScreenProps = {
   updateTransactionAction: (data: UpdateTransactionInput) => Promise<void>;
 };
 
-function getInitialFormState(transaction: Transaction): EditableTransaction {
+function getInitialFormState(
+  transaction: Transaction,
+  incomeCategoryId: string,
+): EditableTransaction {
   return {
     amount: Math.abs(transaction.amount).toFixed(2),
-    category: transaction.categoryId ?? "none",
+    category:
+      transaction.type === "income"
+        ? incomeCategoryId
+        : (transaction.categoryId ?? "none"),
     date: transaction.date,
     description: transaction.descriptionKey,
     notes: transaction.notes ?? "",
@@ -144,9 +150,15 @@ export function TransactionsScreen({
   const categoryOptions = useMemo(
     () =>
       [...categories]
+        .filter(
+          (category) => category.id !== "none" && category.group !== "income",
+        )
         .sort((left, right) => {
           const order = { needs: 0, wants: 1, savings: 2 };
-          return order[left.group] - order[right.group];
+          return (
+            order[left.group as keyof typeof order] -
+            order[right.group as keyof typeof order]
+          );
         })
         .map((category) => ({
           label: t(category.label),
@@ -154,6 +166,19 @@ export function TransactionsScreen({
         })),
     [categories, t],
   );
+
+  const incomeCategory = useMemo(
+    () => categories.find((category) => category.group === "income"),
+    [categories],
+  );
+  const incomeCategoryOption = useMemo(
+    () => ({
+      label: t(incomeCategory?.label ?? "data.category.receipts"),
+      value: incomeCategory?.id ?? "none",
+    }),
+    [incomeCategory, t],
+  );
+  const incomeCategoryId = incomeCategoryOption.value;
 
   const paymentMethodOptions = useMemo(
     () =>
@@ -197,7 +222,7 @@ export function TransactionsScreen({
 
   const openTransactionDialog = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
-    setFormData(getInitialFormState(transaction));
+    setFormData(getInitialFormState(transaction, incomeCategoryId));
   };
 
   const closeTransactionDialog = () => {
@@ -503,7 +528,14 @@ export function TransactionsScreen({
                       setFormData({
                         ...formData,
                         category:
-                          value === "income" ? "none" : formData.category,
+                          value === "income"
+                            ? incomeCategoryId
+                            : categoryOptions.some(
+                                  (category) =>
+                                    category.value === formData.category,
+                                )
+                              ? formData.category
+                              : (categoryOptions[0]?.value ?? "none"),
                         type: value as TransactionType,
                       })
                     }
@@ -578,7 +610,6 @@ export function TransactionsScreen({
                   </Label>
                   <Select
                     value={formData.category}
-                    disabled={formData.type === "income"}
                     onValueChange={(value) =>
                       setFormData({ ...formData, category: value })
                     }
@@ -587,10 +618,10 @@ export function TransactionsScreen({
                       <SelectValue placeholder={t("common.category")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">
-                        {t("data.category.receipts")}
-                      </SelectItem>
-                      {categoryOptions.map((category) => (
+                      {(formData.type === "income"
+                        ? [incomeCategoryOption]
+                        : categoryOptions
+                      ).map((category) => (
                         <SelectItem key={category.value} value={category.value}>
                           {category.label}
                         </SelectItem>

@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { type ExpensesByCategoryItem } from "@/lib/finance/transactions";
@@ -54,27 +56,36 @@ export function ExpensesByCategoryChart({
   expensesByCategory,
 }: ExpensesByCategoryChartProps) {
   const { formatCurrency, t } = useI18n();
-  const chartData = expensesByCategory.map((item) => ({
-    ...item,
-    groupName: t(item.groupKey),
-    name: t(item.nameKey),
-  }));
-  const total = expensesByCategory.reduce((sum, item) => sum + item.value, 0);
-  const groupOrder = ["needs", "wants", "savings"];
-  const groupedData = groupOrder
-    .map((group) => {
-      const items = chartData.filter((item) => item.group === group);
-      const groupTotal = items.reduce((sum, item) => sum + item.value, 0);
+  const chartData = useMemo(
+    () =>
+      expensesByCategory.map((item) => ({
+        ...item,
+        groupName: t(item.groupKey),
+        name: t(item.nameKey),
+      })),
+    [expensesByCategory, t],
+  );
+  const total = useMemo(
+    () => expensesByCategory.reduce((sum, item) => sum + item.value, 0),
+    [expensesByCategory],
+  );
+  const groupedData = useMemo(() => {
+    const groupOrder = ["needs", "wants", "savings"];
+    return groupOrder
+      .map((group) => {
+        const items = chartData.filter((item) => item.group === group);
+        const groupTotal = items.reduce((sum, item) => sum + item.value, 0);
 
-      return {
-        color: items[0]?.color ?? "#64748B",
-        group,
-        groupName: items[0]?.groupName ?? "",
-        groupTotal,
-        items,
-      };
-    })
-    .filter((group) => group.items.length > 0);
+        return {
+          color: items[0]?.color ?? "#64748B",
+          group,
+          groupName: items[0]?.groupName ?? "",
+          groupTotal,
+          items,
+        };
+      })
+      .filter((group) => group.items.length > 0);
+  }, [chartData]);
 
   return (
     <Card className="bg-card border-border card-shadow">
@@ -112,14 +123,13 @@ export function ExpensesByCategoryChart({
                       ))}
                     </Pie>
                     <Tooltip
-                      content={(props) => (
+                      content={
                         <ExpensesByCategoryTooltip
-                          {...props}
                           formatCurrency={formatCurrency}
                           t={t}
                           total={total}
                         />
-                      )}
+                      }
                     />
                   </PieChart>
                 </ResponsiveContainer>

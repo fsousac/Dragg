@@ -1,5 +1,7 @@
 "use client"
 
+import { useMemo } from "react"
+
 import { Download, FileSpreadsheet, FileText, TrendingDown, TrendingUp } from "lucide-react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
@@ -80,21 +82,29 @@ export function ReportsScreen({ reportsData }: ReportsScreenProps) {
   const expenseChange = getPercentageChange(currentMonth.expenses, previousMonth.expenses)
   const savingsChange = getPercentageChange(currentMonth.savings, previousMonth.savings)
 
-  const incomeVsExpensesData = monthlyReports
-    .map((report) => ({
-      expenses: report.expenses,
-      income: report.income,
-      month: t(report.monthKey),
-      savings: report.savings,
-    }))
-    .reverse()
+  const incomeVsExpensesData = useMemo(
+    () =>
+      monthlyReports
+        .map((report) => ({
+          expenses: report.expenses,
+          income: report.income,
+          month: t(report.monthKey),
+          savings: report.savings,
+        }))
+        .reverse(),
+    [monthlyReports, t],
+  )
 
-  const netWorthData = monthlyReports
-    .map((report) => ({
-      month: t(report.monthKey),
-      netWorth: report.netWorth,
-    }))
-    .reverse()
+  const netWorthData = useMemo(
+    () =>
+      monthlyReports
+        .map((report) => ({
+          month: t(report.monthKey),
+          netWorth: report.netWorth,
+        }))
+        .reverse(),
+    [monthlyReports, t],
+  )
 
   function handlePeriodChange(period: string) {
     const params = new URLSearchParams(searchParams.toString())
@@ -273,7 +283,7 @@ export function ReportsScreen({ reportsData }: ReportsScreenProps) {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="month" stroke="var(--muted-foreground)" fontSize={12} />
                   <YAxis stroke="var(--muted-foreground)" fontSize={12} tickFormatter={(value) => formatCurrency(Number(value)).replace(/([,.]00|,00)$/, "")} />
-                  <Tooltip formatter={(value: number) => [formatCurrency(value), ""]} />
+                  <Tooltip formatter={(value) => [formatCurrency(Number(value ?? 0)), ""]} />
                   <Legend />
                   <Bar dataKey="income" name={t("common.income")} fill="var(--income)" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="expenses" name={t("common.expense")} fill="var(--expense)" radius={[4, 4, 0, 0]} />
@@ -294,7 +304,7 @@ export function ReportsScreen({ reportsData }: ReportsScreenProps) {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="month" stroke="var(--muted-foreground)" fontSize={12} />
                   <YAxis stroke="var(--muted-foreground)" fontSize={12} tickFormatter={(value) => formatCurrency(Number(value)).replace(/([,.]00|,00)$/, "")} />
-                  <Tooltip formatter={(value: number) => [formatCurrency(value), t("screen.reports.netWorth")]} />
+                  <Tooltip formatter={(value) => [formatCurrency(Number(value ?? 0)), t("screen.reports.netWorth")]} />
                   <defs>
                     <linearGradient id="colorNetWorth" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />

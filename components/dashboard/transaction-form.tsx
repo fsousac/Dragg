@@ -70,7 +70,10 @@ export function TransactionForm({
     type: "expense",
     date: today,
     amount: 0,
-    category: categories[0]?.id ?? "none",
+    category:
+      categories.find(
+        (category) => category.id !== "none" && category.group !== "income",
+      )?.id ?? "none",
     paymentMethod: paymentMethods[0]?.id ?? "none",
     installmentCount: 1,
     description: "",
@@ -80,6 +83,48 @@ export function TransactionForm({
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const expenseCategories = useMemo(
+    () =>
+      categories.filter(
+        (category) => category.id !== "none" && category.group !== "income",
+      ),
+    [categories],
+  );
+  const incomeCategory = useMemo(
+    () => categories.find((category) => category.group === "income"),
+    [categories],
+  );
+  const fallbackExpenseCategoryId = expenseCategories[0]?.id ?? "none";
+  const incomeCategoryOption = useMemo(
+    () => ({
+      value: incomeCategory?.id ?? "none",
+      label: t(incomeCategory?.label ?? "data.category.receipts"),
+      icon: incomeCategory?.icon ?? "💼",
+    }),
+    [incomeCategory, t],
+  );
+  const incomeCategoryId = incomeCategoryOption.value;
+
+  const categoryOptions = useMemo(
+    () =>
+      [...expenseCategories]
+        .sort((left, right) => {
+          const order = { needs: 0, wants: 1, savings: 2 };
+          return (
+            order[left.group as keyof typeof order] -
+            order[right.group as keyof typeof order]
+          );
+        })
+        .map((category) => ({
+          value: category.id,
+          label: t(category.label),
+          group: category.group,
+          icon: category.icon,
+        })),
+    [expenseCategories, t],
+  );
+  const displayedCategoryOptions =
+    formData.type === "income" ? [incomeCategoryOption] : categoryOptions;
 
   useEffect(() => {
     setMounted(true);
@@ -90,28 +135,23 @@ export function TransactionForm({
       ...currentFormData,
       category:
         currentFormData.type === "income"
-          ? "none"
-          : currentFormData.category !== "none"
+          ? incomeCategoryId
+          : expenseCategories.some(
+                (category) => category.id === currentFormData.category,
+              )
             ? currentFormData.category
-            : (categories[0]?.id ?? "none"),
+            : fallbackExpenseCategoryId,
       paymentMethod:
         currentFormData.paymentMethod !== "none"
           ? currentFormData.paymentMethod
           : (paymentMethods[0]?.id ?? "none"),
     }));
-  }, [categories, paymentMethods]);
-
-  useEffect(() => {
-    setFormData((currentFormData) => ({
-      ...currentFormData,
-      category:
-        currentFormData.type === "income"
-          ? "none"
-          : currentFormData.category !== "none"
-          ? currentFormData.category
-          : (categories[0]?.id ?? "none"),
-    }));
-  }, [categories]);
+  }, [
+    expenseCategories,
+    fallbackExpenseCategoryId,
+    incomeCategoryId,
+    paymentMethods,
+  ]);
 
   const parseDateValue = (dateValue: string) =>
     parse(dateValue, "dd/MM/yyyy", new Date());
@@ -171,7 +211,7 @@ export function TransactionForm({
       type: "expense",
       date: today,
       amount: 0,
-      category: categories[0]?.id ?? "none",
+      category: fallbackExpenseCategoryId,
       paymentMethod: paymentMethods[0]?.id ?? "none",
       installmentCount: 1,
       description: "",
@@ -198,36 +238,13 @@ export function TransactionForm({
     }
   };
 
-  const categoryOptions = useMemo(
-    () =>
-      [...categories]
-        .sort((left, right) => {
-          const order = { needs: 0, wants: 1, savings: 2, income: 3 };
-          return order[left.group] - order[right.group];
-        })
-        .map((category) => ({
-          value: category.id,
-          label: t(category.label),
-          group: category.group,
-          icon: category.icon,
-        })),
-    [categories, t],
+  const paymentMethodOptions = useMemo(
+    () => paymentMethods.map((paymentMethod) => ({
+      value: paymentMethod.id,
+      label: t(paymentMethod.label),
+    })),
+    [paymentMethods, t],
   );
-  const displayedCategoryOptions =
-    formData.type === "income"
-      ? [
-          {
-            value: "none",
-            label: t("data.category.receipts"),
-            icon: "💼",
-          },
-        ]
-      : categoryOptions;
-
-  const paymentMethodOptions = paymentMethods.map((paymentMethod) => ({
-    value: paymentMethod.id,
-    label: t(paymentMethod.label),
-  }));
 
   const selectedPaymentMethod = paymentMethods.find(
     (paymentMethod) => paymentMethod.id === formData.paymentMethod,
@@ -291,10 +308,11 @@ export function TransactionForm({
                 onClick={() =>
                   setFormData({
                     ...formData,
-                    category:
-                      formData.category === "none"
-                        ? (categories[0]?.id ?? "none")
-                        : formData.category,
+                    category: expenseCategories.some(
+                      (category) => category.id === formData.category,
+                    )
+                      ? formData.category
+                      : fallbackExpenseCategoryId,
                     type: "expense",
                   })
                 }
@@ -312,7 +330,7 @@ export function TransactionForm({
                 onClick={() =>
                   setFormData({
                     ...formData,
-                    category: "none",
+                    category: incomeCategoryId,
                     installmentCount: 1,
                     type: "income",
                   })
@@ -366,6 +384,7 @@ export function TransactionForm({
             </div>
 
             <CompactSelect
+              key={`category-${formData.type}`}
               label={t("transaction.category")}
               id="category"
               value={formData.category}
@@ -373,7 +392,6 @@ export function TransactionForm({
                 setFormData({ ...formData, category: value })
               }
               options={displayedCategoryOptions}
-              disabled={formData.type === "income"}
               icon={<Tag className="w-4 h-4" />}
               addActionLabel={
                 formData.type === "income"
@@ -384,11 +402,11 @@ export function TransactionForm({
                 formData.type === "income"
                   ? undefined
                   : createCategoryAction
-                  ? () => setIsCategoryDialogOpen(true)
-                  : () =>
-                      router.push(
-                        withSelectedMonth("/categories", searchParams),
-                      )
+                    ? () => setIsCategoryDialogOpen(true)
+                    : () =>
+                        router.push(
+                          withSelectedMonth("/categories", searchParams),
+                        )
               }
             />
 

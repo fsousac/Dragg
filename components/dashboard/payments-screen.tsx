@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2,
@@ -185,25 +185,30 @@ export function PaymentsScreen({
   const [deletingSubscription, setDeletingSubscription] =
     useState<SubscriptionOverviewItem | null>(null);
 
-  const activeSubscriptions = subscriptions.filter(
-    (subscription) => subscription.status === "active",
+  const activeSubscriptions = useMemo(
+    () => subscriptions.filter((subscription) => subscription.status === "active"),
+    [subscriptions],
   );
-  const monthlyTotal = activeSubscriptions
-    .filter((subscription) => subscription.frequency === "monthly")
-    .reduce((acc, subscription) => acc + subscription.amount, 0);
+  const monthlyTotal = useMemo(
+    () =>
+      activeSubscriptions
+        .filter((subscription) => subscription.frequency === "monthly")
+        .reduce((acc, subscription) => acc + subscription.amount, 0),
+    [activeSubscriptions],
+  );
 
   const statusColor = {
     active: "bg-income text-white",
     cancelled: "bg-destructive text-white",
     paused: "bg-yellow text-black",
   };
-  const totalSpentByPaymentMethod = paymentMethods.reduce(
-    (sum, paymentMethod) => sum + paymentMethod.spent,
-    0,
+  const totalSpentByPaymentMethod = useMemo(
+    () => paymentMethods.reduce((sum, paymentMethod) => sum + paymentMethod.spent, 0),
+    [paymentMethods],
   );
-  const totalCreditLimit = paymentMethods.reduce(
-    (sum, paymentMethod) => sum + paymentMethod.creditLimit,
-    0,
+  const totalCreditLimit = useMemo(
+    () => paymentMethods.reduce((sum, paymentMethod) => sum + paymentMethod.creditLimit, 0),
+    [paymentMethods],
   );
 
   const handleUpdatePaymentMethod = () => {

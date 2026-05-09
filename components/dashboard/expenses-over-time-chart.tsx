@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   XAxis,
@@ -21,11 +23,14 @@ export function ExpensesOverTimeChart({
   expensesOverTime,
 }: ExpensesOverTimeChartProps) {
   const { formatCurrency, t } = useI18n();
-  const chartData = expensesOverTime.map((item) => ({
-    ...item,
-    month: t(item.monthKey),
-  }));
-  const hasData = chartData.some((item) => item.amount > 0);
+  const chartData = useMemo(
+    () => expensesOverTime.map((item) => ({ ...item, month: t(item.monthKey) })),
+    [expensesOverTime, t],
+  );
+  const hasData = useMemo(
+    () => chartData.some((item) => item.amount > 0),
+    [chartData],
+  );
 
   return (
     <Card className="bg-card border-border card-shadow">

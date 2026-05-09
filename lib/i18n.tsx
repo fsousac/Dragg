@@ -2,10 +2,10 @@
 
 import * as React from "react";
 
-import { formatCurrencyValue, resolveCurrency } from "@/lib/i18n-currency";
+import { formatCurrency, isSupportedCurrency } from "@/lib/i18n/currency";
 
 export type Locale = "en" | "pt-BR";
-export type Currency = "BRL" | "USD" | "EUR";
+export type Currency = import("@/lib/i18n/currency").CurrencyCode;
 
 type Messages = typeof messages.en;
 
@@ -907,7 +907,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const storedCurrency = window.localStorage.getItem(currencyStorageKey);
 
     setLocaleState(nextLocale);
-    setCurrencyState(resolveCurrency(storedCurrency, nextLocale));
+    setCurrencyState(isSupportedCurrency(storedCurrency) ? storedCurrency : (nextLocale === "pt-BR" ? "BRL" : "USD"));
   }, []);
 
   React.useEffect(() => {
@@ -923,7 +923,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     () => ({
       currency,
       formatCurrency(value: number) {
-        return formatCurrencyValue(value, locale, currency);
+        return formatCurrency(value, locale, currency);
       },
       formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions) {
         const value =
@@ -938,7 +938,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       },
       locale,
       setCurrency(nextCurrency: Currency) {
-        setCurrencyState(resolveCurrency(nextCurrency, locale));
+        setCurrencyState(isSupportedCurrency(nextCurrency) ? nextCurrency : (locale === "pt-BR" ? "BRL" : "USD"));
       },
       setLocale(nextLocale: Locale) {
         setLocaleState(nextLocale);

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
+import { type SupabaseClient } from "@supabase/supabase-js";
 
 import {
   type Transaction,
@@ -15,7 +16,7 @@ type DbTransactionKind = TransactionType;
 type CategoryRow = {
   icon?: string | null;
   id: string;
-  group_type: DbCategoryGroup;
+  group_type: TransactionGroup;
   is_default: boolean | null;
   monthly_limit: number | string | null;
   name: string;
@@ -55,7 +56,7 @@ type GoalRow = {
 };
 
 export type TransactionFormCategory = {
-  group: DbCategoryGroup;
+  group: TransactionGroup;
   id: string;
   icon: string;
   label: string;
@@ -465,10 +466,7 @@ function assertPositiveFiniteAmount(value: number, label: string) {
 }
 
 function assertValidMonthDay(value: number | null, label: string) {
-  if (
-    value !== null &&
-    (!Number.isInteger(value) || value < 1 || value > 31)
-  ) {
+  if (value !== null && (!Number.isInteger(value) || value < 1 || value > 31)) {
     throw new Error(`${label} is invalid.`);
   }
 }
@@ -562,8 +560,10 @@ function toPaymentMethodLabelKey(
   );
 }
 
-async function getUserContext() {
-  const supabase = await createClient();
+export async function getUserContext(supabaseClient?: SupabaseClient | Promise<SupabaseClient>) {
+  const supabase = supabaseClient
+    ? await (supabaseClient as Promise<SupabaseClient>)
+    : await createClient();
   const [{ data: claimsData }, { data: userData }] = await Promise.all([
     supabase.auth.getClaims(),
     supabase.auth.getUser(),
@@ -952,8 +952,9 @@ function emptyBudgetData(): BudgetData {
   };
 }
 
-async function listCategories() {
-  const { supabase, userId } = await getUserContext();
+async function listCategories(options?: { userContext?: Awaited<ReturnType<typeof getUserContext>> }) {
+  const ctx = options?.userContext ?? (await getUserContext());
+  const { supabase, userId } = ctx;
   const { data, error } = await supabase
     .from("categories")
     .select("id, name, icon, group_type, is_default, monthly_limit")
@@ -985,33 +986,41 @@ async function listCategories() {
 
 export async function listCategoryOverview(
   month?: string,
+  userContext?: Awaited<ReturnType<typeof getUserContext>>
 ): Promise<CategoryOverviewItem[]> {
-  const categories = await listCategories();
-  const transactions = await listTransactions({ month });
+  const ctx = userContext ?? (await getUserContext());
+  const categories = await listCategories({ userContext: ctx });
+  const transactions = await listTransactions({ month, userContext: ctx });
 
-  return categories.map((category) => {
-    const label = toCategoryLabelKey(category.name, category.is_default);
-    const spent = transactions
-      .filter((transaction) => transaction.categoryId === category.id)
-      .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+  return categories
+    .filter(
+      (category): category is CategoryRow & { group_type: DbCategoryGroup } =>
+        category.group_type !== "income",
+    )
+    .map((category) => {
+      const label = toCategoryLabelKey(category.name, category.is_default);
+      const spent = transactions
+        .filter((transaction) => transaction.categoryId === category.id)
+        .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
 
-    return {
-      color: groupColors[category.group_type],
-      canModify: true,
-      group: category.group_type,
-      icon: toCategoryIcon(category.name, category.icon),
-      id: category.id,
-      isDefault: Boolean(category.is_default),
-      label,
-      monthlyLimit: Number(category.monthly_limit ?? 0),
-      name: category.name,
-      spent,
-    };
-  });
+      return {
+        color: groupColors[category.group_type],
+        canModify: true,
+        group: category.group_type,
+        icon: toCategoryIcon(category.name, category.icon),
+        id: category.id,
+        isDefault: Boolean(category.is_default),
+        label,
+        monthlyLimit: Number(category.monthly_limit ?? 0),
+        name: category.name,
+        spent,
+      };
+    });
 }
 
-async function listPaymentMethods() {
-  const { supabase, userId } = await getUserContext();
+async function listPaymentMethods(options?: { userContext?: Awaited<ReturnType<typeof getUserContext>> }) {
+  const ctx = options?.userContext ?? (await getUserContext());
+  const { supabase, userId } = ctx;
   const { data, error } = await supabase
     .from("payment_methods")
     .select("id, name, type, is_default, credit_limit, due_day, closing_day")
@@ -1259,7 +1268,7 @@ async function getPaymentMethodForMutation(paymentMethodId: string) {
         : fallbackWithLimit;
 
     data = fallback.data
-        ? ({
+      ? ({
           ...fallback.data,
           closing_day: null,
           is_default:
@@ -1284,10 +1293,11 @@ async function getPaymentMethodForMutation(paymentMethodId: string) {
   };
 }
 
-export async function getTransactionFormOptions(): Promise<TransactionFormOptions> {
+export async function getTransactionFormOptions(options?: { userContext?: Awaited<ReturnType<typeof getUserContext>> }): Promise<TransactionFormOptions> {
+  const ctx = options?.userContext ?? (await getUserContext());
   const [categories, paymentMethods] = await Promise.all([
-    listCategories(),
-    listPaymentMethods(),
+    listCategories({ userContext: ctx }),
+    listPaymentMethods({ userContext: ctx }),
   ]);
 
   const mappedCategories = categories.map((category) => ({
@@ -1506,9 +1516,7 @@ async function getSubscriptionOccurrences(subscriptionId: string) {
     .maybeSingle();
 
   if (referenceError) {
-    throw new Error(
-      `Unable to load subscription: ${referenceError.message}`,
-    );
+    throw new Error(`Unable to load subscription: ${referenceError.message}`);
   }
 
   const subscription = reference as SubscriptionReferenceRow | null;
@@ -1576,21 +1584,32 @@ export async function updateSubscription(input: UpdateSubscriptionInput) {
 
   const [year, month, day] = date.split("-").map(Number);
   const baseDate = new Date(year, month - 1, day);
-  const updates = occurrences.map((occurrence, index) =>
-    supabase
-      .from("transactions")
-      .update({
-        amount,
-        category_id: categoryId,
-        date: toDateValue(addMonthsClamped(baseDate, index)),
-        description,
-        notes: `subscription ${index + 1}/12`,
-        payment_method_id: paymentMethodId,
-      })
-      .eq("id", occurrence.id)
-      .eq("user_id", userId),
+  const occurrenceIds = occurrences.map((o) => o.id);
+  const { error: notesError } = await supabase
+    .from("transactions")
+    .update({ notes: `subscription ${occurrences.length}/12` })
+    .in("id", occurrenceIds)
+    .eq("user_id", userId);
+
+  if (notesError) {
+    throw new Error(`Unable to update subscription: ${notesError.message}`);
+  }
+
+  const results = await Promise.all(
+    occurrences.map((occurrence, index) =>
+      supabase
+        .from("transactions")
+        .update({
+          amount,
+          category_id: categoryId,
+          date: toDateValue(addMonthsClamped(baseDate, index)),
+          description,
+          payment_method_id: paymentMethodId,
+        })
+        .eq("id", occurrence.id)
+        .eq("user_id", userId),
+    ),
   );
-  const results = await Promise.all(updates);
   const error = results.find((result) => result.error)?.error;
 
   if (error) {
@@ -1867,33 +1886,19 @@ export async function addGoalFunds(goalId: string, amount: number) {
   assertUuid(goalId, "Goal");
   assertPositiveFiniteAmount(amount, "Amount");
   const { supabase, userId } = await getUserContext();
-  const { data, error: loadError } = await supabase
-    .from("goals")
-    .select("current_amount, target_amount")
-    .eq("id", goalId)
-    .eq("user_id", userId)
-    .maybeSingle();
 
-  if (loadError) {
-    throw new Error(`Unable to load goal: ${loadError.message}`);
+  const { data, error } = await supabase.rpc("add_goal_funds", {
+    p_goal_id: goalId,
+    p_user_id: userId,
+    p_amount: amount,
+  });
+
+  if (error) {
+    throw new Error(`Unable to add goal funds: ${error.message}`);
   }
 
   if (!data) {
     throw new Error("Goal not found.");
-  }
-
-  const currentAmount = Number(data.current_amount ?? 0);
-  const targetAmount = Number(data.target_amount);
-  const { error } = await supabase
-    .from("goals")
-    .update({
-      current_amount: Math.min(currentAmount + amount, targetAmount),
-    })
-    .eq("id", goalId)
-    .eq("user_id", userId);
-
-  if (error) {
-    throw new Error(`Unable to add goal funds: ${error.message}`);
   }
 }
 
@@ -2086,11 +2091,15 @@ export async function listTransactions(options?: {
   includeFuture?: boolean;
   month?: string;
   useFinancialMonth?: boolean;
+  limit?: number;
+  userContext?: Awaited<ReturnType<typeof getUserContext>>;
 }) {
-  const { supabase, userId } = await getUserContext();
+  const ctx = options?.userContext ?? (await getUserContext());
+  const { supabase, userId } = ctx;
   const includePrevious = options?.includePrevious ?? false;
   const includeFuture = options?.includeFuture ?? false;
   const useFinancialMonth = options?.useFinancialMonth ?? true;
+  const limit = options?.limit;
   const monthRange = options?.month
     ? includeFuture
       ? getMonthRange(options.month)
@@ -2119,6 +2128,10 @@ export async function listTransactions(options?: {
     }
   } else if (!includeFuture) {
     query = query.lte("date", getTodayValue());
+  }
+
+  if (limit) {
+    query = query.limit(limit);
   }
 
   const { data, error } = await query;
@@ -2174,19 +2187,20 @@ export async function listTransactions(options?: {
   throw new Error(`Unable to load transactions: ${error.message}`);
 }
 
-export async function getDashboardData(month?: string): Promise<DashboardData> {
+export async function getDashboardData(month?: string, userContext?: Awaited<ReturnType<typeof getUserContext>>): Promise<DashboardData> {
   const selectedMonth = normalizeMonthValue(month);
   const monthBuckets = getLastSixMonthKeys(selectedMonth);
+  const ctx = userContext ?? (await getUserContext());
   const [
     transactions,
     scheduledTransactions,
     trendTransactions,
     { categories, paymentMethods },
   ] = await Promise.all([
-    listTransactions({ month: selectedMonth }),
-    listTransactions({ includeFuture: true, month: selectedMonth }),
-    listTransactions({ includePrevious: true, month: selectedMonth }),
-    getTransactionFormOptions(),
+    listTransactions({ month: selectedMonth, userContext: ctx }),
+    listTransactions({ includeFuture: true, month: selectedMonth, userContext: ctx }),
+    listTransactions({ includePrevious: true, month: selectedMonth, userContext: ctx }),
+    getTransactionFormOptions({ userContext: ctx }),
   ]);
   const incomeTransactions = transactions.filter(
     (transaction) => transaction.type === "income",
@@ -2431,10 +2445,12 @@ export async function getReportsData(
 
 export async function getBudgetOverviewData(
   month?: string,
+  userContext?: Awaited<ReturnType<typeof getUserContext>>,
 ): Promise<BudgetOverviewData> {
+  const ctx = userContext ?? (await getUserContext());
   const [dashboardData, categories] = await Promise.all([
-    getDashboardData(month),
-    listCategoryOverview(month),
+    getDashboardData(month, ctx),
+    listCategoryOverview(month, ctx),
   ]);
 
   return {

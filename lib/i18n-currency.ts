@@ -1,27 +1,26 @@
-import { type Currency, type Locale } from "@/lib/i18n";
+export {
+  formatCurrency,
+  getStoredCurrency,
+  isSupportedCurrency,
+  setStoredCurrency,
+} from "@/lib/i18n/currency";
+export type { CurrencyCode } from "@/lib/i18n/currency";
 
-const supportedCurrencies = new Set<Currency>(["BRL", "USD", "EUR"]);
+import { formatCurrency, isSupportedCurrency } from "@/lib/i18n/currency";
+import type { CurrencyCode } from "@/lib/i18n/currency";
 
 export function resolveCurrency(
   value?: string | null,
-  locale: Locale = "en",
-): Currency {
-  if (value && supportedCurrencies.has(value as Currency)) {
-    return value as Currency;
-  }
-
-  return locale === "pt-BR" ? "BRL" : "USD";
+  locale: string = "en",
+): CurrencyCode {
+  if (value && isSupportedCurrency(value)) return value;
+  return locale.toLowerCase().startsWith("pt") ? "BRL" : "USD";
 }
 
 export function formatCurrencyValue(
   value: number,
-  locale: Locale,
-  currency: Currency,
+  locale: string,
+  currency: CurrencyCode,
 ) {
-  return new Intl.NumberFormat(locale, {
-    currency,
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
-    style: "currency",
-  }).format(value);
+  return formatCurrency(value, locale, currency);
 }

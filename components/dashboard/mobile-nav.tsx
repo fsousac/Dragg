@@ -27,13 +27,13 @@ const mobileNavItems = [
   { nameKey: "nav.overview", icon: LayoutDashboard, href: "/dashboard" },
   { nameKey: "nav.transactions", icon: ArrowLeftRight, href: "/transactions" },
   { nameKey: "nav.budgets", icon: PieChart, href: "/budgets" },
-  { nameKey: "nav.reports", icon: BarChart3, href: "/reports" }
+  { nameKey: "nav.payments", icon: CreditCard, href: "/payments" },
 ]
 
 const moreNavItems = [
   { nameKey: "nav.categories", icon: Folder, href: "/categories" },
-  { nameKey: "nav.payments", icon: CreditCard, href: "/payments" },
   { nameKey: "nav.goals", icon: Target, href: "/goals" },
+  { nameKey: "nav.reports", icon: BarChart3, href: "/reports" },
   { nameKey: "nav.settings", icon: Settings, href: "/settings" }
 ]
 

@@ -11,13 +11,13 @@ import { useI18n } from "@/lib/i18n";
 const actions = [
   {
     nameKey: "dashboard.quickActions.addIncome",
-    href: "/transactions/new",
+    href: "/transactions",
     icon: Plus,
     color: "bg-[#22C55E]/10 text-[#22C55E] hover:bg-[#22C55E]/20",
   },
   {
     nameKey: "dashboard.quickActions.addExpense",
-    href: "/transactions/new",
+    href: "/transactions",
     icon: Minus,
     color: "bg-[#FB7185]/10 text-[#FB7185] hover:bg-[#FB7185]/20",
   },

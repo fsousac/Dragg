@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import {
   Cell,
@@ -40,37 +42,40 @@ export function BudgetsScreen({
   const totalSpent =
     budgetData.needs.spent + budgetData.wants.spent + budgetData.savings.spent;
   const left = totalBudget - totalSpent;
-  const chartData = budgetSplitData.map((item) => ({
-    ...item,
-    name: t(item.nameKey),
-  }));
+  const chartData = useMemo(
+    () => budgetSplitData.map((item) => ({ ...item, name: t(item.nameKey) })),
+    [budgetSplitData, t],
+  );
 
-  const budgetGroups = [
-    {
-      description: t("data.category.needs"),
-      icon: "🏠",
-      key: "needs" as const,
-      name: t("data.group.needs"),
-      color: "var(--needs)",
-      ...budgetData.needs,
-    },
-    {
-      description: t("data.category.leisure"),
-      icon: "🎉",
-      key: "wants" as const,
-      name: t("data.group.wants"),
-      color: "var(--wants)",
-      ...budgetData.wants,
-    },
-    {
-      description: t("data.category.investments"),
-      icon: "💰",
-      key: "savings" as const,
-      name: t("data.group.savings"),
-      color: "var(--savings)",
-      ...budgetData.savings,
-    },
-  ];
+  const budgetGroups = useMemo(
+    () => [
+      {
+        description: t("data.category.needs"),
+        icon: "🏠",
+        key: "needs" as const,
+        name: t("data.group.needs"),
+        color: "var(--needs)",
+        ...budgetData.needs,
+      },
+      {
+        description: t("data.category.leisure"),
+        icon: "🎉",
+        key: "wants" as const,
+        name: t("data.group.wants"),
+        color: "var(--wants)",
+        ...budgetData.wants,
+      },
+      {
+        description: t("data.category.investments"),
+        icon: "💰",
+        key: "savings" as const,
+        name: t("data.group.savings"),
+        color: "var(--savings)",
+        ...budgetData.savings,
+      },
+    ],
+    [budgetData, t],
+  );
 
   return (
     <>
@@ -136,7 +141,7 @@ export function BudgetsScreen({
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number) => [
+                    formatter={(value) => [
                       `${value}%`,
                       t("screen.budgets.monthlyAllocation"),
                     ]}

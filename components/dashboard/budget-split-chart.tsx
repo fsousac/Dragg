@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { type BudgetSplitItem } from "@/lib/finance/transactions";
@@ -48,12 +50,18 @@ export function BudgetSplitTooltip({
 
 export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
   const { formatCurrency, t } = useI18n();
-  const chartData = budgetSplitData.map((item) => ({
-    ...item,
-    name: t(item.nameKey),
-  }));
-  const totalPlanned = chartData.reduce((sum, item) => sum + item.maxAmount, 0);
-  const totalSpent = chartData.reduce((sum, item) => sum + item.spentAmount, 0);
+  const chartData = useMemo(
+    () => budgetSplitData.map((item) => ({ ...item, name: t(item.nameKey) })),
+    [budgetSplitData, t],
+  );
+  const totalPlanned = useMemo(
+    () => chartData.reduce((sum, item) => sum + item.maxAmount, 0),
+    [chartData],
+  );
+  const totalSpent = useMemo(
+    () => chartData.reduce((sum, item) => sum + item.spentAmount, 0),
+    [chartData],
+  );
 
   return (
     <Card className="bg-card border-border card-shadow">
@@ -88,13 +96,12 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
                   ))}
                 </Pie>
                 <Tooltip
-                  content={(props) => (
+                  content={
                     <BudgetSplitTooltip
-                      {...props}
                       formatCurrency={formatCurrency}
                       t={t}
                     />
-                  )}
+                  }
                 />
               </PieChart>
             </ResponsiveContainer>

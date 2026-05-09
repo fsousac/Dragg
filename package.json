@@ -61,7 +61,7 @@
     "react-dom": "^19",
     "react-hook-form": "^7.54.1",
     "react-resizable-panels": "^2.1.7",
-    "recharts": "2.15.0",
+    "recharts": "3.8.1",
     "sonner": "^1.7.1",
     "tailwind-merge": "^3.3.1",
     "vaul": "^1.1.2",
@@ -82,6 +82,7 @@
     "vitest": "^4.1.5"
   },
   "overrides": {
-    "postcss": "^8.5.12"
+    "postcss": "^8.5.12",
+    "lodash": ">=4.18.0"
   }
 }
