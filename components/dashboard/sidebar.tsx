@@ -112,7 +112,7 @@ export function Sidebar({
                 referrerPolicy="no-referrer"
               />
             ) : null}
-            <AvatarFallback className="bg-gradient-to-br from-primary to-emerald-400 text-xs font-bold text-primary-foreground">
+            <AvatarFallback className="bg-linear-to-br from-primary to-emerald-400 text-xs font-bold text-primary-foreground">
               {initials}
             </AvatarFallback>
           </Avatar>

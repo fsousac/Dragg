@@ -29,6 +29,7 @@ const messages = {
     "common.ofBudget": "of budget",
     "common.ofTotal": "of total",
     "common.planned": "Planned",
+    "common.available": "Available",
     "common.used": "used",
     "common.active": "active",
     "common.addFunds": "Add funds",
@@ -163,6 +164,7 @@ const messages = {
     "dashboard.budgetSplit.description": "Planned budget and spending by group",
     "dashboard.budgetSplit.incomeBase": "Monthly income base",
     "dashboard.budgetSplit.ofIncomeBase": "of income",
+    "dashboard.budgetSplit.plannedSpend": "Planned spend",
     "dashboard.budgetSplit.title": "50/30/20 by Group",
     "dashboard.expensesByCategory.description":
       "Category spending grouped by 50/30/20",
@@ -454,6 +456,7 @@ const messages = {
     "common.ofBudget": "do orçamento",
     "common.ofTotal": "do total",
     "common.planned": "Planejado",
+    "common.available": "Disponível",
     "common.used": "usado",
     "common.active": "ativos",
     "common.addFunds": "Adicionar valor",
@@ -588,6 +591,7 @@ const messages = {
       "Orçamento previsto e gastos por grupo",
     "dashboard.budgetSplit.incomeBase": "Entradas do mês",
     "dashboard.budgetSplit.ofIncomeBase": "das entradas",
+    "dashboard.budgetSplit.plannedSpend": "Uso previsto",
     "dashboard.budgetSplit.title": "50/30/20 por grupo",
     "dashboard.expensesByCategory.description":
       "Gastos por categoria agrupados pelo 50/30/20",
@@ -907,7 +911,13 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const storedCurrency = window.localStorage.getItem(currencyStorageKey);
 
     setLocaleState(nextLocale);
-    setCurrencyState(isSupportedCurrency(storedCurrency) ? storedCurrency : (nextLocale === "pt-BR" ? "BRL" : "USD"));
+    setCurrencyState(
+      isSupportedCurrency(storedCurrency)
+        ? storedCurrency
+        : nextLocale === "pt-BR"
+          ? "BRL"
+          : "USD",
+    );
   }, []);
 
   React.useEffect(() => {
@@ -938,7 +948,13 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       },
       locale,
       setCurrency(nextCurrency: Currency) {
-        setCurrencyState(isSupportedCurrency(nextCurrency) ? nextCurrency : (locale === "pt-BR" ? "BRL" : "USD"));
+        setCurrencyState(
+          isSupportedCurrency(nextCurrency)
+            ? nextCurrency
+            : locale === "pt-BR"
+              ? "BRL"
+              : "USD",
+        );
       },
       setLocale(nextLocale: Locale) {
         setLocaleState(nextLocale);

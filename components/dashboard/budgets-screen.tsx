@@ -20,6 +20,7 @@ import {
   type BudgetSplitItem,
   type CategoryOverviewItem,
 } from "@/lib/finance/transactions";
+import { calculateBudgetUsage } from "@/lib/finance/budget";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -41,7 +42,7 @@ export function BudgetsScreen({
     budgetData.savings.budget;
   const totalSpent =
     budgetData.needs.spent + budgetData.wants.spent + budgetData.savings.spent;
-  const left = totalBudget - totalSpent;
+  const totalUsage = calculateBudgetUsage(totalSpent, totalBudget);
   const chartData = useMemo(
     () => budgetSplitData.map((item) => ({ ...item, name: t(item.nameKey) })),
     [budgetSplitData, t],
@@ -94,12 +95,20 @@ export function BudgetsScreen({
           [
             t("screen.budgets.totalSpent"),
             formatCurrency(totalSpent),
-            `${Math.round((totalSpent / totalBudget) * 100)}% ${t("common.ofBudget")}`,
+            `${totalUsage.usagePercentage}% ${t("common.ofBudget")}`,
           ],
           [
-            t("common.left"),
-            formatCurrency(left),
-            t("screen.budgets.leftToSpend"),
+            totalUsage.isOverBudget
+              ? t("common.overBudget")
+              : t("common.left"),
+            formatCurrency(
+              totalUsage.isOverBudget
+                ? totalUsage.exceededAmount
+                : totalUsage.remainingAmount,
+            ),
+            totalUsage.isOverBudget
+              ? t("common.overBudget")
+              : t("screen.budgets.leftToSpend"),
           ],
         ].map(([label, value, note]) => (
           <Card key={label} className="border-border bg-card card-shadow">
@@ -167,9 +176,13 @@ export function BudgetsScreen({
           </CardHeader>
           <CardContent className="space-y-6">
             {budgetGroups.map((group) => {
-              const percentage = Math.round((group.spent / group.budget) * 100);
+              const usage = calculateBudgetUsage(group.spent, group.budget);
               const trend =
-                percentage > 80 ? "over" : percentage > 50 ? "normal" : "under";
+                usage.isOverBudget || usage.usagePercentage > 80
+                  ? "over"
+                  : usage.usagePercentage > 50
+                    ? "normal"
+                    : "under";
               return (
                 <div key={group.key}>
                   <div className="mb-2 flex items-center justify-between gap-3">
@@ -201,7 +214,7 @@ export function BudgetsScreen({
                     }}
                   >
                     <Progress
-                      value={Math.min(percentage, 100)}
+                      value={usage.progressValue}
                       className="h-3"
                     />
                   </div>
@@ -209,7 +222,7 @@ export function BudgetsScreen({
                     <span
                       className={cn(
                         "flex items-center gap-1 text-xs",
-                        percentage > 100
+                        usage.isOverBudget
                           ? "text-destructive"
                           : "text-muted-foreground",
                       )}
@@ -217,11 +230,19 @@ export function BudgetsScreen({
                       {trend === "over" && <TrendingUp className="size-3" />}
                       {trend === "under" && <TrendingDown className="size-3" />}
                       {trend === "normal" && <Minus className="size-3" />}
-                      {percentage}% {t("common.used")}
+                      {usage.usagePercentage}% {t("common.used")}
                     </span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatCurrency(group.budget - group.spent)}{" "}
-                      {t("common.left")}
+                    <span
+                      className={cn(
+                        "text-xs",
+                        usage.isOverBudget
+                          ? "font-medium text-destructive"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {usage.isOverBudget
+                        ? `${formatCurrency(usage.exceededAmount)} ${t("common.overBudget")}`
+                        : `${formatCurrency(usage.remainingAmount)} ${t("common.left")}`}
                     </span>
                   </div>
                 </div>
