@@ -1,21 +1,16 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Building2,
-  Calendar,
-  CreditCard,
-  MoreVertical,
-  Pause,
-  Pencil,
-  Plus,
-  Trash2,
-  Wallet,
-} from "lucide-react";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
+import {
+  PaymentMethodsTab,
+  type EditablePaymentMethod,
+} from "@/components/dashboard/payment-methods-tab";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { SubscriptionsTab } from "@/components/dashboard/subscriptions-tab";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,9 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -37,12 +30,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -64,7 +51,6 @@ import {
   type UpdateSubscriptionInput,
 } from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 
 type PaymentsScreenProps = {
   categories: TransactionFormCategory[];
@@ -81,16 +67,6 @@ type PaymentsScreenProps = {
   updateSubscriptionAction: (data: UpdateSubscriptionInput) => Promise<void>;
 };
 
-type EditablePaymentMethod = {
-  closingDay: string;
-  creditLimit: string;
-  dueDay: string;
-  id: string;
-  name: string;
-  originalName: string;
-  type: UpdatePaymentMethodInput["type"];
-};
-
 type EditableSubscription = {
   amount: string;
   category: string;
@@ -99,16 +75,6 @@ type EditableSubscription = {
   nextDate: string;
   paymentMethod: string;
 };
-
-const paymentTypeIcons = {
-  bank: Building2,
-  boleto: Wallet,
-  cash: Wallet,
-  credit: CreditCard,
-  debit: CreditCard,
-  pix: Wallet,
-  other: Wallet,
-} as const;
 
 const editablePaymentTypeOptions: UpdatePaymentMethodInput["type"][] = [
   "bank",
@@ -155,7 +121,7 @@ export function PaymentsScreen({
   updateSubscriptionAction,
 }: PaymentsScreenProps) {
   const router = useRouter();
-  const { formatCurrency, formatDate, t } = useI18n();
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState("payments");
   const [isPending, startTransition] = useTransition();
   const [isPaymentMethodDialogOpen, setIsPaymentMethodDialogOpen] =
@@ -185,32 +151,6 @@ export function PaymentsScreen({
   const [deletingSubscription, setDeletingSubscription] =
     useState<SubscriptionOverviewItem | null>(null);
 
-  const activeSubscriptions = useMemo(
-    () => subscriptions.filter((subscription) => subscription.status === "active"),
-    [subscriptions],
-  );
-  const monthlyTotal = useMemo(
-    () =>
-      activeSubscriptions
-        .filter((subscription) => subscription.frequency === "monthly")
-        .reduce((acc, subscription) => acc + subscription.amount, 0),
-    [activeSubscriptions],
-  );
-
-  const statusColor = {
-    active: "bg-income text-white",
-    cancelled: "bg-destructive text-white",
-    paused: "bg-yellow text-black",
-  };
-  const totalSpentByPaymentMethod = useMemo(
-    () => paymentMethods.reduce((sum, paymentMethod) => sum + paymentMethod.spent, 0),
-    [paymentMethods],
-  );
-  const totalCreditLimit = useMemo(
-    () => paymentMethods.reduce((sum, paymentMethod) => sum + paymentMethod.creditLimit, 0),
-    [paymentMethods],
-  );
-
   const handleUpdatePaymentMethod = () => {
     if (!editingPaymentMethod) return;
 
@@ -232,7 +172,8 @@ export function PaymentsScreen({
               : null,
           creditLimit: parseCurrencyInput(editingPaymentMethod.creditLimit),
           dueDay:
-            editingPaymentMethod.type === "credit" && editingPaymentMethod.dueDay
+            editingPaymentMethod.type === "credit" &&
+            editingPaymentMethod.dueDay
               ? Number(editingPaymentMethod.dueDay)
               : null,
           id: editingPaymentMethod.id,
@@ -398,7 +339,9 @@ export function PaymentsScreen({
     });
   };
 
-  const handleToggleSubscriptionStatus = (subscription: SubscriptionOverviewItem) => {
+  const handleToggleSubscriptionStatus = (
+    subscription: SubscriptionOverviewItem,
+  ) => {
     startTransition(async () => {
       try {
         if (subscription.status === "paused") {
@@ -458,7 +401,9 @@ export function PaymentsScreen({
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
         <TabsList className="grid w-full max-w-lg grid-cols-2">
-          <TabsTrigger value="payments">{t("payments.methodsTitle")}</TabsTrigger>
+          <TabsTrigger value="payments">
+            {t("payments.methodsTitle")}
+          </TabsTrigger>
           <TabsTrigger value="subscriptions">
             {t("screen.payments.activeSubscriptions")}
           </TabsTrigger>
@@ -466,267 +411,19 @@ export function PaymentsScreen({
       </Tabs>
 
       {activeTab === "payments" ? (
-        <>
-          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-            {[
-              [
-                t("payments.totalSpent"),
-                formatCurrency(totalSpentByPaymentMethod),
-                t("payments.totalSpentDescription"),
-              ],
-              [
-                t("payments.totalLimit"),
-                formatCurrency(totalCreditLimit),
-                t("payments.totalLimitDescription"),
-              ],
-              [
-                t("payments.availableLimit"),
-                formatCurrency(Math.max(totalCreditLimit - totalSpentByPaymentMethod, 0)),
-                t("payments.availableLimitDescription"),
-              ],
-            ].map(([label, value, note]) => (
-              <Card key={label} className="border-border bg-card card-shadow">
-                <CardContent className="p-5">
-                  <p className="text-sm text-muted-foreground">{label}</p>
-                  <p className="mt-1 text-2xl font-bold text-foreground">
-                    {value}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">{note}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <Card className="mb-6 border-border bg-card card-shadow">
-        <CardHeader>
-          <CardTitle className="text-lg">
-            {t("payments.methodsTitle")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="divide-y divide-border">
-            {paymentMethods.map((paymentMethod) => {
-              const Icon = paymentTypeIcons[paymentMethod.type] ?? Wallet;
-              const label = t(paymentMethod.label);
-
-              return (
-                <div
-                  key={paymentMethod.id}
-                  className="flex items-center gap-4 p-4 transition-colors hover:bg-accent/50"
-                >
-                  <div className="flex size-11 items-center justify-center rounded-lg bg-accent text-foreground">
-                    <Icon className="size-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-foreground">{label}</p>
-                      {!paymentMethod.canModify ? (
-                        <Badge variant="secondary" className="text-xs">
-                          {t("payments.protectedMethod")}
-                        </Badge>
-                      ) : null}
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {t(`payments.type.${paymentMethod.type}`)}
-                    </p>
-                  </div>
-                  <div className="hidden text-right sm:block">
-                    <p className="text-sm font-semibold text-foreground">
-                      {formatCurrency(paymentMethod.spent)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {paymentMethod.creditLimit > 0
-                        ? `${t("payments.limit")}: ${formatCurrency(paymentMethod.creditLimit)}`
-                        : t("payments.noLimit")}
-                    </p>
-                    {paymentMethod.type === "credit" ? (
-                      <>
-                        <p className="text-xs text-muted-foreground">
-                          {paymentMethod.closingDay
-                            ? `${t("payments.closingDay")}: ${paymentMethod.closingDay}`
-                            : t("payments.noClosingDay")}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {paymentMethod.dueDay
-                            ? `${t("payments.dueDay")}: ${paymentMethod.dueDay}`
-                            : t("payments.noDueDay")}
-                        </p>
-                      </>
-                    ) : null}
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8"
-                        disabled={!paymentMethod.canModify}
-                      >
-                        <MoreVertical className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() =>
-                          setEditingPaymentMethod({
-                            closingDay: paymentMethod.closingDay
-                              ? String(paymentMethod.closingDay)
-                              : "",
-                            creditLimit: paymentMethod.creditLimit
-                              ? String(paymentMethod.creditLimit).replace(".", ",")
-                              : "",
-                            dueDay: paymentMethod.dueDay
-                              ? String(paymentMethod.dueDay)
-                              : "",
-                            id: paymentMethod.id,
-                            name:
-                              paymentMethod.isDefault ||
-                              paymentMethod.label !== paymentMethod.name
-                              ? ""
-                              : paymentMethod.name,
-                            originalName: paymentMethod.name,
-                            type:
-                              paymentMethod.type === "boleto" ||
-                              paymentMethod.type === "credit" ||
-                              paymentMethod.type === "debit" ||
-                              paymentMethod.type === "other"
-                                ? paymentMethod.type
-                                : "credit",
-                          })
-                        }
-                      >
-                        <Pencil className="mr-2 size-4" />
-                        {t("common.edit")}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => setDeletingPaymentMethod(paymentMethod)}
-                      >
-                        <Trash2 className="mr-2 size-4" />
-                        {t("common.delete")}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-        </>
+        <PaymentMethodsTab
+          onDeletePaymentMethod={setDeletingPaymentMethod}
+          onEditPaymentMethod={setEditingPaymentMethod}
+          paymentMethods={paymentMethods}
+        />
       ) : (
-        <>
-          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-        {[
-          [
-            t("screen.payments.monthlySubscriptions"),
-            formatCurrency(monthlyTotal),
-            `${activeSubscriptions.length} ${t("common.active")}`,
-          ],
-          [
-            t("screen.payments.yearlySubscriptions"),
-            formatCurrency(0),
-            `${formatCurrency(0)}/${t("screen.payments.monthlyAverage")}`,
-          ],
-          [
-            t("screen.payments.annualCost"),
-            formatCurrency(monthlyTotal * 12),
-            t("screen.payments.combined"),
-          ],
-        ].map(([label, value, note]) => (
-          <Card key={label} className="border-border bg-card card-shadow">
-            <CardContent className="p-5">
-              <p className="text-sm text-muted-foreground">{label}</p>
-              <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{note}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Card className="mb-6 border-border bg-card card-shadow">
-        <CardHeader>
-          <CardTitle className="text-lg">
-            {t("screen.payments.activeSubscriptions")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="divide-y divide-border">
-            {subscriptions.map((payment) => (
-                <div
-                  key={payment.id}
-                  className="flex items-center gap-4 p-4 transition-colors hover:bg-accent/50"
-                >
-                <div className="flex size-12 items-center justify-center rounded-lg bg-accent text-2xl">
-                  {payment.icon}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-foreground">
-                      {payment.name}
-                    </p>
-                    <Badge
-                      variant="secondary"
-                      className={cn("text-xs", statusColor[payment.status])}
-                    >
-                      {t(`common.${payment.status}`)}
-                    </Badge>
-                  </div>
-                  <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
-                    <span>{t(payment.categoryKey)}</span>
-                    <span>·</span>
-                    <span>{t(`data.frequency.${payment.frequency}`)}</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold text-foreground">
-                    {formatCurrency(payment.amount)}
-                  </p>
-                  <p className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
-                    <Calendar className="size-3" />
-                    {t("common.next")}:{" "}
-                    {formatDate(payment.nextDate, {
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </p>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="size-8">
-                      <MoreVertical className="size-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => openSubscriptionDialog(payment)}>
-                      <Pencil className="mr-2 size-4" />
-                      {t("common.edit")}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={isPending}
-                      onClick={() => handleToggleSubscriptionStatus(payment)}
-                    >
-                      <Pause className="mr-2 size-4" />
-                      {payment.status === "paused"
-                        ? t("common.resume")
-                        : t("common.pause")}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive"
-                      onClick={() => setDeletingSubscription(payment)}
-                    >
-                      <Trash2 className="mr-2 size-4" />
-                      {t("common.delete")}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-        </>
+        <SubscriptionsTab
+          isPending={isPending}
+          onDeleteSubscription={setDeletingSubscription}
+          onEditSubscription={openSubscriptionDialog}
+          onToggleSubscriptionStatus={handleToggleSubscriptionStatus}
+          subscriptions={subscriptions}
+        />
       )}
 
       <Dialog
@@ -993,7 +690,10 @@ export function PaymentsScreen({
                   </SelectTrigger>
                   <SelectContent>
                     {transactionPaymentMethods.map((paymentMethod) => (
-                      <SelectItem key={paymentMethod.id} value={paymentMethod.id}>
+                      <SelectItem
+                        key={paymentMethod.id}
+                        value={paymentMethod.id}
+                      >
                         {t(paymentMethod.label)}
                       </SelectItem>
                     ))}
