@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { calculateBudgetUsage } from "@/lib/finance/budget";
 import { type BudgetSplitItem } from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
@@ -42,7 +43,8 @@ export function BudgetSplitTooltip({
         {formatCurrency(data.maxAmount)}
       </p>
       <p className="text-xs text-muted-foreground">
-        {t("common.spent")}: {formatCurrency(data.spentAmount)}
+        {t("dashboard.budgetSplit.plannedSpend")}:{" "}
+        {formatCurrency(data.spentAmount)}
       </p>
     </div>
   );
@@ -75,7 +77,7 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="grid grid-cols-1 gap-4">
-          <div className="h-[170px] min-h-0 min-w-0">
+          <div className="h-42.5 min-h-0 min-w-0">
             <ResponsiveContainer
               width="100%"
               height="100%"
@@ -88,7 +90,7 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
                   data={chartData}
                   cx="50%"
                   cy="50%"
-                  dataKey="maxAmount"
+                  dataKey="value"
                   innerRadius={44}
                   outerRadius={72}
                   paddingAngle={4}
@@ -103,10 +105,7 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
                 </Pie>
                 <Tooltip
                   content={
-                    <BudgetSplitTooltip
-                      formatCurrency={formatCurrency}
-                      t={t}
-                    />
+                    <BudgetSplitTooltip formatCurrency={formatCurrency} t={t} />
                   }
                 />
               </PieChart>
@@ -123,7 +122,7 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
             </div>
             <div className="sm:text-right">
               <p className="text-xs text-muted-foreground">
-                {t("common.spent")}
+                {t("dashboard.budgetSplit.plannedSpend")}
               </p>
               <p className="text-sm font-semibold text-foreground">
                 {formatCurrency(totalSpent)}
@@ -134,15 +133,10 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
 
         <div className="space-y-5">
           {chartData.map((item) => {
-            const usedPercentage =
-              item.maxAmount > 0
-                ? Math.round((item.spentAmount / item.maxAmount) * 100)
-                : 0;
-            const progressValue = Math.min(usedPercentage, 100);
-            const balance = Number(
-              (item.maxAmount - item.spentAmount).toFixed(2),
+            const usage = calculateBudgetUsage(
+              item.spentAmount,
+              item.maxAmount,
             );
-            const isOverBudget = balance < 0.0;
 
             return (
               <div key={item.nameKey} className="space-y-2.5">
@@ -158,7 +152,7 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
                       </p>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {t("common.planned")}: {formatCurrency(item.maxAmount)}
+                      {t("common.available")}: {formatCurrency(item.maxAmount)}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
@@ -167,29 +161,29 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
                     </p>
                     <p
                       className={
-                        isOverBudget
+                        usage.isOverBudget
                           ? "text-xs font-medium text-destructive"
                           : "text-xs text-muted-foreground"
                       }
                     >
-                      {isOverBudget
-                        ? `${formatCurrency(Math.abs(balance))} ${t("common.overBudget")}`
-                        : `${formatCurrency(Math.abs(balance))} ${t("common.left").toLowerCase()}`}
+                      {usage.isOverBudget
+                        ? `${formatCurrency(usage.exceededAmount)} ${t("common.overBudget")}`
+                        : `${formatCurrency(usage.remainingAmount)} ${t("common.left").toLowerCase()}`}
                     </p>
                   </div>
                 </div>
                 <Progress
-                  value={progressValue}
+                  value={usage.progressValue}
                   className="h-2.5 bg-accent"
                   style={{
                     // @ts-expect-error CSS variable
-                    "--progress-foreground": isOverBudget
+                    "--progress-foreground": usage.isOverBudget
                       ? "var(--destructive)"
                       : item.color,
                   }}
                 />
                 <p className="text-right text-xs text-muted-foreground">
-                  {usedPercentage}% {t("common.used")}
+                  {usage.usagePercentage}% {t("common.used")}
                 </p>
               </div>
             );

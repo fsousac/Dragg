@@ -8,6 +8,11 @@ import {
   type TransactionGroup,
   type TransactionType,
 } from "@/lib/data";
+import {
+  BUDGET_GROUP_RATIOS,
+  calculateBudgetData,
+  sumBudgetUsageByGroup,
+} from "@/lib/finance/budget";
 import { createClient } from "@/lib/supabase/server";
 
 type DbCategoryGroup = Exclude<TransactionGroup, "income">;
@@ -290,12 +295,6 @@ const monthKeys = [
   "data.month.nov",
   "data.month.dec",
 ] as const;
-
-const groupBudgetRatios = {
-  needs: 0.5,
-  wants: 0.3,
-  savings: 0.2,
-} as const;
 
 const categoryGroups = ["needs", "wants", "savings"] as const;
 const editablePaymentMethodTypes = [
@@ -877,8 +876,8 @@ function getMonthlySavingsBalance(transactions: Transaction[]) {
     )
     .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
   const excessExpenses =
-    Math.max(needsSpent - income * groupBudgetRatios.needs, 0) +
-    Math.max(wantsSpent - income * groupBudgetRatios.wants, 0);
+    Math.max(needsSpent - income * BUDGET_GROUP_RATIOS.needs, 0) +
+    Math.max(wantsSpent - income * BUDGET_GROUP_RATIOS.wants, 0);
 
   return savings - excessExpenses;
 }
@@ -906,8 +905,8 @@ function getMonthlyFinanceSummary(transactions: Transaction[]) {
     )
     .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
   const excessExpenses =
-    Math.max(needsSpent - income * groupBudgetRatios.needs, 0) +
-    Math.max(wantsSpent - income * groupBudgetRatios.wants, 0);
+    Math.max(needsSpent - income * BUDGET_GROUP_RATIOS.needs, 0) +
+    Math.max(wantsSpent - income * BUDGET_GROUP_RATIOS.wants, 0);
 
   return {
     excessExpenses,
@@ -942,14 +941,6 @@ function getCumulativeSavingsBalance(
 function getSafeReportPeriod(periodMonths?: number) {
   if (!periodMonths || Number.isNaN(periodMonths)) return 6;
   return Math.min(Math.max(Math.trunc(periodMonths), 1), 12);
-}
-
-function emptyBudgetData(): BudgetData {
-  return {
-    needs: { budget: 0, percentage: 0, spent: 0 },
-    savings: { budget: 0, percentage: 0, spent: 0 },
-    wants: { budget: 0, percentage: 0, spent: 0 },
-  };
 }
 
 async function listCategories(options?: { userContext?: Awaited<ReturnType<typeof getUserContext>> }) {
@@ -2232,19 +2223,8 @@ export async function getDashboardData(month?: string, userContext?: Awaited<Ret
     selectedMonth,
   );
 
-  const budgetData = emptyBudgetData();
-  for (const group of Object.keys(groupBudgetRatios) as DbCategoryGroup[]) {
-    const spent = transactions
-      .filter((transaction) => transaction.group === group)
-      .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
-    const budget = totalIncome * groupBudgetRatios[group];
-
-    budgetData[group] = {
-      budget,
-      percentage: budget > 0 ? Math.round((spent / budget) * 100) : 0,
-      spent,
-    };
-  }
+  const plannedUsageByGroup = sumBudgetUsageByGroup(scheduledTransactions);
+  const budgetData = calculateBudgetData(totalIncome, plannedUsageByGroup);
 
   const expensesByCategory = expenseTransactions
     .reduce((acc, transaction) => {
@@ -2302,7 +2282,7 @@ export async function getDashboardData(month?: string, userContext?: Awaited<Ret
     {
       amount: budgetData.needs.spent,
       color: groupColors.needs,
-      maxAmount: totalIncome * groupBudgetRatios.needs,
+      maxAmount: budgetData.needs.budget,
       nameKey: "data.group.needs",
       spentAmount: budgetData.needs.spent,
       value: 50,
@@ -2310,7 +2290,7 @@ export async function getDashboardData(month?: string, userContext?: Awaited<Ret
     {
       amount: budgetData.wants.spent,
       color: groupColors.wants,
-      maxAmount: totalIncome * groupBudgetRatios.wants,
+      maxAmount: budgetData.wants.budget,
       nameKey: "data.group.wants",
       spentAmount: budgetData.wants.spent,
       value: 30,
@@ -2318,7 +2298,7 @@ export async function getDashboardData(month?: string, userContext?: Awaited<Ret
     {
       amount: budgetData.savings.spent,
       color: groupColors.savings,
-      maxAmount: totalIncome * groupBudgetRatios.savings,
+      maxAmount: budgetData.savings.budget,
       nameKey: "data.group.savings",
       spentAmount: budgetData.savings.spent,
       value: 20,

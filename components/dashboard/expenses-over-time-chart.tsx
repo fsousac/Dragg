@@ -88,14 +88,36 @@ export function ExpensesOverTimeChart({
                 <Tooltip
                   content={({ active, payload, label }) => {
                     if (active && payload && payload.length) {
+                      const data = payload[0].payload as {
+                        amount?: number;
+                        plannedAmount?: number;
+                      };
+                      const spentAmount = Number(data.amount ?? 0);
+                      const plannedAmount = Number(data.plannedAmount ?? 0);
+
                       return (
                         <div className="bg-card border border-border rounded-lg p-3 shadow-xl">
                           <p className="text-sm font-medium text-foreground">
                             {label}
                           </p>
-                          <p className="text-lg font-bold text-primary mt-1">
-                            {formatCurrency(Number(payload[0].value))}
-                          </p>
+                          <div className="mt-2 space-y-1">
+                            <div className="flex min-w-40 items-center justify-between gap-4 text-sm">
+                              <span className="text-muted-foreground">
+                                {t("common.spent")}
+                              </span>
+                              <span className="font-semibold text-primary">
+                                {formatCurrency(spentAmount)}
+                              </span>
+                            </div>
+                            <div className="flex min-w-40 items-center justify-between gap-4 text-sm">
+                              <span className="text-muted-foreground">
+                                {t("common.planned")}
+                              </span>
+                              <span className="font-semibold text-rose-400">
+                                {formatCurrency(plannedAmount)}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       );
                     }
