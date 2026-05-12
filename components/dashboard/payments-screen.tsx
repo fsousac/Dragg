@@ -426,23 +426,6 @@ export function PaymentsScreen({
       <PageHeader
         title={t("screen.payments.title")}
         description={t("screen.payments.description")}
-        actions={
-          <Button
-            className="gap-2"
-            onClick={() => {
-              if (activeTab === "subscriptions") {
-                openSubscriptionDialog();
-              } else {
-                setIsPaymentMethodDialogOpen(true);
-              }
-            }}
-          >
-            <Plus className="size-4" />
-            {activeTab === "subscriptions"
-              ? t("screen.payments.addSubscription")
-              : t("payments.addMethod")}
-          </Button>
-        }
       />
 
       <section className="mb-8 grid gap-4">
@@ -663,17 +646,33 @@ export function PaymentsScreen({
         </Card>
       </section>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList className="grid w-full max-w-lg grid-cols-2">
-          <TabsTrigger value="payments">
-            {t("payments.methodsTitle")}
-          </TabsTrigger>
-          <TabsTrigger value="subscriptions">
-            {t("screen.payments.activeSubscriptions")}
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full max-w-lg grid-cols-2">
+            <TabsTrigger value="payments">
+              {t("payments.methodsTitle")}
+            </TabsTrigger>
+            <TabsTrigger value="subscriptions">
+              {t("screen.payments.activeSubscriptions")}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <Button
+          className="gap-2 w-auto"
+          onClick={() => {
+            if (activeTab === "subscriptions") {
+              openSubscriptionDialog();
+            } else {
+              setIsPaymentMethodDialogOpen(true);
+            }
+          }}
+        >
+          <Plus className="size-4" />
+          {activeTab === "subscriptions"
+            ? t("screen.payments.addSubscription")
+            : t("payments.addMethod")}
+        </Button>
+      </div>
       {activeTab === "payments" ? (
         <PaymentMethodsTab
           onDeletePaymentMethod={setDeletingPaymentMethod}
