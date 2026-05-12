@@ -1,5 +1,5 @@
-import { AppShell } from "@/components/dashboard/app-shell"
-import { PaymentsScreen } from "@/components/dashboard/payments-screen"
+import { AppShell } from "@/components/dashboard/app-shell";
+import { PaymentsScreen } from "@/components/dashboard/payments-screen";
 import {
   createPaymentMethodAction,
   createSubscriptionAction,
@@ -9,12 +9,13 @@ import {
   resumeSubscriptionAction,
   updatePaymentMethodAction,
   updateSubscriptionAction,
-} from "@/app/transactions/actions"
+} from "@/app/transactions/actions";
 import {
+  getPaymentsDueData,
   getTransactionFormOptions,
   listPaymentMethodOverview,
   listSubscriptionOverview,
-} from "@/lib/finance/transactions"
+} from "@/lib/finance/transactions";
 
 type PaymentsPageProps = {
   searchParams?: Promise<{
@@ -22,16 +23,24 @@ type PaymentsPageProps = {
   }>;
 };
 
-export default async function PaymentsPage({ searchParams }: PaymentsPageProps) {
+export default async function PaymentsPage({
+  searchParams,
+}: PaymentsPageProps) {
   const resolvedSearchParams = await searchParams;
   const selectedMonth = Array.isArray(resolvedSearchParams?.month)
     ? resolvedSearchParams.month[0]
     : resolvedSearchParams?.month;
-  const [paymentMethods, subscriptions, transactionFormOptions] = await Promise.all([
+  const [
+    paymentMethods,
+    subscriptions,
+    paymentsDueData,
+    transactionFormOptions,
+  ] = await Promise.all([
     listPaymentMethodOverview(selectedMonth),
     listSubscriptionOverview(),
+    getPaymentsDueData(selectedMonth),
     getTransactionFormOptions(),
-  ])
+  ]);
 
   return (
     <AppShell>
@@ -43,6 +52,7 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
         deleteSubscriptionAction={deleteSubscriptionAction}
         pauseSubscriptionAction={pauseSubscriptionAction}
         paymentMethods={paymentMethods}
+        paymentsDueData={paymentsDueData}
         resumeSubscriptionAction={resumeSubscriptionAction}
         subscriptions={subscriptions}
         transactionPaymentMethods={transactionFormOptions.paymentMethods}
@@ -50,5 +60,5 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
         updateSubscriptionAction={updateSubscriptionAction}
       />
     </AppShell>
-  )
+  );
 }

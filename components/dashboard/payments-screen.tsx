@@ -21,7 +21,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +45,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   type CreatePaymentMethodInput,
   type CreateSubscriptionInput,
+  type PaymentInvoiceItem,
+  type PaymentsDueData,
   type PaymentMethodOverviewItem,
   type SubscriptionOverviewItem,
   type TransactionFormCategory,
@@ -60,6 +64,7 @@ type PaymentsScreenProps = {
   deleteSubscriptionAction: (subscriptionId: string) => Promise<void>;
   pauseSubscriptionAction: (subscriptionId: string) => Promise<void>;
   paymentMethods: PaymentMethodOverviewItem[];
+  paymentsDueData: PaymentsDueData;
   resumeSubscriptionAction: (subscriptionId: string) => Promise<void>;
   subscriptions: SubscriptionOverviewItem[];
   transactionPaymentMethods: TransactionFormPaymentMethod[];
@@ -114,6 +119,7 @@ export function PaymentsScreen({
   deleteSubscriptionAction,
   pauseSubscriptionAction,
   paymentMethods,
+  paymentsDueData,
   resumeSubscriptionAction,
   subscriptions,
   transactionPaymentMethods,
@@ -121,7 +127,13 @@ export function PaymentsScreen({
   updateSubscriptionAction,
 }: PaymentsScreenProps) {
   const router = useRouter();
-  const { t } = useI18n();
+  const { formatCurrency, formatDate, t } = useI18n();
+  const {
+    bills,
+    invoices,
+    subscriptions: dueSubscriptions,
+    summary,
+  } = paymentsDueData;
   const [activeTab, setActiveTab] = useState("payments");
   const [isPending, startTransition] = useTransition();
   const [isPaymentMethodDialogOpen, setIsPaymentMethodDialogOpen] =
@@ -150,6 +162,40 @@ export function PaymentsScreen({
     useState<EditableSubscription | null>(null);
   const [deletingSubscription, setDeletingSubscription] =
     useState<SubscriptionOverviewItem | null>(null);
+  const [selectedInvoice, setSelectedInvoice] =
+    useState<PaymentInvoiceItem | null>(null);
+  const today = new Date().toISOString().slice(0, 10);
+  const dueThreshold = (() => {
+    const threshold = new Date();
+    threshold.setDate(threshold.getDate() + 3);
+    return threshold.toISOString().slice(0, 10);
+  })();
+
+  const getDueStatusLabel = (status: "planned" | "next") => {
+    if (status === "next") return t("common.next");
+    return t("common.planned");
+  };
+
+  const formatInvoicePurchaseCount = (count: number) =>
+    t("payments.invoicePurchaseCount").replace("{count}", String(count));
+
+  const getDueStatusStyle = (status: "planned" | "next") => {
+    if (status === "next") return "bg-yellow text-black";
+    return "bg-muted text-muted-foreground";
+  };
+
+  const shouldShowDueBadge = (dateValue: string) => dateValue > today;
+
+  const getSubscriptionStatus = (subscription: SubscriptionOverviewItem) => {
+    if (subscription.status === "paused") return "paused" as const;
+    if (
+      subscription.nextDate > today &&
+      subscription.nextDate <= dueThreshold
+    ) {
+      return "next" as const;
+    }
+    return "planned" as const;
+  };
 
   const handleUpdatePaymentMethod = () => {
     if (!editingPaymentMethod) return;
@@ -380,36 +426,253 @@ export function PaymentsScreen({
       <PageHeader
         title={t("screen.payments.title")}
         description={t("screen.payments.description")}
-        actions={
-          <Button
-            className="gap-2"
-            onClick={() => {
-              if (activeTab === "subscriptions") {
-                openSubscriptionDialog();
-              } else {
-                setIsPaymentMethodDialogOpen(true);
-              }
-            }}
-          >
-            <Plus className="size-4" />
-            {activeTab === "subscriptions"
-              ? t("screen.payments.addSubscription")
-              : t("payments.addMethod")}
-          </Button>
-        }
       />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList className="grid w-full max-w-lg grid-cols-2">
-          <TabsTrigger value="payments">
-            {t("payments.methodsTitle")}
-          </TabsTrigger>
-          <TabsTrigger value="subscriptions">
-            {t("screen.payments.activeSubscriptions")}
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <section className="mb-8 grid gap-4">
+        <Card className="border-border bg-card card-shadow">
+          <CardHeader>
+            <CardTitle className="text-lg">
+              {t("payments.monthlyDueTitle")}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {t("payments.monthlyDueDescription")}
+            </p>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-5">
+            {[
+              [t("payments.totalDue"), summary.totalDue],
+              [t("payments.totalInvoices"), summary.totalInvoices],
+              [t("payments.totalSubscriptions"), summary.totalSubscriptions],
+              [t("payments.totalBills"), summary.totalBills],
+            ].map(([label, value]) => (
+              <div
+                key={String(label)}
+                className="rounded-lg border border-border/70 bg-muted/20 p-4"
+              >
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="mt-1 text-lg font-semibold text-foreground">
+                  {formatCurrency(Number(value))}
+                </p>
+              </div>
+            ))}
+            <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
+              <p className="text-xs text-muted-foreground">
+                {t("payments.nextDue")}
+              </p>
+              <p className="mt-1 text-lg font-semibold text-foreground">
+                {summary.nextDueDate
+                  ? formatDate(summary.nextDueDate, {
+                      day: "numeric",
+                      month: "short",
+                    })
+                  : t("payments.noDueDate")}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Card className="border-border bg-card card-shadow">
+            <CardHeader>
+              <CardTitle className="text-base">
+                {t("payments.invoicesTitle")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {invoices.length ? (
+                <div className="divide-y divide-border">
+                  {invoices.map((invoice) => (
+                    <button
+                      key={invoice.id}
+                      type="button"
+                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-accent/50"
+                      onClick={() => setSelectedInvoice(invoice)}
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {t("transaction.creditCardInvoiceFor")}{" "}
+                          {t(invoice.paymentMethodKey)}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {t("transaction.invoiceDueDate")}:{" "}
+                          {formatDate(invoice.dueDate, {
+                            day: "numeric",
+                            month: "short",
+                          })}
+                          {" · "}
+                          {formatInvoicePurchaseCount(invoice.purchaseCount)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {shouldShowDueBadge(invoice.dueDate) ? (
+                          <Badge
+                            variant="secondary"
+                            className={getDueStatusStyle(invoice.status)}
+                          >
+                            {getDueStatusLabel(invoice.status)}
+                          </Badge>
+                        ) : null}
+                        <span className="text-sm font-semibold text-foreground tabular-nums">
+                          {formatCurrency(invoice.amount)}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-4 py-6 text-sm text-muted-foreground">
+                  {t("payments.noInvoices")}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-border bg-card card-shadow">
+            <CardHeader>
+              <CardTitle className="text-base">
+                {t("payments.subscriptionsTitle")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {dueSubscriptions.length ? (
+                <div className="divide-y divide-border">
+                  {dueSubscriptions.map((subscription) => {
+                    const status = getSubscriptionStatus(subscription);
+                    return (
+                      <div
+                        key={subscription.id}
+                        className="flex items-center justify-between gap-4 px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {subscription.name}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {t(subscription.categoryKey)}
+                            {" · "}
+                            {t(`data.frequency.${subscription.frequency}`)}
+                            {" · "}
+                            {formatDate(subscription.nextDate, {
+                              day: "numeric",
+                              month: "short",
+                            })}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {status === "paused" ||
+                          shouldShowDueBadge(subscription.nextDate) ? (
+                            <Badge
+                              variant="secondary"
+                              className={
+                                status === "paused"
+                                  ? "bg-yellow text-black"
+                                  : getDueStatusStyle(status)
+                              }
+                            >
+                              {status === "paused"
+                                ? t("common.paused")
+                                : getDueStatusLabel(status)}
+                            </Badge>
+                          ) : null}
+                          <span className="text-sm font-semibold text-foreground tabular-nums">
+                            {formatCurrency(subscription.amount)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="px-4 py-6 text-sm text-muted-foreground">
+                  {t("payments.noSubscriptions")}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="border-border bg-card card-shadow">
+          <CardHeader>
+            <CardTitle className="text-base">
+              {t("payments.billsTitle")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {bills.length ? (
+              <div className="divide-y divide-border">
+                {bills.map((bill) => (
+                  <div
+                    key={bill.id}
+                    className="flex items-center justify-between gap-4 px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {t(bill.descriptionKey)}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {t(bill.categoryKey)}
+                        {bill.paymentMethodKey
+                          ? ` · ${t(bill.paymentMethodKey)}`
+                          : ""}
+                        {" · "}
+                        {formatDate(bill.date, {
+                          day: "numeric",
+                          month: "short",
+                        })}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {shouldShowDueBadge(bill.date) ? (
+                        <Badge
+                          variant="secondary"
+                          className={getDueStatusStyle(bill.status)}
+                        >
+                          {getDueStatusLabel(bill.status)}
+                        </Badge>
+                      ) : null}
+                      <span className="text-sm font-semibold text-foreground tabular-nums">
+                        {formatCurrency(bill.amount)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="px-4 py-6 text-sm text-muted-foreground">
+                {t("payments.noBills")}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full max-w-lg grid-cols-2">
+            <TabsTrigger value="payments">
+              {t("payments.methodsTitle")}
+            </TabsTrigger>
+            <TabsTrigger value="subscriptions">
+              {t("screen.payments.activeSubscriptions")}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <Button
+          className="gap-2 w-auto"
+          onClick={() => {
+            if (activeTab === "subscriptions") {
+              openSubscriptionDialog();
+            } else {
+              setIsPaymentMethodDialogOpen(true);
+            }
+          }}
+        >
+          <Plus className="size-4" />
+          {activeTab === "subscriptions"
+            ? t("screen.payments.addSubscription")
+            : t("payments.addMethod")}
+        </Button>
+      </div>
       {activeTab === "payments" ? (
         <PaymentMethodsTab
           onDeletePaymentMethod={setDeletingPaymentMethod}
@@ -425,6 +688,108 @@ export function PaymentsScreen({
           subscriptions={subscriptions}
         />
       )}
+
+      <Dialog
+        open={Boolean(selectedInvoice)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedInvoice(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedInvoice
+                ? `${t("transaction.creditCardInvoiceFor")} ${t(selectedInvoice.paymentMethodKey)}`
+                : t("transaction.creditCardInvoice")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("transaction.invoiceDetailsDescription")}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedInvoice ? (
+            <div className="grid gap-4">
+              <div className="grid gap-3 rounded-lg border border-border bg-muted/20 p-4 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("transaction.paymentMethod")}
+                  </p>
+                  <p className="mt-1 text-sm font-medium">
+                    {t(selectedInvoice.paymentMethodKey)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("transaction.invoiceCycle")}
+                  </p>
+                  <p className="mt-1 text-sm font-medium">
+                    {formatDate(selectedInvoice.invoice.startsAt, {
+                      day: "numeric",
+                      month: "short",
+                    })}{" "}
+                    -{" "}
+                    {formatDate(selectedInvoice.invoice.closingDate, {
+                      day: "numeric",
+                      month: "short",
+                    })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("transaction.invoiceDueDate")}
+                  </p>
+                  <p className="mt-1 text-sm font-medium">
+                    {formatDate(selectedInvoice.invoice.dueDate, {
+                      day: "numeric",
+                      month: "short",
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-lg border border-border">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-border bg-muted/30 px-4 py-3 text-sm font-medium">
+                  <span>{t("transaction.invoicePurchases")}</span>
+                  <span className="tabular-nums">
+                    {formatCurrency(selectedInvoice.amount)}
+                  </span>
+                </div>
+                <div className="divide-y divide-border">
+                  {selectedInvoice.invoice.purchases.map((purchase) => (
+                    <div
+                      key={purchase.id}
+                      className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <p className="truncate text-sm font-medium">
+                            {t(purchase.descriptionKey)}
+                          </p>
+                          {purchase.installmentLabel ? (
+                            <Badge variant="secondary" className="shrink-0">
+                              {purchase.installmentLabel}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatDate(purchase.date, {
+                            day: "numeric",
+                            month: "short",
+                          })}{" "}
+                          · {t(purchase.categoryKey)}
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold tabular-nums sm:text-right">
+                        {formatCurrency(purchase.amount)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={isPaymentMethodDialogOpen}

@@ -29,6 +29,7 @@ const messages = {
     "common.ofBudget": "of budget",
     "common.ofTotal": "of total",
     "common.planned": "Planned",
+    "common.available": "Available",
     "common.used": "used",
     "common.active": "active",
     "common.addFunds": "Add funds",
@@ -163,6 +164,7 @@ const messages = {
     "dashboard.budgetSplit.description": "Planned budget and spending by group",
     "dashboard.budgetSplit.incomeBase": "Monthly income base",
     "dashboard.budgetSplit.ofIncomeBase": "of income",
+    "dashboard.budgetSplit.plannedSpend": "Planned spend",
     "dashboard.budgetSplit.title": "50/30/20 by Group",
     "dashboard.expensesByCategory.description":
       "Category spending grouped by 50/30/20",
@@ -326,6 +328,22 @@ const messages = {
     "payments.subscriptionStatusError": "Failed to update subscription status.",
     "payments.subscriptionUpdateError": "Failed to update subscription.",
     "payments.subscriptionUpdateSuccess": "Subscription updated successfully.",
+    "payments.monthlyDueTitle": "Payments due this month",
+    "payments.monthlyDueDescription":
+      "Track what is scheduled to be paid in the selected month.",
+    "payments.totalDue": "Total due",
+    "payments.totalInvoices": "Credit card invoices",
+    "payments.totalSubscriptions": "Subscriptions",
+    "payments.totalBills": "Bills",
+    "payments.nextDue": "Next due",
+    "payments.noDueDate": "No due date",
+    "payments.invoicesTitle": "Credit card invoices",
+    "payments.noInvoices": "No invoices due this month.",
+    "payments.subscriptionsTitle": "Subscriptions due",
+    "payments.noSubscriptions": "No subscriptions due this month.",
+    "payments.billsTitle": "Bills due",
+    "payments.noBills": "No bills due this month.",
+    "payments.invoicePurchaseCount": "{count} purchases",
     "payments.type.boleto": "Bill",
     "payments.type.other": "Other",
     "payments.type.cash": "Payment",
@@ -376,6 +394,7 @@ const messages = {
     "screen.transactions.search": "Search transactions...",
     "screen.transactions.hidePrevious": "Hide previous",
     "screen.transactions.planned": "Planned",
+    "screen.transactions.plannedInvoice": "Planned invoice",
     "screen.transactions.showPrevious": "Show previous",
     "screen.transactions.sort": "Sort",
     "screen.transactions.sortAmountAsc": "Amount: low to high",
@@ -393,6 +412,8 @@ const messages = {
     "transaction.date": "Date",
     "transaction.amount": "Amount",
     "transaction.category": "Category",
+    "transaction.creditCardInvoice": "Credit card invoice",
+    "transaction.creditCardInvoiceFor": "Invoice for",
     "transaction.needs": "Needs (50%)",
     "transaction.wants": "Wants (30%)",
     "transaction.savings": "Savings (20%)",
@@ -428,6 +449,12 @@ const messages = {
     "transaction.detailsDescription":
       "Review the details, update fields, or delete this transaction.",
     "transaction.detailsTitle": "Transaction details",
+    "transaction.invoiceCycle": "Invoice cycle",
+    "transaction.invoiceDetailsDescription":
+      "Review the purchases included in this planned credit card invoice.",
+    "transaction.invoiceDetailsTitle": "Credit card invoice",
+    "transaction.invoiceDueDate": "Due date",
+    "transaction.invoicePurchases": "Included purchases",
     "transaction.saveChanges": "Save changes",
     "transaction.summary": "Summary",
     "transaction.updateSuccess": "Transaction updated successfully.",
@@ -454,6 +481,7 @@ const messages = {
     "common.ofBudget": "do orçamento",
     "common.ofTotal": "do total",
     "common.planned": "Planejado",
+    "common.available": "Disponível",
     "common.used": "usado",
     "common.active": "ativos",
     "common.addFunds": "Adicionar valor",
@@ -588,6 +616,7 @@ const messages = {
       "Orçamento previsto e gastos por grupo",
     "dashboard.budgetSplit.incomeBase": "Entradas do mês",
     "dashboard.budgetSplit.ofIncomeBase": "das entradas",
+    "dashboard.budgetSplit.plannedSpend": "Uso previsto",
     "dashboard.budgetSplit.title": "50/30/20 por grupo",
     "dashboard.expensesByCategory.description":
       "Gastos por categoria agrupados pelo 50/30/20",
@@ -761,6 +790,22 @@ const messages = {
     "payments.subscriptionUpdateError":
       "Não foi possível atualizar a assinatura.",
     "payments.subscriptionUpdateSuccess": "Assinatura atualizada com sucesso.",
+    "payments.monthlyDueTitle": "A pagar neste mês",
+    "payments.monthlyDueDescription":
+      "Acompanhe o que vence e precisa ser pago no mês selecionado.",
+    "payments.totalDue": "Total a pagar",
+    "payments.totalInvoices": "Faturas de cartão",
+    "payments.totalSubscriptions": "Assinaturas",
+    "payments.totalBills": "Boletos e contas",
+    "payments.nextDue": "Próximo vencimento",
+    "payments.noDueDate": "Sem vencimentos",
+    "payments.invoicesTitle": "Faturas de cartão",
+    "payments.noInvoices": "Sem faturas para este mês.",
+    "payments.subscriptionsTitle": "Assinaturas do mês",
+    "payments.noSubscriptions": "Sem assinaturas para este mês.",
+    "payments.billsTitle": "Boletos e contas",
+    "payments.noBills": "Sem boletos ou contas para este mês.",
+    "payments.invoicePurchaseCount": "{count} compras",
     "payments.type.boleto": "Boleto",
     "payments.type.other": "Outro",
     "payments.type.cash": "Pagamento",
@@ -812,6 +857,7 @@ const messages = {
     "screen.transactions.search": "Buscar transações...",
     "screen.transactions.hidePrevious": "Ocultar anteriores",
     "screen.transactions.planned": "Prevista",
+    "screen.transactions.plannedInvoice": "Fatura prevista",
     "screen.transactions.showPrevious": "Mostrar anteriores",
     "screen.transactions.sort": "Ordenar",
     "screen.transactions.sortAmountAsc": "Valor: menor primeiro",
@@ -829,6 +875,8 @@ const messages = {
     "transaction.date": "Data",
     "transaction.amount": "Valor",
     "transaction.category": "Categoria",
+    "transaction.creditCardInvoice": "Fatura do cartão",
+    "transaction.creditCardInvoiceFor": "Fatura do",
     "transaction.needs": "Necessidades (50%)",
     "transaction.wants": "Desejos (30%)",
     "transaction.savings": "Economias (20%)",
@@ -865,6 +913,12 @@ const messages = {
     "transaction.detailsDescription":
       "Revise os detalhes, atualize campos ou exclua esta transação.",
     "transaction.detailsTitle": "Detalhes da transação",
+    "transaction.invoiceCycle": "Ciclo da fatura",
+    "transaction.invoiceDetailsDescription":
+      "Revise as compras incluídas nesta fatura prevista do cartão.",
+    "transaction.invoiceDetailsTitle": "Fatura do cartão",
+    "transaction.invoiceDueDate": "Vencimento",
+    "transaction.invoicePurchases": "Compras incluídas",
     "transaction.saveChanges": "Salvar alterações",
     "transaction.summary": "Resumo",
     "transaction.updateSuccess": "Transação atualizada com sucesso.",
@@ -907,7 +961,13 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const storedCurrency = window.localStorage.getItem(currencyStorageKey);
 
     setLocaleState(nextLocale);
-    setCurrencyState(isSupportedCurrency(storedCurrency) ? storedCurrency : (nextLocale === "pt-BR" ? "BRL" : "USD"));
+    setCurrencyState(
+      isSupportedCurrency(storedCurrency)
+        ? storedCurrency
+        : nextLocale === "pt-BR"
+          ? "BRL"
+          : "USD",
+    );
   }, []);
 
   React.useEffect(() => {
@@ -938,7 +998,13 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       },
       locale,
       setCurrency(nextCurrency: Currency) {
-        setCurrencyState(isSupportedCurrency(nextCurrency) ? nextCurrency : (locale === "pt-BR" ? "BRL" : "USD"));
+        setCurrencyState(
+          isSupportedCurrency(nextCurrency)
+            ? nextCurrency
+            : locale === "pt-BR"
+              ? "BRL"
+              : "USD",
+        );
       },
       setLocale(nextLocale: Locale) {
         setLocaleState(nextLocale);

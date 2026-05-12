@@ -55,7 +55,7 @@ export function ExpensesByCategoryTooltip({
 export function ExpensesByCategoryChart({
   expensesByCategory,
 }: ExpensesByCategoryChartProps) {
-  const { formatCurrency, t } = useI18n();
+  const { formatCurrency, formatNumber, t } = useI18n();
   const chartData = useMemo(
     () =>
       expensesByCategory.map((item) => ({
@@ -86,6 +86,11 @@ export function ExpensesByCategoryChart({
       })
       .filter((group) => group.items.length > 0);
   }, [chartData]);
+  const formatPercentage = (value: number) =>
+    formatNumber(value, {
+      maximumFractionDigits: 1,
+      minimumFractionDigits: 1,
+    });
 
   return (
     <Card className="bg-card border-border card-shadow">
@@ -142,7 +147,7 @@ export function ExpensesByCategoryChart({
               </div>
               <div className="rounded-md border-border/70 bg-muted/20 p-3 w-fit">
                 <p className="text-xs text-muted-foreground">
-                  {t("common.expense")}
+                  {t("dashboard.summary.predictedExpenses")}
                 </p>
                 <p className="text-lg font-semibold text-foreground m-auto">
                   {formatCurrency(total)}
@@ -162,9 +167,14 @@ export function ExpensesByCategoryChart({
                       {group.groupName}
                     </p>
                   </div>
-                  <p className="shrink-0 text-sm font-semibold text-foreground">
-                    {formatCurrency(group.groupTotal)}
-                  </p>
+                  <div className="flex shrink-0 items-baseline gap-2 text-right">
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                      {formatPercentage((group.groupTotal / total) * 100)}%
+                    </p>
+                    <p className="text-sm font-semibold text-foreground">
+                      {formatCurrency(group.groupTotal)}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="space-y-3">

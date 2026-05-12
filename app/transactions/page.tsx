@@ -31,6 +31,7 @@ export default async function TransactionsPage({
     : resolvedSearchParams?.history === "1";
   const [transactions, transactionFormOptions] = await Promise.all([
     listTransactions({
+      includeCreditCardInvoices: true,
       includePrevious: showPrevious,
       includeFuture: true,
       month: selectedMonth,

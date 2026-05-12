@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { calculateBudgetUsage } from "@/lib/finance/budget";
 import { type BudgetData } from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
 
@@ -40,42 +41,48 @@ export function BudgetProgress({ budgetData }: BudgetProgressProps) {
         </p>
       </CardHeader>
       <CardContent className="space-y-4 lg:space-y-6">
-        {budgets.map((budget) => (
-          <div key={budget.nameKey} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: budget.color }}
+        {budgets.map((budget) => {
+          const usage = calculateBudgetUsage(budget.spent, budget.budget);
+
+          return (
+            <div key={budget.nameKey} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: budget.color }}
+                  />
+                  <span className="text-sm font-medium text-foreground">
+                    {t(budget.nameKey)}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-semibold text-foreground">
+                    {formatCurrency(budget.spent)}
+                  </span>
+                  <span className="text-xs text-muted-foreground ml-1">
+                    / {formatCurrency(budget.budget)}
+                  </span>
+                </div>
+              </div>
+              <div className="relative">
+                <Progress
+                  value={usage.progressValue}
+                  className="h-2 lg:h-3 bg-accent"
+                  style={{
+                    // @ts-expect-error CSS variable
+                    "--progress-foreground": usage.isOverBudget
+                      ? "var(--destructive)"
+                      : budget.color,
+                  }}
                 />
-                <span className="text-sm font-medium text-foreground">
-                  {t(budget.nameKey)}
-                </span>
               </div>
-              <div className="text-right">
-                <span className="text-sm font-semibold text-foreground">
-                  {formatCurrency(budget.spent)}
-                </span>
-                <span className="text-xs text-muted-foreground ml-1">
-                  / {formatCurrency(budget.budget)}
-                </span>
-              </div>
+              <p className="text-xs text-muted-foreground text-right">
+                {usage.usagePercentage}% {t("common.used")}
+              </p>
             </div>
-            <div className="relative">
-              <Progress
-                value={budget.percentage}
-                className="h-2 lg:h-3 bg-accent"
-                style={{
-                  // @ts-expect-error CSS variable
-                  "--progress-foreground": budget.color,
-                }}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground text-right">
-              {budget.percentage}% {t("common.used")}
-            </p>
-          </div>
-        ))}
+          );
+        })}
       </CardContent>
     </Card>
   );

@@ -79,7 +79,17 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">
-                  {t(transaction.descriptionKey)}
+                  {transaction.isCreditCardInvoice
+                    ? (() => {
+                        const invoiceKey =
+                          transaction.invoice?.paymentMethodKey ??
+                          transaction.paymentMethodKey;
+
+                        return invoiceKey
+                          ? `${t("transaction.creditCardInvoiceFor")} ${t(invoiceKey)}`
+                          : t("transaction.creditCardInvoice");
+                      })()
+                    : t(transaction.descriptionKey)}
                 </p>
                 <div className="flex items-center gap-2 mt-1">
                   <span
