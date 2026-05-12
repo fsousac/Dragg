@@ -1,15 +1,11 @@
 name: Dragg CI
 
 on:
-  workflow_run:
-    workflows:
-      - CodeQL
-    types:
-      - completed
+  pull_request:
     branches:
       - main
       - develop
-  pull_request:
+  push:
     branches:
       - main
       - develop
@@ -18,41 +14,20 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: dragg-ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   quality:
     name: Quality checks
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'pull_request' ||
-      (
-        github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.event == 'push' &&
-        github.event.workflow_run.head_repository.full_name == github.repository &&
-        (
-          github.event.workflow_run.head_branch == 'main' ||
-          github.event.workflow_run.head_branch == 'develop'
-        )
-      )
 
     steps:
-      - name: Checkout pull request
-        if: github.event_name == 'pull_request'
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          persist-credentials: false
 
-      - name: Checkout analyzed branch
-        if: github.event_name == 'workflow_run'
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_branch }}
-          persist-credentials: false
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
