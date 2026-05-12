@@ -67,6 +67,39 @@ describe("budget calculations", () => {
     });
   });
 
+  it("normalizes invalid and negative budget inputs", () => {
+    expect(calculateBudgetUsage(Number.NaN, -100)).toEqual({
+      exceededAmount: 0,
+      isOverBudget: false,
+      plannedAmount: 0,
+      progressValue: 0,
+      remainingAmount: 0,
+      spentAmount: 0,
+      usagePercentage: 0,
+    });
+    expect(calculateBudgetUsage(50, Number.NaN)).toEqual({
+      exceededAmount: 50,
+      isOverBudget: true,
+      plannedAmount: 0,
+      progressValue: 0,
+      remainingAmount: -50,
+      spentAmount: 50,
+      usagePercentage: 0,
+    });
+
+    expect(
+      calculateBudgetData(Number.POSITIVE_INFINITY, {
+        needs: -10,
+        savings: 20,
+        wants: 30,
+      }),
+    ).toEqual({
+      needs: { budget: 0, percentage: 0, spent: 0 },
+      savings: { budget: 0, percentage: 0, spent: 20 },
+      wants: { budget: 0, percentage: 0, spent: 30 },
+    });
+  });
+
   it("sums planned monthly usage by budget group", () => {
     expect(
       sumBudgetUsageByGroup([

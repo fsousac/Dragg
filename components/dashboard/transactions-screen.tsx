@@ -222,7 +222,11 @@ export function TransactionsScreen({
 
   const openTransactionDialog = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
-    setFormData(getInitialFormState(transaction, incomeCategoryId));
+    setFormData(
+      transaction.isCreditCardInvoice
+        ? null
+        : getInitialFormState(transaction, incomeCategoryId),
+    );
   };
 
   const closeTransactionDialog = () => {
@@ -364,6 +368,18 @@ export function TransactionsScreen({
           <div className="divide-y divide-border">
             {filteredTransactions.map((transaction) => {
               const isPlanned = Boolean(transaction.isPlanned);
+              const isCreditCardInvoice = Boolean(
+                transaction.isCreditCardInvoice,
+              );
+              const invoiceLabelKey =
+                transaction.invoice?.paymentMethodKey ??
+                transaction.paymentMethodKey;
+              const invoiceTitle = invoiceLabelKey
+                ? `${t("transaction.creditCardInvoiceFor")} ${t(invoiceLabelKey)}`
+                : t("transaction.creditCardInvoice");
+              const transactionTitle = isCreditCardInvoice
+                ? invoiceTitle
+                : t(transaction.descriptionKey);
 
               return (
                 <div
@@ -399,14 +415,18 @@ export function TransactionsScreen({
                             isPlanned && "text-muted-foreground",
                           )}
                         >
-                          {t(transaction.descriptionKey)}
+                          {transactionTitle}
                         </p>
                         {isPlanned ? (
                           <Badge
                             variant="secondary"
                             className="shrink-0 border-border bg-muted px-2 py-0 text-[10px] font-medium text-muted-foreground"
                           >
-                            {t("screen.transactions.planned")}
+                            {t(
+                              isCreditCardInvoice
+                                ? "screen.transactions.plannedInvoice"
+                                : "screen.transactions.planned",
+                            )}
                           </Badge>
                         ) : null}
                         {transaction.type === "income" && (
@@ -443,42 +463,44 @@ export function TransactionsScreen({
                       {formatCurrency(Math.abs(transaction.amount))}
                     </p>
                   </button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-9 shrink-0 text-muted-foreground"
-                      >
-                        <MoreHorizontal className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          openTransactionDialog(transaction);
-                        }}
-                      >
-                        <Pencil className="size-4" />
-                        {t("common.edit")}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        variant="destructive"
-                        disabled={
-                          isPending && pendingTransactionId === transaction.id
-                        }
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleDeleteTransaction(transaction);
-                        }}
-                      >
-                        <Trash2 className="size-4" />
-                        {t("common.delete")}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {isCreditCardInvoice ? null : (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-9 shrink-0 text-muted-foreground"
+                        >
+                          <MoreHorizontal className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openTransactionDialog(transaction);
+                          }}
+                        >
+                          <Pencil className="size-4" />
+                          {t("common.edit")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          variant="destructive"
+                          disabled={
+                            isPending && pendingTransactionId === transaction.id
+                          }
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDeleteTransaction(transaction);
+                          }}
+                        >
+                          <Trash2 className="size-4" />
+                          {t("common.delete")}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
               );
             })}
@@ -509,11 +531,108 @@ export function TransactionsScreen({
       >
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{t("transaction.detailsTitle")}</DialogTitle>
+            <DialogTitle>
+              {selectedTransaction?.isCreditCardInvoice
+                ? (() => {
+                    const invoiceKey =
+                      selectedTransaction.invoice?.paymentMethodKey ??
+                      selectedTransaction.paymentMethodKey;
+
+                    return invoiceKey
+                      ? `${t("transaction.creditCardInvoiceFor")} ${t(invoiceKey)}`
+                      : t("transaction.creditCardInvoice");
+                  })()
+                : t("transaction.detailsTitle")}
+            </DialogTitle>
             <DialogDescription>
-              {t("transaction.detailsDescription")}
+              {selectedTransaction?.isCreditCardInvoice
+                ? t("transaction.invoiceDetailsDescription")
+                : t("transaction.detailsDescription")}
             </DialogDescription>
           </DialogHeader>
+
+          {selectedTransaction?.isCreditCardInvoice &&
+            selectedTransaction.invoice && (
+              <div className="grid gap-4">
+                <div className="grid gap-3 rounded-lg border border-border bg-muted/20 p-4 sm:grid-cols-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      {t("transaction.paymentMethod")}
+                    </p>
+                    <p className="mt-1 text-sm font-medium">
+                      {t(selectedTransaction.invoice.paymentMethodKey)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      {t("transaction.invoiceCycle")}
+                    </p>
+                    <p className="mt-1 text-sm font-medium">
+                      {formatDate(selectedTransaction.invoice.startsAt, {
+                        day: "numeric",
+                        month: "short",
+                      })}{" "}
+                      -{" "}
+                      {formatDate(selectedTransaction.invoice.closingDate, {
+                        day: "numeric",
+                        month: "short",
+                      })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      {t("transaction.invoiceDueDate")}
+                    </p>
+                    <p className="mt-1 text-sm font-medium">
+                      {formatDate(selectedTransaction.invoice.dueDate, {
+                        day: "numeric",
+                        month: "short",
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-lg border border-border">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-border bg-muted/30 px-4 py-3 text-sm font-medium">
+                    <span>{t("transaction.invoicePurchases")}</span>
+                    <span className="tabular-nums">
+                      {formatCurrency(Math.abs(selectedTransaction.amount))}
+                    </span>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {selectedTransaction.invoice.purchases.map((purchase) => (
+                      <div
+                        key={purchase.id}
+                        className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <p className="truncate text-sm font-medium">
+                              {t(purchase.descriptionKey)}
+                            </p>
+                            {purchase.installmentLabel ? (
+                              <Badge variant="secondary" className="shrink-0">
+                                {purchase.installmentLabel}
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {formatDate(purchase.date, {
+                              day: "numeric",
+                              month: "short",
+                            })}{" "}
+                            · {t(purchase.categoryKey)}
+                          </p>
+                        </div>
+                        <p className="text-sm font-semibold tabular-nums sm:text-right">
+                          {formatCurrency(purchase.amount)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
           {selectedTransaction && formData && (
             <div className="grid gap-4">
@@ -677,16 +796,17 @@ export function TransactionsScreen({
           )}
 
           <DialogFooter className="gap-2 sm:justify-between">
-            {selectedTransaction && (
-              <Button
-                variant="destructive"
-                disabled={isPending}
-                onClick={() => handleDeleteTransaction(selectedTransaction)}
-              >
-                <Trash2 className="size-4" />
-                {t("common.delete")}
-              </Button>
-            )}
+            {selectedTransaction &&
+              !selectedTransaction.isCreditCardInvoice && (
+                <Button
+                  variant="destructive"
+                  disabled={isPending}
+                  onClick={() => handleDeleteTransaction(selectedTransaction)}
+                >
+                  <Trash2 className="size-4" />
+                  {t("common.delete")}
+                </Button>
+              )}
             <div className="flex flex-col-reverse gap-2 sm:flex-row">
               <Button
                 type="button"
@@ -696,15 +816,17 @@ export function TransactionsScreen({
               >
                 {t("common.cancel")}
               </Button>
-              <Button
-                type="button"
-                disabled={isPending || !formData?.description.trim()}
-                onClick={handleUpdateTransaction}
-              >
-                {isPending
-                  ? t("transaction.saving")
-                  : t("transaction.saveChanges")}
-              </Button>
+              {selectedTransaction?.isCreditCardInvoice ? null : (
+                <Button
+                  type="button"
+                  disabled={isPending || !formData?.description.trim()}
+                  onClick={handleUpdateTransaction}
+                >
+                  {isPending
+                    ? t("transaction.saving")
+                    : t("transaction.saveChanges")}
+                </Button>
+              )}
             </div>
           </DialogFooter>
         </DialogContent>

@@ -56,7 +56,8 @@ vi.mock("@/lib/i18n", () => ({
     formatCurrency: (value: number) => `$${value}`,
     formatDate: (value: string | Date) =>
       value instanceof Date ? value.toISOString() : value,
-    formatNumber: (value: number) => String(value),
+    formatNumber: (value: number, options?: Intl.NumberFormatOptions) =>
+      new Intl.NumberFormat("en", options).format(value),
     locale: "en",
     t: (key: string) => translations[key] ?? key,
   }),
@@ -115,7 +116,7 @@ describe("dashboard component rendering", () => {
         budgetData={{
           needs: { budget: 1000, percentage: 40, spent: 400 },
           savings: { budget: 400, percentage: 100, spent: 400 },
-          wants: { budget: 600, percentage: 25, spent: 150 },
+          wants: { budget: 600, percentage: 125, spent: 750 },
         }}
       />,
     );
@@ -123,6 +124,7 @@ describe("dashboard component rendering", () => {
     expect(html).toContain("Needs");
     expect(html).toContain("Wants");
     expect(html).toContain("Savings");
+    expect(html).toContain("125% used");
   });
 
   it("renders budget split with income base and over-budget status", () => {
@@ -222,6 +224,13 @@ describe("dashboard component rendering", () => {
             nameKey: "data.category.shopping",
             value: 75,
           },
+          {
+            color: "#8B5CF6",
+            group: "savings",
+            groupKey: "data.group.savings",
+            nameKey: "data.category.investments",
+            value: 0,
+          },
         ]}
       />,
     );
@@ -229,6 +238,10 @@ describe("dashboard component rendering", () => {
     expect(html).toContain("Expenses by Category");
     expect(html).toContain("Health");
     expect(html).toContain("Shopping");
+    expect(html).toContain("Savings");
+    expect(html).toContain("76.9%");
+    expect(html).toContain("23.1%");
+    expect(html).toContain("0.0%");
   });
 
   it("renders category tooltip percentages and empty fallback", () => {

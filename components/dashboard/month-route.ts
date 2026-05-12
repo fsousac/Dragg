@@ -20,5 +20,5 @@ export function withSelectedMonth(
   nextSearchParams.set("month", month);
   const nextQuery = nextSearchParams.toString();
 
-  return nextQuery ? `${pathname}?${nextQuery}` : pathname;
+  return `${pathname}?${nextQuery}`;
 }
