@@ -184,7 +184,7 @@ export function createCreditCardInvoiceTransactions(options: {
         paymentMethodId: paymentMethod.id,
         paymentMethodKey: paymentMethod.labelKey,
         paymentMethodClosingDay: paymentMethod.closingDay ?? null,
-        paymentMethodDueDay: paymentMethod.dueDay ?? null,
+        paymentMethodDueDay: paymentMethod.dueDay,
         paymentMethodType: "credit",
         type: "expense",
       } satisfies CreditCardInvoiceTransaction,

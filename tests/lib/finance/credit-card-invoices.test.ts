@@ -114,4 +114,85 @@ describe("credit card invoices", () => {
       startsAt: "2026-04-14",
     });
   });
+
+  it("uses the last day of the month when no due day is configured", () => {
+    expect(
+      getCreditCardInvoiceCycle({
+        month: "2026-02",
+      }),
+    ).toEqual({
+      closingDate: "2026-02-27",
+      dueDate: "2026-02-28",
+      startsAt: "2026-01-28",
+    });
+  });
+
+  it("clamps due and closing days to the target month length", () => {
+    expect(
+      getCreditCardInvoiceCycle({
+        closingDay: 31,
+        dueDay: 31,
+        month: "2026-02",
+      }),
+    ).toEqual({
+      closingDate: "2026-02-27",
+      dueDate: "2026-02-28",
+      startsAt: "2026-01-31",
+    });
+  });
+
+  it("skips cards without due days and cards without purchases", () => {
+    const { invoices, purchaseIds } = createCreditCardInvoiceTransactions({
+      month: "2026-05",
+      paymentMethods: [
+        {
+          closingDay: 7,
+          dueDay: null,
+          id: "card-without-due-day",
+          labelKey: "No due",
+        },
+        {
+          closingDay: 7,
+          dueDay: 14,
+          id: "card-without-purchases",
+          labelKey: "Empty",
+        },
+      ],
+      transactions: [
+        makeTransaction({
+          amount: -20,
+          date: "2026-04-20",
+          id: "other-card-purchase",
+          paymentMethodId: "other-card",
+        }),
+      ],
+    });
+
+    expect(invoices).toEqual([]);
+    expect([...purchaseIds]).toEqual([]);
+  });
+
+  it("extracts installment labels from descriptions when notes are empty", () => {
+    const { invoices } = createCreditCardInvoiceTransactions({
+      month: "2026-05",
+      paymentMethods: [
+        {
+          dueDay: 14,
+          id: "card-1",
+          labelKey: "Card",
+        },
+      ],
+      transactions: [
+        makeTransaction({
+          amount: -30,
+          date: "2026-04-20",
+          descriptionKey: "Headphones 1/2",
+          id: "installment-from-description",
+          notes: null,
+        }),
+      ],
+    });
+
+    expect(invoices[0].invoice.purchases[0].installmentLabel).toBe("1/2");
+  });
 });

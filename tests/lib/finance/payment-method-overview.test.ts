@@ -104,6 +104,27 @@ describe("payment method overview spending", () => {
     ).toBe(100);
   });
 
+  it("falls back to the following invoice month when a card purchase cannot be matched to a cycle", () => {
+    expect(
+      calculatePaymentMethodSpent({
+        paymentMethod: {
+          closingDay: 7,
+          dueDay: 14,
+          id: "card-1",
+          type: "credit",
+        },
+        today: "2026-05-12",
+        transactions: [
+          makeTransaction({
+            amount: -60,
+            date: "2026-99-99",
+            id: "malformed-date-still-counts-as-open",
+          }),
+        ],
+      }),
+    ).toBe(60);
+  });
+
   it("keeps grouped spending for non-credit methods", () => {
     expect(
       calculatePaymentMethodSpent({
