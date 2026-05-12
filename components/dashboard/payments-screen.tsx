@@ -167,12 +167,11 @@ export function PaymentsScreen({
   const today = new Date().toISOString().slice(0, 10);
   const dueThreshold = (() => {
     const threshold = new Date();
-    threshold.setDate(threshold.getDate() + 7);
+    threshold.setDate(threshold.getDate() + 3);
     return threshold.toISOString().slice(0, 10);
   })();
 
-  const getDueStatusLabel = (status: "planned" | "overdue" | "next") => {
-    if (status === "overdue") return t("common.overdue");
+  const getDueStatusLabel = (status: "planned" | "next") => {
     if (status === "next") return t("common.next");
     return t("common.planned");
   };
@@ -180,16 +179,21 @@ export function PaymentsScreen({
   const formatInvoicePurchaseCount = (count: number) =>
     t("payments.invoicePurchaseCount").replace("{count}", String(count));
 
-  const getDueStatusStyle = (status: "planned" | "overdue" | "next") => {
-    if (status === "overdue") return "bg-destructive text-white";
+  const getDueStatusStyle = (status: "planned" | "next") => {
     if (status === "next") return "bg-yellow text-black";
     return "bg-muted text-muted-foreground";
   };
 
+  const shouldShowDueBadge = (dateValue: string) => dateValue > today;
+
   const getSubscriptionStatus = (subscription: SubscriptionOverviewItem) => {
     if (subscription.status === "paused") return "paused" as const;
-    if (subscription.nextDate < today) return "overdue" as const;
-    if (subscription.nextDate <= dueThreshold) return "next" as const;
+    if (
+      subscription.nextDate > today &&
+      subscription.nextDate <= dueThreshold
+    ) {
+      return "next" as const;
+    }
     return "planned" as const;
   };
 
@@ -517,12 +521,14 @@ export function PaymentsScreen({
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <Badge
-                          variant="secondary"
-                          className={getDueStatusStyle(invoice.status)}
-                        >
-                          {getDueStatusLabel(invoice.status)}
-                        </Badge>
+                        {shouldShowDueBadge(invoice.dueDate) ? (
+                          <Badge
+                            variant="secondary"
+                            className={getDueStatusStyle(invoice.status)}
+                          >
+                            {getDueStatusLabel(invoice.status)}
+                          </Badge>
+                        ) : null}
                         <span className="text-sm font-semibold text-foreground tabular-nums">
                           {formatCurrency(invoice.amount)}
                         </span>
@@ -570,18 +576,21 @@ export function PaymentsScreen({
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
-                          <Badge
-                            variant="secondary"
-                            className={
-                              status === "paused"
-                                ? "bg-yellow text-black"
-                                : getDueStatusStyle(status)
-                            }
-                          >
-                            {status === "paused"
-                              ? t("common.paused")
-                              : getDueStatusLabel(status)}
-                          </Badge>
+                          {status === "paused" ||
+                          shouldShowDueBadge(subscription.nextDate) ? (
+                            <Badge
+                              variant="secondary"
+                              className={
+                                status === "paused"
+                                  ? "bg-yellow text-black"
+                                  : getDueStatusStyle(status)
+                              }
+                            >
+                              {status === "paused"
+                                ? t("common.paused")
+                                : getDueStatusLabel(status)}
+                            </Badge>
+                          ) : null}
                           <span className="text-sm font-semibold text-foreground tabular-nums">
                             {formatCurrency(subscription.amount)}
                           </span>
@@ -630,12 +639,14 @@ export function PaymentsScreen({
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Badge
-                        variant="secondary"
-                        className={getDueStatusStyle(bill.status)}
-                      >
-                        {getDueStatusLabel(bill.status)}
-                      </Badge>
+                      {shouldShowDueBadge(bill.date) ? (
+                        <Badge
+                          variant="secondary"
+                          className={getDueStatusStyle(bill.status)}
+                        >
+                          {getDueStatusLabel(bill.status)}
+                        </Badge>
+                      ) : null}
                       <span className="text-sm font-semibold text-foreground tabular-nums">
                         {formatCurrency(bill.amount)}
                       </span>

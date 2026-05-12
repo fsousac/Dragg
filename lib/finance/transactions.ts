@@ -15,6 +15,7 @@ import {
   sumBudgetUsageByGroup,
 } from "@/lib/finance/budget";
 import { createCreditCardInvoiceTransactions } from "@/lib/finance/credit-card-invoices";
+import { calculatePaymentMethodSpent } from "@/lib/finance/payment-method-overview";
 import { createClient } from "@/lib/supabase/server";
 
 type DbCategoryGroup = Exclude<TransactionGroup, "income">;
@@ -268,7 +269,7 @@ export type ReportsData = {
   transactions: ReportTransactionItem[];
 };
 
-export type PaymentsDueStatus = "planned" | "overdue" | "next";
+export type PaymentsDueStatus = "planned" | "next";
 
 export type PaymentInvoiceItem = {
   amount: number;
@@ -912,10 +913,10 @@ function getTodayValue() {
 }
 
 function getPaymentsDueStatus(dateValue: string, today: string) {
-  if (dateValue < today) return "overdue" as const;
+  if (dateValue <= today) return "planned" as const;
 
   const threshold = new Date(`${today}T00:00:00.000Z`);
-  threshold.setDate(threshold.getDate() + 7);
+  threshold.setDate(threshold.getDate() + 3);
   const thresholdValue = threshold.toISOString().slice(0, 10);
 
   if (dateValue <= thresholdValue) return "next" as const;
@@ -1229,38 +1230,55 @@ async function getCategoryForMutation(categoryId: string) {
 
 export async function listPaymentMethodOverview(
   month?: string,
+  userContext?: Awaited<ReturnType<typeof getUserContext>>,
 ): Promise<PaymentMethodOverviewItem[]> {
-  const [paymentMethods, transactions] = await Promise.all([
-    listPaymentMethods(),
-    listTransactions({ month }),
-  ]);
+  const selectedMonth = normalizeMonthValue(month);
+  const ctx = userContext ?? (await getUserContext());
+  const today = getTodayValue();
+  const [paymentMethods, transactions, registeredTransactions] =
+    await Promise.all([
+      listPaymentMethods({ userContext: ctx }),
+      listTransactions({ month: selectedMonth, userContext: ctx }),
+      listTransactions({ includeFuture: true, userContext: ctx }),
+    ]);
 
-  return paymentMethods.map((paymentMethod) => ({
-    canModify: !isProtectedPaymentMethod(paymentMethod),
-    closingDay:
+  return paymentMethods.map((paymentMethod) => {
+    const closingDay =
       paymentMethod.closing_day == null
         ? null
-        : Number(paymentMethod.closing_day),
-    creditLimit: Number(paymentMethod.credit_limit ?? 0),
-    dueDay:
-      paymentMethod.due_day == null ? null : Number(paymentMethod.due_day),
-    id: paymentMethod.id,
-    isDefault: Boolean(paymentMethod.is_default),
-    label: toPaymentMethodLabelKey(
-      paymentMethod.name,
-      paymentMethod.type,
-      paymentMethod.is_default,
-    ),
-    name: paymentMethod.name,
-    spent: transactions
-      .filter(
-        (transaction) =>
-          transaction.paymentMethodId === paymentMethod.id &&
-          transaction.type !== "income",
-      )
-      .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0),
-    type: paymentMethod.type,
-  }));
+        : Number(paymentMethod.closing_day);
+    const dueDay =
+      paymentMethod.due_day == null ? null : Number(paymentMethod.due_day);
+
+    return {
+      canModify: !isProtectedPaymentMethod(paymentMethod),
+      closingDay,
+      creditLimit: Number(paymentMethod.credit_limit ?? 0),
+      dueDay,
+      id: paymentMethod.id,
+      isDefault: Boolean(paymentMethod.is_default),
+      label: toPaymentMethodLabelKey(
+        paymentMethod.name,
+        paymentMethod.type,
+        paymentMethod.is_default,
+      ),
+      name: paymentMethod.name,
+      spent: calculatePaymentMethodSpent({
+        paymentMethod: {
+          closingDay,
+          dueDay,
+          id: paymentMethod.id,
+          type: paymentMethod.type,
+        },
+        today,
+        transactions:
+          paymentMethod.type === "credit"
+            ? registeredTransactions
+            : transactions,
+      }),
+      type: paymentMethod.type,
+    };
+  });
 }
 
 export async function listSubscriptionOverview(): Promise<
@@ -1361,6 +1379,13 @@ export async function getPaymentsDueData(
       (transaction) =>
         transaction.date >= monthRange.start &&
         transaction.date <= monthRange.end,
+    )
+    .filter(
+      (transaction) =>
+        !(
+          transaction.paymentMethodType === "credit" &&
+          transaction.paymentMethodDueDay != null
+        ),
     )
     .sort((left, right) => left.date.localeCompare(right.date));
   const groupedSubscriptions = new Map<string, SubscriptionOverviewItem>();
@@ -2532,7 +2557,7 @@ export async function getDashboardData(
   const plannedUsageByGroup = sumBudgetUsageByGroup(scheduledTransactions);
   const budgetData = calculateBudgetData(totalIncome, plannedUsageByGroup);
 
-  const expensesByCategory = expenseTransactions
+  const expensesByCategory = scheduledExpenseTransactions
     .reduce((acc, transaction) => {
       const group = transaction.group as DbCategoryGroup;
       const nameKey = transaction.categoryKey;

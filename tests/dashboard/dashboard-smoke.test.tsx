@@ -56,7 +56,8 @@ vi.mock("@/lib/i18n", () => ({
     formatCurrency: (value: number) => `$${value}`,
     formatDate: (value: string | Date) =>
       value instanceof Date ? value.toISOString() : value,
-    formatNumber: (value: number) => String(value),
+    formatNumber: (value: number, options?: Intl.NumberFormatOptions) =>
+      new Intl.NumberFormat("en", options).format(value),
     locale: "en",
     t: (key: string) => translations[key] ?? key,
   }),
@@ -229,6 +230,8 @@ describe("dashboard component rendering", () => {
     expect(html).toContain("Expenses by Category");
     expect(html).toContain("Health");
     expect(html).toContain("Shopping");
+    expect(html).toContain("76.9%");
+    expect(html).toContain("23.1%");
   });
 
   it("renders category tooltip percentages and empty fallback", () => {
