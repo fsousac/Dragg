@@ -1,11 +1,11 @@
 name: Dragg CI
 
 on:
-  pull_request:
-    branches:
-      - main
-      - develop
-  push:
+  workflow_run:
+    workflows:
+      - CodeQL
+    types:
+      - completed
     branches:
       - main
       - develop
