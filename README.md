@@ -19,14 +19,14 @@
 		<img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" />
 	</a>
 	<a href="https://github.com/fsousac/Dragg/blob/main/package.json">
-		<img src="https://img.shields.io/badge/next-16.2.4-black" alt="Next.js" />
+		<img src="https://img.shields.io/badge/next-16.2.6-black" alt="Next.js" />
 	</a>
 	<a href="https://github.com/fsousac/Dragg/blob/main/package.json">
 		<img src="https://img.shields.io/badge/react-19-149eca" alt="React" />
 	</a>
 </p>
 
-Dragg is an open-source personal finance web app for tracking income, expenses, budgets, categories, payment methods, and monthly progress.
+Dragg is an open-source personal finance web app for tracking income, expenses, budgets, categories, payment methods, subscriptions, goals, reports, and monthly progress.
 
 It is designed to be simple to self-host and inexpensive to operate, with Supabase handling authentication and data security through PostgreSQL + Row Level Security.
 
@@ -34,12 +34,16 @@ It is designed to be simple to self-host and inexpensive to operate, with Supaba
 
 - Google OAuth authentication with Supabase Auth
 - User-owned finance data isolated via Supabase Row Level Security
-- Dashboard with monthly financial summary and 50/30/20 split
+- Dashboard with monthly financial summary, planned expenses, and 50/30/20 split
 - Full transaction flow: create, list, update, and delete
+- Installment expenses and monthly subscription scheduling through transaction records
 - Categories organized by Needs, Wants, and Savings
 - Category emoji icons and monthly spending limits
-- Payment methods management with protected defaults (Pix and Payment/Cash)
-- Goals and reports screens
+- Payment methods management with protected Pix and Cash defaults
+- Credit card due-day and closing-day support with planned invoice rows
+- Goals screen with create, edit, fund, and delete flows
+- Reports screen with monthly summaries, net worth progression, and export-friendly data
+- LGPD-oriented privacy request table in the database schema
 - Charts and progress indicators powered by Recharts
 - Responsive experience for desktop and mobile
 
@@ -47,8 +51,8 @@ It is designed to be simple to self-host and inexpensive to operate, with Supaba
 
 Requirements:
 
-- Node.js 22+
-- pnpm (recommended package manager)
+- Node.js 24.x
+- pnpm 10.x through Corepack
 - Supabase project
 - Google OAuth provider configured in Supabase
 
@@ -97,7 +101,8 @@ Dragg currently targets:
 - Next.js 16
 - React 19
 - TypeScript 5
-- Node.js 22+
+- Node.js 24.x
+- pnpm 10.x
 - Supabase Postgres
 
 ### 🔐 Security
@@ -109,6 +114,7 @@ Security is a core part of the project architecture.
 - Validate Server Action payloads at runtime (recommended with Zod)
 - Never expose service-role keys or OAuth secrets in client code
 - Keep migrations reproducible and free of production data
+- Keep LGPD/privacy workflow data scoped by authenticated user ownership
 
 For vulnerability reports, follow [SECURITY.md](./SECURITY.md).
 
@@ -134,6 +140,8 @@ Dragg is ready to deploy on Vercel.
    - `https://your-domain.com/auth/callback`
 4. Apply migrations to the production Supabase project.
 5. Deploy.
+
+The repository also includes GitHub Actions for CodeQL, quality checks, and production Vercel deployment after successful checks on `main`.
 
 ### 🙋 Contributing
 
