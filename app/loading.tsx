@@ -10,7 +10,7 @@ export default function Loading() {
       <div className="relative grid size-24 place-items-center">
         <div className="dragg-loading-loader grid size-14 place-items-center rounded-full bg-primary">
           <Image
-            src="/icon.svg"
+            src="/dragg-icon.svg"
             alt=""
             width={32}
             height={32}
