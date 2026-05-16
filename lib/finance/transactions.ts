@@ -14,9 +14,16 @@ import {
   calculateBudgetData,
   sumBudgetUsageByGroup,
 } from "@/lib/finance/budget";
+import {
+  buildExpensesByCategoryData,
+  type ExpensesByCategoryItem,
+} from "@/lib/finance/category-aggregation";
 import { createCreditCardInvoiceTransactions } from "@/lib/finance/credit-card-invoices";
 import { calculatePaymentMethodSpent } from "@/lib/finance/payment-method-overview";
 import { createClient } from "@/lib/supabase/server";
+
+export { buildExpensesByCategoryData };
+export type { ExpensesByCategoryItem };
 
 type DbCategoryGroup = Exclude<TransactionGroup, "income">;
 type DbTransactionKind = TransactionType;
@@ -224,14 +231,6 @@ export type CategoryOverviewItem = {
   monthlyLimit: number;
   name: string;
   spent: number;
-};
-
-export type ExpensesByCategoryItem = {
-  group: DbCategoryGroup;
-  groupKey: string;
-  nameKey: string;
-  value: number;
-  color: string;
 };
 
 export type ExpensesOverTimeItem = {
@@ -2557,43 +2556,9 @@ export async function getDashboardData(
   const plannedUsageByGroup = sumBudgetUsageByGroup(scheduledTransactions);
   const budgetData = calculateBudgetData(totalIncome, plannedUsageByGroup);
 
-  const expensesByCategory = scheduledExpenseTransactions
-    .reduce((acc, transaction) => {
-      const group = transaction.group as DbCategoryGroup;
-      const nameKey = transaction.categoryKey;
-      const existing = acc.find(
-        (item) =>
-          item.nameKey === nameKey &&
-          item.group === group &&
-          item.groupKey === `data.group.${group}`,
-      );
-
-      if (existing) {
-        existing.value += Math.abs(transaction.amount);
-      } else {
-        acc.push({
-          color: groupColors[group] ?? "#64748B",
-          group,
-          groupKey: `data.group.${group}`,
-          nameKey,
-          value: Math.abs(transaction.amount),
-        });
-      }
-
-      return acc;
-    }, [] as ExpensesByCategoryItem[])
-    .sort((left, right) => {
-      const order = {
-        needs: 0,
-        wants: 1,
-        savings: 2,
-      };
-      const groupOrder =
-        (order[left.group as keyof typeof order] ?? 99) -
-        (order[right.group as keyof typeof order] ?? 99);
-
-      return groupOrder || right.value - left.value;
-    });
+  const expensesByCategory = buildExpensesByCategoryData(
+    scheduledExpenseTransactions,
+  );
 
   const expensesOverTime = monthBuckets.map((monthBucket) => ({
     amount: trendExpenseTransactions
