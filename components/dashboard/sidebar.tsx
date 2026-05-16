@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -11,7 +12,6 @@ import {
   BarChart3,
   Target,
   Settings,
-  Wallet,
   LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -55,8 +55,15 @@ export function Sidebar({
     <aside className="hidden lg:flex flex-col w-64 bg-card border-r border-border h-screen sticky top-0 card-shadow">
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-6">
-        <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary">
-          <Wallet className="w-5 h-5 text-primary-foreground" />
+        <div className="flex items-center justify-center w-10 h-10 rounded-xl border border-border bg-card">
+          <Image
+            src="/dragg-icon.svg"
+            alt=""
+            width={28}
+            height={28}
+            className="size-7"
+            aria-hidden="true"
+          />
         </div>
         <span className="text-xl font-bold text-foreground">Dragg</span>
       </div>

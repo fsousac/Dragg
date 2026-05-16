@@ -5,51 +5,51 @@
 
 /* Light Mode (default) */
 :root {
-  --background: #f8faf9;
-  --foreground: #0a0d0b;
+  --background: #FFF9F1;
+  --foreground: #1A1C1E;
   --card: #ffffff;
-  --card-foreground: #0a0d0b;
+  --card-foreground: #1A1C1E;
   --popover: #ffffff;
-  --popover-foreground: #0a0d0b;
-  --primary: #16a34a;
+  --popover-foreground: #1A1C1E;
+  --primary: #22C55E;
   --primary-foreground: #ffffff;
-  --secondary: #f1f5f2;
-  --secondary-foreground: #0a0d0b;
-  --muted: #f1f5f2;
-  --muted-foreground: #6b7280;
-  --accent: #f1f5f2;
-  --accent-foreground: #0a0d0b;
+  --secondary: #FFF7EB;
+  --secondary-foreground: #1A1C1E;
+  --muted: #FFF7EB;
+  --muted-foreground: #6B6F76;
+  --accent: #FFF7EB;
+  --accent-foreground: #1A1C1E;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --border: #e2e8e4;
-  --input: #e2e8e4;
-  --ring: #16a34a;
+  --border: #F1E7DA;
+  --input: #F1E7DA;
+  --ring: #22C55E;
   --radius: 0.75rem;
 
   /* Custom Dragg colors - adjusted for light mode */
-  --needs: #ea580c;
-  --wants: #db2777;
-  --savings: #7c3aed;
-  --income: #16a34a;
+  --needs: #EA580C;
+  --wants: #DB2777;
+  --savings: #7C3AED;
+  --income: #15803D;
   --expense: #f43f5e;
-  --yellow: #eab308;
+  --yellow: #F6C453;
 
   /* Chart colors */
-  --chart-1: #16a34a;
-  --chart-2: #ea580c;
-  --chart-3: #db2777;
-  --chart-4: #7c3aed;
-  --chart-5: #eab308;
+  --chart-1: #22C55E;
+  --chart-2: #15803D;
+  --chart-3: #DB2777;
+  --chart-4: #7C3AED;
+  --chart-5: #A6A29A;
 
   /* Sidebar */
   --sidebar: #ffffff;
-  --sidebar-foreground: #0a0d0b;
-  --sidebar-primary: #16a34a;
+  --sidebar-foreground: #1A1C1E;
+  --sidebar-primary: #22C55E;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f1f5f2;
-  --sidebar-accent-foreground: #0a0d0b;
-  --sidebar-border: #e2e8e4;
-  --sidebar-ring: #16a34a;
+  --sidebar-accent: #FFF7EB;
+  --sidebar-accent-foreground: #1A1C1E;
+  --sidebar-border: #F1E7DA;
+  --sidebar-ring: #22C55E;
 
   /* Card shadow for light mode */
   --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
@@ -57,49 +57,49 @@
 
 /* Dark Mode */
 .dark {
-  --background: #050505;
-  --foreground: #ffffff;
-  --card: #0b0f0c;
-  --card-foreground: #ffffff;
-  --popover: #0b0f0c;
-  --popover-foreground: #ffffff;
+  --background: #0B0D0E;
+  --foreground: #F5F7FA;
+  --card: #111418;
+  --card-foreground: #F5F7FA;
+  --popover: #111418;
+  --popover-foreground: #F5F7FA;
   --primary: #22c55e;
-  --primary-foreground: #050505;
-  --secondary: #1a1f1b;
-  --secondary-foreground: #ffffff;
-  --muted: #1a1f1b;
-  --muted-foreground: #a1a1aa;
-  --accent: #1a1f1b;
-  --accent-foreground: #ffffff;
+  --primary-foreground: #0F1112;
+  --secondary: #1F2428;
+  --secondary-foreground: #F5F7FA;
+  --muted: #1F2428;
+  --muted-foreground: #A1A7AD;
+  --accent: #1F2428;
+  --accent-foreground: #F5F7FA;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: #1f2520;
-  --input: #1f2520;
+  --border: #1F2428;
+  --input: #1F2428;
   --ring: #22c55e;
 
   /* Custom Dragg colors */
-  --needs: #f97316;
-  --wants: #ec4899;
-  --savings: #8b5cf6;
+  --needs: #F97316;
+  --wants: #EC4899;
+  --savings: #8B5CF6;
   --income: #22c55e;
   --expense: #fb7185;
-  --yellow: #facc15;
+  --yellow: #F6C453;
 
   /* Chart colors */
   --chart-1: #22c55e;
-  --chart-2: #f97316;
-  --chart-3: #ec4899;
-  --chart-4: #8b5cf6;
-  --chart-5: #facc15;
+  --chart-2: #15803D;
+  --chart-3: #EC4899;
+  --chart-4: #8B5CF6;
+  --chart-5: #A1A7AD;
 
   /* Sidebar */
-  --sidebar: #0b0f0c;
-  --sidebar-foreground: #ffffff;
+  --sidebar: #111418;
+  --sidebar-foreground: #F5F7FA;
   --sidebar-primary: #22c55e;
-  --sidebar-primary-foreground: #050505;
-  --sidebar-accent: #1a1f1b;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #1f2520;
+  --sidebar-primary-foreground: #0F1112;
+  --sidebar-accent: #1F2428;
+  --sidebar-accent-foreground: #F5F7FA;
+  --sidebar-border: #1F2428;
   --sidebar-ring: #22c55e;
 
   /* No shadow in dark mode, use borders */
@@ -107,7 +107,7 @@
 }
 
 @theme inline {
-  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-satoshi), Inter, ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);

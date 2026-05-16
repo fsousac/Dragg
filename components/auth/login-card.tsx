@@ -1,5 +1,7 @@
 "use client"
 
+import Image from "next/image"
+
 import { GoogleLoginButton } from "@/components/auth/google-login-button"
 import { useI18n } from "@/lib/i18n"
 
@@ -9,8 +11,15 @@ export function LoginCard() {
   return (
     <section className="w-full max-w-md rounded-lg border border-white/10 bg-zinc-950/88 p-6 shadow-2xl shadow-green-950/30 backdrop-blur md:p-8">
       <div className="mb-8 flex items-center gap-3">
-        <div className="flex size-11 items-center justify-center rounded-md bg-primary text-lg font-black text-primary-foreground shadow-[0_0_28px_rgba(34,197,94,0.35)]">
-          D
+        <div className="flex size-11 items-center justify-center rounded-md border border-white/10 bg-zinc-900 shadow-[0_0_28px_rgba(34,197,94,0.35)]">
+          <Image
+            src="/dragg-icon.svg"
+            alt=""
+            width={30}
+            height={30}
+            className="size-8"
+            aria-hidden="true"
+          />
         </div>
         <div>
           <p className="text-2xl font-bold leading-none tracking-normal">
@@ -46,4 +55,3 @@ export function LoginCard() {
     </section>
   )
 }
-

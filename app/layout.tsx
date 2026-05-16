@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -6,11 +7,37 @@ import { Toaster } from "@/components/ui/sonner";
 import { LanguageProvider } from "@/lib/i18n";
 import "./globals.css";
 
+const satoshi = localFont({
+  src: [
+    {
+      path: "../public/fonts/satoshi/satoshi-light.woff2",
+      weight: "300",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/satoshi/satoshi-regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/satoshi/satoshi-medium.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/satoshi/satoshi-bold.woff2",
+      weight: "700",
+      style: "normal",
+    },
+  ],
+  variable: "--font-satoshi",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Dragg - Personal Finance Dashboard",
+  title: "Dragg - Your Personal Finance Dashboard",
   description:
-    "A modern personal finance dashboard to track your income, expenses, and savings with beautiful visualizations.",
-  generator: "v0.app",
+    "Open-source personal finance made clear. Track, budget, and grow with confidence.",
   icons: {
     icon: [
       {
@@ -18,14 +45,14 @@ export const metadata: Metadata = {
         type: "image/svg+xml",
       },
     ],
-    apple: "/apple-icon.png",
+    apple: "/drag-icon-app.png",
   },
 };
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F8FAF9" },
-    { media: "(prefers-color-scheme: dark)", color: "#050505" },
+    { media: "(prefers-color-scheme: light)", color: "#FFF9F1" },
+    { media: "(prefers-color-scheme: dark)", color: "#0B0D0E" },
   ],
   width: "device-width",
   initialScale: 1,
@@ -40,7 +67,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className="font-sans antialiased bg-background">
+      <body
+        className={`${satoshi.variable} bg-background font-sans antialiased`}
+      >
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

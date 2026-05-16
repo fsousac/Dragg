@@ -1,5 +1,5 @@
 <h1 align="center">
-	<img width="120" src="public/icon.svg" alt="Dragg" />
+	<img width="180" src="public/dragg-logo-wordmark.svg" alt="Dragg" />
 </h1>
 
 <h3 align="center">Dragg</h3>
