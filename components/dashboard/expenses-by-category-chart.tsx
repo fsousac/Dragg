@@ -126,7 +126,7 @@ export function ExpensesByCategoryChart({
                     >
                       {chartData.map((entry, index) => (
                         <Cell
-                          key={`${entry.group}-${entry.nameKey}`}
+                          key={`${entry.categoryId ?? entry.group}-${entry.nameKey}`}
                           className="stroke-card stroke-2"
                           fill={entry.color}
                           opacity={1 - (index % 4) * 0.12}
@@ -186,7 +186,7 @@ export function ExpensesByCategoryChart({
 
                     return (
                       <div
-                        key={`${category.group}-${category.nameKey}`}
+                        key={`${category.categoryId ?? category.group}-${category.nameKey}`}
                         className="space-y-1.5"
                       >
                         <div className="flex items-center justify-between gap-3 text-xs">
