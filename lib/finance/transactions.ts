@@ -2628,7 +2628,7 @@ export async function getDashboardData(
 
       return [...byId.values()]
         .sort((a, b) => b.date.localeCompare(a.date))
-        .slice(0, 5);
+        .slice(0, 10);
     })(),
     paymentMethods,
     summaryData: {

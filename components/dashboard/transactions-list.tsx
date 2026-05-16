@@ -29,12 +29,11 @@ type TransactionsListProps = {
 
 export function TransactionsList({ transactions }: TransactionsListProps) {
   const { formatCurrency, formatDate, t } = useI18n();
-  const latestTransactions = transactions.slice(0, 5);
   const searchParams = useSearchParams();
   const router = useRouter();
 
   return (
-    <Card className="bg-card border-border card-shadow">
+    <Card className="h-full bg-card border-border card-shadow flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
           <CardTitle className="text-base lg:text-lg font-semibold text-foreground">
@@ -65,9 +64,9 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
           </Button>
         </Link>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="p-0 flex-1 overflow-hidden">
         <div className="divide-y divide-border">
-          {latestTransactions.map((transaction) => (
+          {transactions.map((transaction) => (
             <div
               key={transaction.id}
               className={`flex items-center gap-3 lg:gap-4 px-4 lg:px-6 py-3 lg:py-4 hover:bg-accent/50 transition-colors ${
