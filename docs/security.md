@@ -59,7 +59,24 @@ Run before release:
 
 ```bash
 pnpm audit --audit-level=moderate
+pnpm run security:trivy
 pnpm run lint
 pnpm run test:coverage
 pnpm run build
+```
+
+## Automated Trivy scans
+
+The repository includes `.github/workflows/trivy.yml` for automated Trivy filesystem scans on pull requests, pushes to `main` and `develop`, a weekly schedule, and manual dispatch.
+
+The scan checks:
+
+- dependency vulnerabilities
+- leaked secrets
+- infrastructure and repository misconfigurations
+
+The workflow uploads SARIF results to GitHub Code Scanning and fails on unfixed high or critical findings. For local runs, install the Trivy CLI and run:
+
+```bash
+pnpm run security:trivy
 ```

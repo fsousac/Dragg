@@ -47,9 +47,12 @@ Run:
 
 ```bash
 pnpm audit --audit-level=moderate
+pnpm run security:trivy
 pnpm run lint
 pnpm run test:coverage
 pnpm run build
 ```
 
 Fix moderate or higher dependency advisories before release unless a documented exception is accepted by a maintainer.
+
+Automated Trivy scans also run in GitHub Actions for pull requests, pushes to protected integration branches, weekly scheduled checks, and manual dispatch. Results are uploaded as SARIF to GitHub Code Scanning.
