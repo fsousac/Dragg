@@ -1,0 +1,68 @@
+name: ZAP Full Scan
+
+on:
+  schedule:
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zap-full-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-scan:
+    name: Active DAST scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: test-publishable-key
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build app
+        run: pnpm run build
+
+      - name: Start Next.js
+        run: pnpm run start > next-start.log 2>&1 &
+
+      - name: Wait for local app
+        run: |
+          for attempt in {1..60}; do
+            if curl -fsS http://127.0.0.1:3000 >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat next-start.log
+          exit 1
+
+      - name: Run ZAP full scan
+        uses: zaproxy/action-full-scan@v0.13.0
+        with:
+          target: http://127.0.0.1:3000
+          allow_issue_writing: false
+          fail_action: true
+          rules_file_name: .zap/rules.tsv
+          cmd_options: "-a -m 5"

@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "security:audit": "pnpm audit --audit-level=moderate",
     "security:trivy": "trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 .",
     "update": "pnpm update",
     "update:check": "pnpm outdated"

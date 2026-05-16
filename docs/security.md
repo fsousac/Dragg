@@ -59,6 +59,7 @@ Run before release:
 
 ```bash
 pnpm audit --audit-level=moderate
+pnpm run security:audit
 pnpm run security:trivy
 pnpm run lint
 pnpm run test:coverage
@@ -80,3 +81,14 @@ The workflow uploads SARIF results to GitHub Code Scanning and fails on unfixed 
 ```bash
 pnpm run security:trivy
 ```
+
+## Additional automated security scans
+
+The repository also includes the selected recommended checks:
+
+- `.github/workflows/dependency-audit.yml`: runs `pnpm audit --audit-level=moderate`.
+- `.github/workflows/semgrep.yml`: runs Semgrep Community Edition rules for OWASP, JavaScript, TypeScript, and React, then uploads SARIF to GitHub Code Scanning.
+- `.github/workflows/zap-baseline.yml`: builds and starts the app locally, then runs an unauthenticated OWASP ZAP baseline scan against the login surface.
+- `.github/workflows/zap-full-scan.yml`: builds and starts the app locally, then runs an unauthenticated OWASP ZAP full active scan on a weekly schedule or manual dispatch.
+
+ZAP is intentionally scoped to the unauthenticated local app surface until an authenticated test account is available. The baseline scan runs on pull requests; the full scan is schedule/manual only because active DAST can be slower and more intrusive.

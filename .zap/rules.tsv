@@ -1,0 +1,5 @@
+# ZAP rule configuration for the baseline and full scans.
+# Format: <rule_id>	<action>	<optional description>
+#
+# Keep this file intentionally strict. Add ignores only after documenting why
+# the alert is accepted for the local unauthenticated login surface.
