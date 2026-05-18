@@ -28,6 +28,7 @@ type PaymentMethodsTabProps = {
   paymentMethods: PaymentMethodOverviewItem[];
   onDeletePaymentMethod: (paymentMethod: PaymentMethodOverviewItem) => void;
   onEditPaymentMethod: (paymentMethod: EditablePaymentMethod) => void;
+  onViewPaymentMethod: (paymentMethod: PaymentMethodOverviewItem) => void;
 };
 
 export type EditablePaymentMethod = {
@@ -53,6 +54,7 @@ const paymentTypeIcons = {
 export function PaymentMethodsTab({
   onDeletePaymentMethod,
   onEditPaymentMethod,
+  onViewPaymentMethod,
   paymentMethods,
 }: PaymentMethodsTabProps) {
   const { formatCurrency, t } = useI18n();
@@ -112,48 +114,60 @@ export function PaymentMethodsTab({
               return (
                 <div
                   key={paymentMethod.id}
-                  className="flex items-center gap-4 p-4 transition-colors hover:bg-accent/50"
+                  className="flex items-center gap-2 p-2 transition-colors hover:bg-accent/50 sm:gap-4 sm:p-4"
                 >
-                  <div className="flex size-11 items-center justify-center rounded-lg bg-accent text-foreground">
-                    <Icon className="size-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-foreground">{label}</p>
-                      {!paymentMethod.canModify ? (
-                        <Badge variant="secondary" className="text-xs">
-                          {t("payments.protectedMethod")}
-                        </Badge>
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-4 rounded-md p-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => onViewPaymentMethod(paymentMethod)}
+                    aria-label={`${t("payments.details.title")}: ${label}`}
+                  >
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-accent text-foreground">
+                      <Icon className="size-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-medium text-foreground">
+                          {label}
+                        </p>
+                        {!paymentMethod.canModify ? (
+                          <Badge variant="secondary" className="text-xs">
+                            {t("payments.protectedMethod")}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {t(`payments.type.${paymentMethod.type}`)}
+                      </p>
+                    </div>
+                    <div className="hidden text-right sm:block">
+                      <p className="text-sm font-semibold text-foreground">
+                        {formatCurrency(paymentMethod.spent)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {paymentMethod.creditLimit > 0
+                          ? `${t("payments.limit")}: ${formatCurrency(paymentMethod.creditLimit)}`
+                          : t("payments.noLimit")}
+                      </p>
+                      {paymentMethod.type === "credit" ? (
+                        <>
+                          <p className="text-xs text-muted-foreground">
+                            {paymentMethod.closingDay
+                              ? `${t("payments.closingDay")}: ${paymentMethod.closingDay}`
+                              : t("payments.noClosingDay")}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {paymentMethod.dueDay
+                              ? `${t("payments.dueDay")}: ${paymentMethod.dueDay}`
+                              : t("payments.noDueDay")}
+                          </p>
+                        </>
                       ) : null}
                     </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {t(`payments.type.${paymentMethod.type}`)}
-                    </p>
-                  </div>
-                  <div className="hidden text-right sm:block">
-                    <p className="text-sm font-semibold text-foreground">
+                    <p className="shrink-0 text-sm font-semibold text-foreground tabular-nums sm:hidden">
                       {formatCurrency(paymentMethod.spent)}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {paymentMethod.creditLimit > 0
-                        ? `${t("payments.limit")}: ${formatCurrency(paymentMethod.creditLimit)}`
-                        : t("payments.noLimit")}
-                    </p>
-                    {paymentMethod.type === "credit" ? (
-                      <>
-                        <p className="text-xs text-muted-foreground">
-                          {paymentMethod.closingDay
-                            ? `${t("payments.closingDay")}: ${paymentMethod.closingDay}`
-                            : t("payments.noClosingDay")}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {paymentMethod.dueDay
-                            ? `${t("payments.dueDay")}: ${paymentMethod.dueDay}`
-                            : t("payments.noDueDay")}
-                        </p>
-                      </>
-                    ) : null}
-                  </div>
+                  </button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
