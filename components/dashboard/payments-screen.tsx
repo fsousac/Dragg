@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { CreditCard, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -485,23 +485,30 @@ export function PaymentsScreen({
                     <button
                       key={invoice.id}
                       type="button"
-                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-accent/50"
+                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left text-foreground transition-colors hover:bg-accent/50"
                       onClick={() => setSelectedInvoice(invoice)}
                     >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {t("transaction.creditCardInvoiceFor")}{" "}
-                          {t(invoice.paymentMethodKey)}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {t("transaction.invoiceDueDate")}:{" "}
-                          {formatDate(invoice.dueDate, {
-                            day: "numeric",
-                            month: "short",
-                          })}
-                          {" · "}
-                          {formatInvoicePurchaseCount(invoice.purchaseCount)}
-                        </p>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted/40 text-foreground">
+                          <CreditCard className="size-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {t("transaction.creditCardInvoiceFor")}{" "}
+                            {t(invoice.paymentMethodKey)}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {t("transaction.invoiceDueDate")}:{" "}
+                            <span className="text-foreground">
+                              {formatDate(invoice.dueDate, {
+                                day: "numeric",
+                                month: "short",
+                              })}
+                            </span>
+                            {" · "}
+                            {formatInvoicePurchaseCount(invoice.purchaseCount)}
+                          </p>
+                        </div>
                       </div>
                       <div className="flex items-center gap-3">
                         {shouldShowDueBadge(invoice.dueDate) ? (
