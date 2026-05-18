@@ -45,7 +45,7 @@ export const metadata: Metadata = {
         type: "image/svg+xml",
       },
     ],
-    apple: "/drag-icon-app.png",
+    apple: "/dragg-icon-app.png",
   },
 };
 
