@@ -98,7 +98,7 @@ export function getCreditCardInvoiceCycle(options: {
   };
 }
 
-function extractInstallmentLabel(transaction: Transaction) {
+export function extractInstallmentLabel(transaction: Transaction) {
   return (
     transaction.notes?.match(/\b\d+\/\d+\b/)?.[0] ??
     transaction.descriptionKey.match(/\b\d+\/\d+\b/)?.[0] ??

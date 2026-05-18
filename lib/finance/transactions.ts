@@ -19,7 +19,10 @@ import {
   type ExpensesByCategoryItem,
 } from "@/lib/finance/category-aggregation";
 import { createCreditCardInvoiceTransactions } from "@/lib/finance/credit-card-invoices";
-import { calculatePaymentMethodSpent } from "@/lib/finance/payment-method-overview";
+import {
+  getPaymentMethodDetail,
+  type PaymentMethodDetail,
+} from "@/lib/finance/payment-method-overview";
 import { createClient } from "@/lib/supabase/server";
 
 export { buildExpensesByCategoryData };
@@ -111,6 +114,7 @@ export type PaymentMethodOverviewItem = TransactionFormPaymentMethod & {
   canModify: boolean;
   closingDay: number | null;
   creditLimit: number;
+  detail: PaymentMethodDetail;
   dueDay: number | null;
   isDefault: boolean;
   name: string;
@@ -1249,32 +1253,37 @@ export async function listPaymentMethodOverview(
     const dueDay =
       paymentMethod.due_day == null ? null : Number(paymentMethod.due_day);
 
+    const label = toPaymentMethodLabelKey(
+      paymentMethod.name,
+      paymentMethod.type,
+      paymentMethod.is_default,
+    );
+    const detail = getPaymentMethodDetail({
+      paymentMethod: {
+        closingDay,
+        dueDay,
+        id: paymentMethod.id,
+        label,
+        name: paymentMethod.name,
+        type: paymentMethod.type,
+      },
+      selectedMonth,
+      today,
+      transactions:
+        paymentMethod.type === "credit" ? registeredTransactions : transactions,
+    });
+
     return {
       canModify: !isProtectedPaymentMethod(paymentMethod),
       closingDay,
       creditLimit: Number(paymentMethod.credit_limit ?? 0),
+      detail,
       dueDay,
       id: paymentMethod.id,
       isDefault: Boolean(paymentMethod.is_default),
-      label: toPaymentMethodLabelKey(
-        paymentMethod.name,
-        paymentMethod.type,
-        paymentMethod.is_default,
-      ),
+      label,
       name: paymentMethod.name,
-      spent: calculatePaymentMethodSpent({
-        paymentMethod: {
-          closingDay,
-          dueDay,
-          id: paymentMethod.id,
-          type: paymentMethod.type,
-        },
-        today,
-        transactions:
-          paymentMethod.type === "credit"
-            ? registeredTransactions
-            : transactions,
-      }),
+      spent: detail.totalAmount,
       type: paymentMethod.type,
     };
   });

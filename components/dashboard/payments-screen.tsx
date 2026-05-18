@@ -66,6 +66,7 @@ type PaymentsScreenProps = {
   paymentMethods: PaymentMethodOverviewItem[];
   paymentsDueData: PaymentsDueData;
   resumeSubscriptionAction: (subscriptionId: string) => Promise<void>;
+  selectedMonth: string;
   subscriptions: SubscriptionOverviewItem[];
   transactionPaymentMethods: TransactionFormPaymentMethod[];
   updatePaymentMethodAction: (data: UpdatePaymentMethodInput) => Promise<void>;
@@ -121,6 +122,7 @@ export function PaymentsScreen({
   paymentMethods,
   paymentsDueData,
   resumeSubscriptionAction,
+  selectedMonth,
   subscriptions,
   transactionPaymentMethods,
   updatePaymentMethodAction,
@@ -158,6 +160,8 @@ export function PaymentsScreen({
     useState<EditablePaymentMethod | null>(null);
   const [deletingPaymentMethod, setDeletingPaymentMethod] =
     useState<PaymentMethodOverviewItem | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] =
+    useState<PaymentMethodOverviewItem | null>(null);
   const [editingSubscription, setEditingSubscription] =
     useState<EditableSubscription | null>(null);
   const [deletingSubscription, setDeletingSubscription] =
@@ -178,6 +182,12 @@ export function PaymentsScreen({
 
   const formatInvoicePurchaseCount = (count: number) =>
     t("payments.invoicePurchaseCount").replace("{count}", String(count));
+
+  const formatSelectedMonth = (month: string) =>
+    formatDate(`${month}-01`, {
+      month: "long",
+      year: "numeric",
+    });
 
   const getDueStatusStyle = (status: "planned" | "next") => {
     if (status === "next") return "bg-yellow text-black";
@@ -684,6 +694,7 @@ export function PaymentsScreen({
         <PaymentMethodsTab
           onDeletePaymentMethod={setDeletingPaymentMethod}
           onEditPaymentMethod={setEditingPaymentMethod}
+          onViewPaymentMethod={setSelectedPaymentMethod}
           paymentMethods={paymentMethods}
         />
       ) : (
@@ -695,6 +706,126 @@ export function PaymentsScreen({
           subscriptions={subscriptions}
         />
       )}
+
+      <Dialog
+        open={Boolean(selectedPaymentMethod)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedPaymentMethod(null);
+        }}
+      >
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{t("payments.details.title")}</DialogTitle>
+            <DialogDescription>
+              {selectedPaymentMethod
+                ? t(selectedPaymentMethod.label)
+                : t("payments.details.paymentMethod")}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedPaymentMethod ? (
+            <div className="grid gap-4">
+              <div className="grid gap-3 rounded-lg border border-border bg-muted/20 p-4 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("payments.details.paymentMethod")}
+                  </p>
+                  <p className="mt-1 text-sm font-medium">
+                    {t(selectedPaymentMethod.label)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("common.type")}
+                  </p>
+                  <p className="mt-1 text-sm font-medium">
+                    {t(`payments.type.${selectedPaymentMethod.type}`)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("common.month")}
+                  </p>
+                  <p className="mt-1 text-sm font-medium">
+                    {formatSelectedMonth(selectedMonth)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-lg border border-border">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-border bg-muted/30 px-4 py-3 text-sm font-medium">
+                  <span>{t("payments.details.relatedPurchases")}</span>
+                  <span className="tabular-nums">
+                    {t("payments.details.total")}:{" "}
+                    {formatCurrency(selectedPaymentMethod.detail.totalAmount)}
+                  </span>
+                </div>
+                {selectedPaymentMethod.detail.transactions.length ? (
+                  <div className="divide-y divide-border">
+                    {selectedPaymentMethod.detail.transactions.map(
+                      (transaction) => (
+                        <div
+                          key={transaction.id}
+                          className="grid gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                              <p className="truncate text-sm font-medium">
+                                {t(transaction.descriptionKey)}
+                              </p>
+                              {transaction.installmentLabel ? (
+                                <Badge variant="secondary" className="shrink-0">
+                                  {t("payments.details.installment")}{" "}
+                                  {transaction.installmentLabel}
+                                </Badge>
+                              ) : null}
+                              {transaction.status ? (
+                                <Badge variant="secondary" className="shrink-0">
+                                  {t("common.planned")}
+                                </Badge>
+                              ) : null}
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {t("payments.details.transactionDate")}:{" "}
+                              {formatDate(transaction.date, {
+                                day: "numeric",
+                                month: "short",
+                              })}
+                              {" · "}
+                              {t("payments.details.category")}:{" "}
+                              {t(transaction.categoryKey)}
+                              {transaction.invoiceDueDate ? (
+                                <>
+                                  {" · "}
+                                  {t("transaction.invoiceDueDate")}:{" "}
+                                  {formatDate(transaction.invoiceDueDate, {
+                                    day: "numeric",
+                                    month: "short",
+                                  })}
+                                </>
+                              ) : null}
+                            </p>
+                          </div>
+                          <div className="text-sm font-semibold tabular-nums sm:text-right">
+                            <p className="text-xs font-normal text-muted-foreground sm:hidden">
+                              {t("payments.details.amount")}
+                            </p>
+                            {formatCurrency(transaction.amount)}
+                          </div>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                ) : (
+                  <div className="px-4 py-8 text-sm text-muted-foreground">
+                    {t("payments.details.noPurchases")}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(selectedInvoice)}
