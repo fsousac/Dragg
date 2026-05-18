@@ -143,6 +143,7 @@ export function TransactionsScreen({
   >(null);
   const [isPending, startTransition] = useTransition();
   const transactionsHref = withSelectedMonth("/transactions", searchParams);
+  const today = new Date().toISOString().slice(0, 10);
   const previousTransactionsHref = `${transactionsHref}${
     transactionsHref.includes("?") ? "&" : "?"
   }history=1`;
@@ -371,6 +372,8 @@ export function TransactionsScreen({
               const isCreditCardInvoice = Boolean(
                 transaction.isCreditCardInvoice,
               );
+              const shouldPresentAsPlanned =
+                isPlanned && transaction.date > today;
               const invoiceLabelKey =
                 transaction.invoice?.paymentMethodKey ??
                 transaction.paymentMethodKey;
@@ -386,7 +389,7 @@ export function TransactionsScreen({
                   key={transaction.id}
                   className={cn(
                     "flex items-center gap-2 p-4",
-                    isPlanned && "bg-muted/20",
+                    shouldPresentAsPlanned && "bg-muted/20",
                   )}
                 >
                   <button
@@ -397,7 +400,7 @@ export function TransactionsScreen({
                     <div
                       className={cn(
                         "flex size-12 items-center justify-center rounded-lg bg-accent text-2xl",
-                        isPlanned && "grayscale opacity-55",
+                        shouldPresentAsPlanned && "grayscale opacity-55",
                       )}
                     >
                       {transaction.icon}
@@ -405,19 +408,19 @@ export function TransactionsScreen({
                     <div
                       className={cn(
                         "min-w-0 flex-1",
-                        isPlanned && "opacity-65",
+                        shouldPresentAsPlanned && "opacity-65",
                       )}
                     >
                       <div className="flex items-center gap-2">
                         <p
                           className={cn(
                             "truncate font-medium text-foreground",
-                            isPlanned && "text-muted-foreground",
+                            shouldPresentAsPlanned && "text-muted-foreground",
                           )}
                         >
                           {transactionTitle}
                         </p>
-                        {isPlanned ? (
+                        {shouldPresentAsPlanned ? (
                           <Badge
                             variant="secondary"
                             className="shrink-0 border-border bg-muted px-2 py-0 text-[10px] font-medium text-muted-foreground"
