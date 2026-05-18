@@ -50,7 +50,7 @@ export function buildExpensesByCategoryData(
       } else {
         acc.push({
           categoryId: transaction.categoryId ?? null,
-          color: groupColors[group] ?? "#64748B",
+          color: groupColors[group],
           group,
           groupKey,
           nameKey: transaction.categoryKey,
@@ -66,9 +66,7 @@ export function buildExpensesByCategoryData(
         wants: 1,
         savings: 2,
       };
-      const groupOrder =
-        (order[left.group as keyof typeof order] ?? 99) -
-        (order[right.group as keyof typeof order] ?? 99);
+      const groupOrder = order[left.group] - order[right.group];
 
       return groupOrder || right.value - left.value;
     });
