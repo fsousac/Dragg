@@ -102,12 +102,19 @@ describe("dashboard component rendering", () => {
           totalExpenses: 500,
           totalIncome: 1500,
           totalSaved: 250,
+          trends: {
+            totalExpenses: -25,
+            totalIncome: 50,
+            totalSaved: 10,
+          },
         }}
       />,
     );
 
     expect(html).toContain("Total Income");
     expect(html).toContain("Predicted");
+    expect(html).toContain("+50.0%");
+    expect(html).toContain("-25.0%");
   });
 
   it("renders budget progress for every 50/30/20 group", () => {
