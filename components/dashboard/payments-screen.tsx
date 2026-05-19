@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { CreditCard, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -66,6 +66,7 @@ type PaymentsScreenProps = {
   paymentMethods: PaymentMethodOverviewItem[];
   paymentsDueData: PaymentsDueData;
   resumeSubscriptionAction: (subscriptionId: string) => Promise<void>;
+  selectedMonth: string;
   subscriptions: SubscriptionOverviewItem[];
   transactionPaymentMethods: TransactionFormPaymentMethod[];
   updatePaymentMethodAction: (data: UpdatePaymentMethodInput) => Promise<void>;
@@ -121,6 +122,7 @@ export function PaymentsScreen({
   paymentMethods,
   paymentsDueData,
   resumeSubscriptionAction,
+  selectedMonth,
   subscriptions,
   transactionPaymentMethods,
   updatePaymentMethodAction,
@@ -158,6 +160,8 @@ export function PaymentsScreen({
     useState<EditablePaymentMethod | null>(null);
   const [deletingPaymentMethod, setDeletingPaymentMethod] =
     useState<PaymentMethodOverviewItem | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] =
+    useState<PaymentMethodOverviewItem | null>(null);
   const [editingSubscription, setEditingSubscription] =
     useState<EditableSubscription | null>(null);
   const [deletingSubscription, setDeletingSubscription] =
@@ -178,6 +182,12 @@ export function PaymentsScreen({
 
   const formatInvoicePurchaseCount = (count: number) =>
     t("payments.invoicePurchaseCount").replace("{count}", String(count));
+
+  const formatSelectedMonth = (month: string) =>
+    formatDate(`${month}-01`, {
+      month: "long",
+      year: "numeric",
+    });
 
   const getDueStatusStyle = (status: "planned" | "next") => {
     if (status === "next") return "bg-yellow text-black";
@@ -485,23 +495,30 @@ export function PaymentsScreen({
                     <button
                       key={invoice.id}
                       type="button"
-                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-accent/50"
+                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left text-foreground transition-colors hover:bg-accent/50"
                       onClick={() => setSelectedInvoice(invoice)}
                     >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {t("transaction.creditCardInvoiceFor")}{" "}
-                          {t(invoice.paymentMethodKey)}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {t("transaction.invoiceDueDate")}:{" "}
-                          {formatDate(invoice.dueDate, {
-                            day: "numeric",
-                            month: "short",
-                          })}
-                          {" · "}
-                          {formatInvoicePurchaseCount(invoice.purchaseCount)}
-                        </p>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted/40 text-foreground">
+                          <CreditCard className="size-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {t("transaction.creditCardInvoiceFor")}{" "}
+                            {t(invoice.paymentMethodKey)}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {t("transaction.invoiceDueDate")}:{" "}
+                            <span className="text-foreground">
+                              {formatDate(invoice.dueDate, {
+                                day: "numeric",
+                                month: "short",
+                              })}
+                            </span>
+                            {" · "}
+                            {formatInvoicePurchaseCount(invoice.purchaseCount)}
+                          </p>
+                        </div>
                       </div>
                       <div className="flex items-center gap-3">
                         {shouldShowDueBadge(invoice.dueDate) ? (
@@ -677,6 +694,7 @@ export function PaymentsScreen({
         <PaymentMethodsTab
           onDeletePaymentMethod={setDeletingPaymentMethod}
           onEditPaymentMethod={setEditingPaymentMethod}
+          onViewPaymentMethod={setSelectedPaymentMethod}
           paymentMethods={paymentMethods}
         />
       ) : (
@@ -688,6 +706,126 @@ export function PaymentsScreen({
           subscriptions={subscriptions}
         />
       )}
+
+      <Dialog
+        open={Boolean(selectedPaymentMethod)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedPaymentMethod(null);
+        }}
+      >
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{t("payments.details.title")}</DialogTitle>
+            <DialogDescription>
+              {selectedPaymentMethod
+                ? t(selectedPaymentMethod.label)
+                : t("payments.details.paymentMethod")}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedPaymentMethod ? (
+            <div className="grid gap-4">
+              <div className="grid gap-3 rounded-lg border border-border bg-muted/20 p-4 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("payments.details.paymentMethod")}
+                  </p>
+                  <p className="mt-1 text-sm font-medium">
+                    {t(selectedPaymentMethod.label)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("common.type")}
+                  </p>
+                  <p className="mt-1 text-sm font-medium">
+                    {t(`payments.type.${selectedPaymentMethod.type}`)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("common.month")}
+                  </p>
+                  <p className="mt-1 text-sm font-medium">
+                    {formatSelectedMonth(selectedMonth)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-lg border border-border">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-border bg-muted/30 px-4 py-3 text-sm font-medium">
+                  <span>{t("payments.details.relatedPurchases")}</span>
+                  <span className="tabular-nums">
+                    {t("payments.details.total")}:{" "}
+                    {formatCurrency(selectedPaymentMethod.detail.totalAmount)}
+                  </span>
+                </div>
+                {selectedPaymentMethod.detail.transactions.length ? (
+                  <div className="divide-y divide-border">
+                    {selectedPaymentMethod.detail.transactions.map(
+                      (transaction) => (
+                        <div
+                          key={transaction.id}
+                          className="grid gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                              <p className="truncate text-sm font-medium">
+                                {t(transaction.descriptionKey)}
+                              </p>
+                              {transaction.installmentLabel ? (
+                                <Badge variant="secondary" className="shrink-0">
+                                  {t("payments.details.installment")}{" "}
+                                  {transaction.installmentLabel}
+                                </Badge>
+                              ) : null}
+                              {transaction.status ? (
+                                <Badge variant="secondary" className="shrink-0">
+                                  {t("common.planned")}
+                                </Badge>
+                              ) : null}
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {t("payments.details.transactionDate")}:{" "}
+                              {formatDate(transaction.date, {
+                                day: "numeric",
+                                month: "short",
+                              })}
+                              {" · "}
+                              {t("payments.details.category")}:{" "}
+                              {t(transaction.categoryKey)}
+                              {transaction.invoiceDueDate ? (
+                                <>
+                                  {" · "}
+                                  {t("transaction.invoiceDueDate")}:{" "}
+                                  {formatDate(transaction.invoiceDueDate, {
+                                    day: "numeric",
+                                    month: "short",
+                                  })}
+                                </>
+                              ) : null}
+                            </p>
+                          </div>
+                          <div className="text-sm font-semibold tabular-nums sm:text-right">
+                            <p className="text-xs font-normal text-muted-foreground sm:hidden">
+                              {t("payments.details.amount")}
+                            </p>
+                            {formatCurrency(transaction.amount)}
+                          </div>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                ) : (
+                  <div className="px-4 py-8 text-sm text-muted-foreground">
+                    {t("payments.details.noPurchases")}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(selectedInvoice)}

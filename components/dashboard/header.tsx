@@ -1,7 +1,7 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { Wallet } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -151,8 +151,15 @@ export function Header({
       {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary">
-            <Wallet className="w-4 h-4 text-primary-foreground" />
+          <div className="flex items-center justify-center w-9 h-9 rounded-xl border border-border bg-card">
+            <Image
+              src="/dragg-icon.svg"
+              alt=""
+              width={24}
+              height={24}
+              className="size-6"
+              aria-hidden="true"
+            />
           </div>
           <span className="text-lg font-bold text-foreground">Dragg</span>
         </div>

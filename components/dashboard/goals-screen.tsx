@@ -80,9 +80,9 @@ type GoalFormState = {
 const goalIcons = ["🎯", "🏦", "✈️", "🚗", "🏠", "📈", "🎓", "💻"];
 const goalColors = [
   "#22C55E",
-  "#8B5CF6",
-  "#F97316",
-  "#EC4899",
+  "#15803D",
+  "#F6C453",
+  "#FFC38A",
   "#14B8A6",
   "#EAB308",
 ];

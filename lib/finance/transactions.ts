@@ -14,9 +14,19 @@ import {
   calculateBudgetData,
   sumBudgetUsageByGroup,
 } from "@/lib/finance/budget";
+import {
+  buildExpensesByCategoryData,
+  type ExpensesByCategoryItem,
+} from "@/lib/finance/category-aggregation";
 import { createCreditCardInvoiceTransactions } from "@/lib/finance/credit-card-invoices";
-import { calculatePaymentMethodSpent } from "@/lib/finance/payment-method-overview";
+import {
+  getPaymentMethodDetail,
+  type PaymentMethodDetail,
+} from "@/lib/finance/payment-method-overview";
 import { createClient } from "@/lib/supabase/server";
+
+export { buildExpensesByCategoryData };
+export type { ExpensesByCategoryItem };
 
 type DbCategoryGroup = Exclude<TransactionGroup, "income">;
 type DbTransactionKind = TransactionType;
@@ -104,6 +114,7 @@ export type PaymentMethodOverviewItem = TransactionFormPaymentMethod & {
   canModify: boolean;
   closingDay: number | null;
   creditLimit: number;
+  detail: PaymentMethodDetail;
   dueDay: number | null;
   isDefault: boolean;
   name: string;
@@ -197,6 +208,11 @@ export type SummaryData = {
   predictedExpenses: number;
   totalSaved: number;
   currentBalance: number;
+  trends: {
+    totalExpenses: number;
+    totalIncome: number;
+    totalSaved: number;
+  };
 };
 
 export type BudgetData = Record<
@@ -224,14 +240,6 @@ export type CategoryOverviewItem = {
   monthlyLimit: number;
   name: string;
   spent: number;
-};
-
-export type ExpensesByCategoryItem = {
-  group: DbCategoryGroup;
-  groupKey: string;
-  nameKey: string;
-  value: number;
-  color: string;
 };
 
 export type ExpensesOverTimeItem = {
@@ -973,32 +981,6 @@ function getLastMonthKeys(month: string | undefined, count: number) {
   });
 }
 
-function getMonthlySavingsBalance(transactions: Transaction[]) {
-  const income = transactions
-    .filter((transaction) => transaction.type === "income")
-    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
-  const savings = transactions
-    .filter((transaction) => transaction.type === "saving")
-    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
-  const needsSpent = transactions
-    .filter(
-      (transaction) =>
-        transaction.type === "expense" && transaction.group === "needs",
-    )
-    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
-  const wantsSpent = transactions
-    .filter(
-      (transaction) =>
-        transaction.type === "expense" && transaction.group === "wants",
-    )
-    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
-  const excessExpenses =
-    Math.max(needsSpent - income * BUDGET_GROUP_RATIOS.needs, 0) +
-    Math.max(wantsSpent - income * BUDGET_GROUP_RATIOS.wants, 0);
-
-  return savings - excessExpenses;
-}
-
 function getMonthlyFinanceSummary(transactions: Transaction[]) {
   const income = transactions
     .filter((transaction) => transaction.type === "income")
@@ -1032,27 +1014,6 @@ function getMonthlyFinanceSummary(transactions: Transaction[]) {
     income,
     savings: grossSavings - excessExpenses,
   };
-}
-
-function getCumulativeSavingsBalance(
-  transactions: Transaction[],
-  month: string,
-) {
-  const months = [
-    ...new Set(
-      transactions
-        .map((transaction) => getFinancialMonth(transaction))
-        .filter((financialMonth) => financialMonth <= month),
-    ),
-  ];
-
-  return months.reduce((sum, financialMonth) => {
-    const monthlyTransactions = transactions.filter(
-      (transaction) => getFinancialMonth(transaction) === financialMonth,
-    );
-
-    return sum + getMonthlySavingsBalance(monthlyTransactions);
-  }, 0);
 }
 
 function getSafeReportPeriod(periodMonths?: number) {
@@ -1250,32 +1211,37 @@ export async function listPaymentMethodOverview(
     const dueDay =
       paymentMethod.due_day == null ? null : Number(paymentMethod.due_day);
 
+    const label = toPaymentMethodLabelKey(
+      paymentMethod.name,
+      paymentMethod.type,
+      paymentMethod.is_default,
+    );
+    const detail = getPaymentMethodDetail({
+      paymentMethod: {
+        closingDay,
+        dueDay,
+        id: paymentMethod.id,
+        label,
+        name: paymentMethod.name,
+        type: paymentMethod.type,
+      },
+      selectedMonth,
+      today,
+      transactions:
+        paymentMethod.type === "credit" ? registeredTransactions : transactions,
+    });
+
     return {
       canModify: !isProtectedPaymentMethod(paymentMethod),
       closingDay,
       creditLimit: Number(paymentMethod.credit_limit ?? 0),
+      detail,
       dueDay,
       id: paymentMethod.id,
       isDefault: Boolean(paymentMethod.is_default),
-      label: toPaymentMethodLabelKey(
-        paymentMethod.name,
-        paymentMethod.type,
-        paymentMethod.is_default,
-      ),
+      label,
       name: paymentMethod.name,
-      spent: calculatePaymentMethodSpent({
-        paymentMethod: {
-          closingDay,
-          dueDay,
-          id: paymentMethod.id,
-          type: paymentMethod.type,
-        },
-        today,
-        transactions:
-          paymentMethod.type === "credit"
-            ? registeredTransactions
-            : transactions,
-      }),
+      spent: detail.totalAmount,
       type: paymentMethod.type,
     };
   });
@@ -2485,22 +2451,66 @@ export async function listTransactions(options?: {
   throw new Error(`Unable to load transactions: ${error.message}`);
 }
 
+async function getTotalSavedForMonth(
+  selectedMonth: string,
+  userContext: Awaited<ReturnType<typeof getUserContext>>,
+) {
+  const { data, error } = await userContext.supabase.rpc(
+    "calculate_total_saved",
+    {
+      p_selected_month: `${selectedMonth}-01`,
+    },
+  );
+
+  if (error) {
+    throw new Error(`Unable to calculate total saved: ${error.message}`);
+  }
+
+  return Number(data ?? 0);
+}
+
+function sumTransactionsByType(
+  transactions: Transaction[],
+  type: TransactionType,
+) {
+  return transactions
+    .filter((transaction) => transaction.type === type)
+    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+}
+
+function getPercentageChange(currentValue: number, previousValue: number) {
+  if (previousValue === 0) {
+    return currentValue === 0 ? 0 : 100;
+  }
+
+  return Number(
+    (((currentValue - previousValue) / Math.abs(previousValue)) * 100).toFixed(
+      1,
+    ),
+  );
+}
+
 export async function getDashboardData(
   month?: string,
   userContext?: Awaited<ReturnType<typeof getUserContext>>,
 ): Promise<DashboardData> {
   const selectedMonth = normalizeMonthValue(month);
+  const previousMonth = getPreviousMonthValue(selectedMonth);
   const monthBuckets = getLastSixMonthKeys(selectedMonth);
   const ctx = userContext ?? (await getUserContext());
   const [
     transactions,
+    previousTransactions,
     scheduledTransactions,
     trendTransactions,
     displayTransactions,
     displayScheduledTransactions,
+    totalSaved,
+    previousTotalSaved,
     { categories, paymentMethods },
   ] = await Promise.all([
     listTransactions({ month: selectedMonth, userContext: ctx }),
+    listTransactions({ month: previousMonth, userContext: ctx }),
     listTransactions({
       includeFuture: true,
       month: selectedMonth,
@@ -2522,14 +2532,10 @@ export async function getDashboardData(
       month: selectedMonth,
       userContext: ctx,
     }),
+    getTotalSavedForMonth(selectedMonth, ctx),
+    getTotalSavedForMonth(previousMonth, ctx),
     getTransactionFormOptions({ userContext: ctx }),
   ]);
-  const incomeTransactions = transactions.filter(
-    (transaction) => transaction.type === "income",
-  );
-  const expenseTransactions = transactions.filter(
-    (transaction) => transaction.type === "expense",
-  );
   const trendExpenseTransactions = trendTransactions.filter(
     (transaction) => transaction.type === "expense",
   );
@@ -2537,63 +2543,26 @@ export async function getDashboardData(
     (transaction) => transaction.type === "expense",
   );
 
-  const totalIncome = incomeTransactions.reduce(
-    (sum, transaction) => sum + Math.abs(transaction.amount),
-    0,
+  const totalIncome = sumTransactionsByType(transactions, "income");
+  const totalExpenses = sumTransactionsByType(transactions, "expense");
+  const previousTotalIncome = sumTransactionsByType(
+    previousTransactions,
+    "income",
   );
-  const totalExpenses = expenseTransactions.reduce(
-    (sum, transaction) => sum + Math.abs(transaction.amount),
-    0,
+  const previousTotalExpenses = sumTransactionsByType(
+    previousTransactions,
+    "expense",
   );
   const predictedExpenses = scheduledExpenseTransactions.reduce(
     (sum, transaction) => sum + Math.abs(transaction.amount),
     0,
   );
-  const totalSaved = getCumulativeSavingsBalance(
-    trendTransactions,
-    selectedMonth,
-  );
-
   const plannedUsageByGroup = sumBudgetUsageByGroup(scheduledTransactions);
   const budgetData = calculateBudgetData(totalIncome, plannedUsageByGroup);
 
-  const expensesByCategory = scheduledExpenseTransactions
-    .reduce((acc, transaction) => {
-      const group = transaction.group as DbCategoryGroup;
-      const nameKey = transaction.categoryKey;
-      const existing = acc.find(
-        (item) =>
-          item.nameKey === nameKey &&
-          item.group === group &&
-          item.groupKey === `data.group.${group}`,
-      );
-
-      if (existing) {
-        existing.value += Math.abs(transaction.amount);
-      } else {
-        acc.push({
-          color: groupColors[group] ?? "#64748B",
-          group,
-          groupKey: `data.group.${group}`,
-          nameKey,
-          value: Math.abs(transaction.amount),
-        });
-      }
-
-      return acc;
-    }, [] as ExpensesByCategoryItem[])
-    .sort((left, right) => {
-      const order = {
-        needs: 0,
-        wants: 1,
-        savings: 2,
-      };
-      const groupOrder =
-        (order[left.group as keyof typeof order] ?? 99) -
-        (order[right.group as keyof typeof order] ?? 99);
-
-      return groupOrder || right.value - left.value;
-    });
+  const expensesByCategory = buildExpensesByCategoryData(
+    scheduledExpenseTransactions,
+  );
 
   const expensesOverTime = monthBuckets.map((monthBucket) => ({
     amount: trendExpenseTransactions
@@ -2663,7 +2632,7 @@ export async function getDashboardData(
 
       return [...byId.values()]
         .sort((a, b) => b.date.localeCompare(a.date))
-        .slice(0, 5);
+        .slice(0, 10);
     })(),
     paymentMethods,
     summaryData: {
@@ -2672,6 +2641,14 @@ export async function getDashboardData(
       totalExpenses,
       totalIncome,
       totalSaved,
+      trends: {
+        totalExpenses: getPercentageChange(
+          totalExpenses,
+          previousTotalExpenses,
+        ),
+        totalIncome: getPercentageChange(totalIncome, previousTotalIncome),
+        totalSaved: getPercentageChange(totalSaved, previousTotalSaved),
+      },
     },
   };
 }

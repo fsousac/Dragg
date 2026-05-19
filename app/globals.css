@@ -1,113 +1,113 @@
-@import 'tailwindcss';
-@import 'tw-animate-css';
+@import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
 /* Light Mode (default) */
 :root {
-  --background: #F8FAF9;
-  --foreground: #0A0D0B;
-  --card: #FFFFFF;
-  --card-foreground: #0A0D0B;
-  --popover: #FFFFFF;
-  --popover-foreground: #0A0D0B;
-  --primary: #16A34A;
-  --primary-foreground: #FFFFFF;
-  --secondary: #F1F5F2;
-  --secondary-foreground: #0A0D0B;
-  --muted: #F1F5F2;
-  --muted-foreground: #6B7280;
-  --accent: #F1F5F2;
-  --accent-foreground: #0A0D0B;
-  --destructive: #DC2626;
-  --destructive-foreground: #FFFFFF;
-  --border: #E2E8E4;
-  --input: #E2E8E4;
-  --ring: #16A34A;
+  --background: #FFF9F1;
+  --foreground: #1A1C1E;
+  --card: #ffffff;
+  --card-foreground: #1A1C1E;
+  --popover: #ffffff;
+  --popover-foreground: #1A1C1E;
+  --primary: #22C55E;
+  --primary-foreground: #ffffff;
+  --secondary: #FFF7EB;
+  --secondary-foreground: #1A1C1E;
+  --muted: #FFF7EB;
+  --muted-foreground: #6B6F76;
+  --accent: #FFF7EB;
+  --accent-foreground: #1A1C1E;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #F1E7DA;
+  --input: #F1E7DA;
+  --ring: #22C55E;
   --radius: 0.75rem;
-  
+
   /* Custom Dragg colors - adjusted for light mode */
   --needs: #EA580C;
   --wants: #DB2777;
   --savings: #7C3AED;
-  --income: #16A34A;
-  --expense: #F43F5E;
-  --yellow: #EAB308;
-  
+  --income: #15803D;
+  --expense: #f43f5e;
+  --yellow: #F6C453;
+
   /* Chart colors */
-  --chart-1: #16A34A;
-  --chart-2: #EA580C;
+  --chart-1: #22C55E;
+  --chart-2: #15803D;
   --chart-3: #DB2777;
   --chart-4: #7C3AED;
-  --chart-5: #EAB308;
-  
+  --chart-5: #A6A29A;
+
   /* Sidebar */
-  --sidebar: #FFFFFF;
-  --sidebar-foreground: #0A0D0B;
-  --sidebar-primary: #16A34A;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #F1F5F2;
-  --sidebar-accent-foreground: #0A0D0B;
-  --sidebar-border: #E2E8E4;
-  --sidebar-ring: #16A34A;
-  
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1A1C1E;
+  --sidebar-primary: #22C55E;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #FFF7EB;
+  --sidebar-accent-foreground: #1A1C1E;
+  --sidebar-border: #F1E7DA;
+  --sidebar-ring: #22C55E;
+
   /* Card shadow for light mode */
   --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
 }
 
 /* Dark Mode */
 .dark {
-  --background: #050505;
-  --foreground: #FFFFFF;
-  --card: #0B0F0C;
-  --card-foreground: #FFFFFF;
-  --popover: #0B0F0C;
-  --popover-foreground: #FFFFFF;
-  --primary: #22C55E;
-  --primary-foreground: #050505;
-  --secondary: #1a1f1b;
-  --secondary-foreground: #FFFFFF;
-  --muted: #1a1f1b;
-  --muted-foreground: #A1A1AA;
-  --accent: #1a1f1b;
-  --accent-foreground: #FFFFFF;
-  --destructive: #EF4444;
-  --destructive-foreground: #FFFFFF;
-  --border: #1f2520;
-  --input: #1f2520;
-  --ring: #22C55E;
-  
+  --background: #0B0D0E;
+  --foreground: #F5F7FA;
+  --card: #111418;
+  --card-foreground: #F5F7FA;
+  --popover: #111418;
+  --popover-foreground: #F5F7FA;
+  --primary: #22c55e;
+  --primary-foreground: #0F1112;
+  --secondary: #1F2428;
+  --secondary-foreground: #F5F7FA;
+  --muted: #1F2428;
+  --muted-foreground: #A1A7AD;
+  --accent: #1F2428;
+  --accent-foreground: #F5F7FA;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #1F2428;
+  --input: #1F2428;
+  --ring: #22c55e;
+
   /* Custom Dragg colors */
   --needs: #F97316;
   --wants: #EC4899;
   --savings: #8B5CF6;
-  --income: #22C55E;
-  --expense: #FB7185;
-  --yellow: #FACC15;
-  
+  --income: #22c55e;
+  --expense: #fb7185;
+  --yellow: #F6C453;
+
   /* Chart colors */
-  --chart-1: #22C55E;
-  --chart-2: #F97316;
+  --chart-1: #22c55e;
+  --chart-2: #15803D;
   --chart-3: #EC4899;
   --chart-4: #8B5CF6;
-  --chart-5: #FACC15;
-  
+  --chart-5: #A1A7AD;
+
   /* Sidebar */
-  --sidebar: #0B0F0C;
-  --sidebar-foreground: #FFFFFF;
-  --sidebar-primary: #22C55E;
-  --sidebar-primary-foreground: #050505;
-  --sidebar-accent: #1a1f1b;
-  --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: #1f2520;
-  --sidebar-ring: #22C55E;
-  
+  --sidebar: #111418;
+  --sidebar-foreground: #F5F7FA;
+  --sidebar-primary: #22c55e;
+  --sidebar-primary-foreground: #0F1112;
+  --sidebar-accent: #1F2428;
+  --sidebar-accent-foreground: #F5F7FA;
+  --sidebar-border: #1F2428;
+  --sidebar-ring: #22c55e;
+
   /* No shadow in dark mode, use borders */
   --card-shadow: none;
 }
 
 @theme inline {
-  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-satoshi), Inter, ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -145,7 +145,7 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  
+
   /* Custom Dragg colors */
   --color-needs: var(--needs);
   --color-wants: var(--wants);

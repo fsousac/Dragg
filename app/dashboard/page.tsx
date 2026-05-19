@@ -61,7 +61,7 @@ export default async function DashboardPage({
             expensesByCategory={dashboardData.expensesByCategory}
           />
         </section>
-        <section aria-label="Latest transactions">
+        <section aria-label="Latest transactions" className="h-full">
           <TransactionsList transactions={dashboardData.latestTransactions} />
         </section>
       </div>

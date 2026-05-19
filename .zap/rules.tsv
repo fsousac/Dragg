@@ -1,0 +1,11 @@
+# ZAP rule configuration for the baseline and full scans.
+# Format: <rule_id>	<action>	<optional description>
+#
+# Keep this file intentionally strict. Add ignores only after documenting why
+# the alert is accepted for the local unauthenticated login surface.
+10049	IGNORE	Next.js local scan responses may intentionally be non-storable; cache policy is handled by the framework and hosting layer.
+10055	IGNORE	Next.js requires inline script allowances unless the app adopts nonce-based CSP; tracked as accepted local baseline risk.
+10094	IGNORE	Base64-like strings in generated Next.js CSS/JS chunks are false positives, not disclosed secrets.
+10109	IGNORE	Modern SPA behavior is expected for this Next.js application.
+90004	IGNORE	Cross-Origin-Embedder-Policy is not required for the unauthenticated app surface and can break third-party auth/media integrations.
+90005	IGNORE	ZAP requests omit browser Sec-Fetch-Dest headers; this is scanner behavior, not an application response defect.

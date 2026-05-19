@@ -29,12 +29,12 @@ type TransactionsListProps = {
 
 export function TransactionsList({ transactions }: TransactionsListProps) {
   const { formatCurrency, formatDate, t } = useI18n();
-  const latestTransactions = transactions.slice(0, 5);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <Card className="bg-card border-border card-shadow">
+    <Card className="h-full bg-card border-border card-shadow flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
           <CardTitle className="text-base lg:text-lg font-semibold text-foreground">
@@ -65,60 +65,66 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
           </Button>
         </Link>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="p-0 flex-1 overflow-hidden">
         <div className="divide-y divide-border">
-          {latestTransactions.map((transaction) => (
-            <div
-              key={transaction.id}
-              className={`flex items-center gap-3 lg:gap-4 px-4 lg:px-6 py-3 lg:py-4 hover:bg-accent/50 transition-colors ${
-                transaction.isPlanned ? "opacity-70" : ""
-              }`}
-            >
-              <div className="flex items-center justify-center w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-accent text-xl lg:text-2xl">
-                {transaction.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">
-                  {transaction.isCreditCardInvoice
-                    ? (() => {
-                        const invoiceKey =
-                          transaction.invoice?.paymentMethodKey ??
-                          transaction.paymentMethodKey;
+          {transactions.map((transaction) => {
+            const shouldPresentAsPlanned =
+              Boolean(transaction.isPlanned) && transaction.date > today;
 
-                        return invoiceKey
-                          ? `${t("transaction.creditCardInvoiceFor")} ${t(invoiceKey)}`
-                          : t("transaction.creditCardInvoice");
-                      })()
-                    : t(transaction.descriptionKey)}
-                </p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span
-                    className={cn(
-                      "text-[10px] lg:text-xs px-2 py-0.5 rounded-full font-medium capitalize",
-                      groupColors[transaction.group],
-                    )}
-                  >
-                    {t(`data.group.${transaction.group}`)}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {formatDate(transaction.date, {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </span>
-                </div>
-              </div>
-              <p
+            return (
+              <div
+                key={transaction.id}
                 className={cn(
-                  "text-sm lg:text-base font-semibold tabular-nums",
-                  amountColors[transaction.type],
+                  "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/50 lg:gap-4 lg:px-6 lg:py-4",
+                  shouldPresentAsPlanned && "opacity-70",
                 )}
               >
-                {transaction.amount > 0 ? "+" : ""}
-                {formatCurrency(Math.abs(transaction.amount))}
-              </p>
-            </div>
-          ))}
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-xl lg:h-12 lg:w-12 lg:text-2xl">
+                  {transaction.icon}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {transaction.isCreditCardInvoice
+                      ? (() => {
+                          const invoiceKey =
+                            transaction.invoice?.paymentMethodKey ??
+                            transaction.paymentMethodKey;
+
+                          return invoiceKey
+                            ? `${t("transaction.creditCardInvoiceFor")} ${t(invoiceKey)}`
+                            : t("transaction.creditCardInvoice");
+                        })()
+                      : t(transaction.descriptionKey)}
+                  </p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-medium capitalize lg:text-xs",
+                        groupColors[transaction.group],
+                      )}
+                    >
+                      {t(`data.group.${transaction.group}`)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatDate(transaction.date, {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                  </div>
+                </div>
+                <p
+                  className={cn(
+                    "text-sm font-semibold tabular-nums lg:text-base",
+                    amountColors[transaction.type],
+                  )}
+                >
+                  {transaction.amount > 0 ? "+" : ""}
+                  {formatCurrency(Math.abs(transaction.amount))}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </CardContent>
     </Card>

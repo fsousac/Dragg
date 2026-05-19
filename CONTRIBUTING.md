@@ -83,15 +83,19 @@ Accepted commit types:
 - Validate Server Action input at runtime before writing to Supabase.
 - Verify user ownership for any mutation that receives database IDs from the client.
 - Do not introduce service-role operations into client-rendered code.
+- Keep Supabase SSR clients in `lib/supabase/*` unless a new boundary is needed.
+- Keep finance reads and business logic in `lib/finance/*` instead of UI components.
 - Keep desktop dialogs, except the new transaction dialog, at the project standard of 50vw by 50vh.
 
 ## Supabase changes
 
 - Add SQL migrations under `supabase/migrations`.
 - Keep RLS policies aligned with authenticated user ownership.
+- Keep privileged helper functions in a private or otherwise unexposed schema.
 - Do not use `user_metadata` for authorization decisions.
 - Do not expose Supabase service-role credentials to the browser.
 - When transactions reference categories or payment methods, preserve same-user ownership guarantees.
+- Preserve LGPD/privacy workflow support when changing user-owned tables.
 
 ## Pull requests
 
@@ -143,4 +147,4 @@ v0.1.0-beta.1
 v1.0.0
 ```
 
-See `docs/release-process.md` for the release checklist.
+Use `CHANGELOG.md` as the release checklist source until a dedicated release-process document exists.
