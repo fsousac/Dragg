@@ -5,12 +5,13 @@ This document describes the current application-level security expectations. It 
 ## Authentication
 
 - Supabase Auth is the identity provider.
-- Public users authenticate with Google OAuth through Supabase.
-- The OAuth callback exchanges the code server-side and rejects unsafe redirect targets.
+- Public users authenticate with Google OAuth or email/password through Supabase.
+- The auth callback exchanges OAuth and email recovery codes server-side and rejects unsafe redirect targets.
 - `proxy.ts` refreshes Supabase session cookies through `@supabase/ssr`.
 - Server-rendered app pages verify claims and user data before rendering authenticated UI.
 - OAuth profile data is displayed as read-only account information.
 - `user_metadata` can be displayed, but must not be used for authorization decisions.
+- Email/password flows use Supabase Auth client methods and never use service-role credentials.
 
 ## Data access
 

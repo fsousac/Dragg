@@ -32,7 +32,7 @@ It is designed to be simple to self-host and inexpensive to operate, with Supaba
 
 ### 🔥 Features
 
-- Google OAuth authentication with Supabase Auth
+- Google OAuth and email/password authentication with Supabase Auth
 - User-owned finance data isolated via Supabase Row Level Security
 - Dashboard with monthly financial summary, planned expenses, and 50/30/20 split
 - Full transaction flow: create, list, update, and delete
@@ -55,6 +55,7 @@ Requirements:
 - pnpm 10.x through Corepack
 - Supabase project
 - Google OAuth provider configured in Supabase
+- Email provider enabled in Supabase Auth
 
 Clone and run locally:
 
@@ -87,6 +88,7 @@ If you are not using Supabase CLI, apply SQL files from `supabase/migrations` in
 ### 📖 Documentation
 
 - [Architecture](./docs/architecture.md)
+- [Authentication](./docs/auth.md)
 - [Database](./docs/database.md)
 - [Security Notes](./docs/security.md)
 - [Contributing Guide](./CONTRIBUTING.md)
@@ -136,8 +138,9 @@ Dragg is ready to deploy on Vercel.
 
 1. Import repository into Vercel.
 2. Configure the same environment variables used locally.
-3. Add production auth callback URL in Supabase:
+3. Add production auth callback URLs in Supabase:
    - `https://your-domain.com/auth/callback`
+   - `https://your-domain.com/auth/update-password`
 4. Apply migrations to the production Supabase project.
 5. Deploy.
 
