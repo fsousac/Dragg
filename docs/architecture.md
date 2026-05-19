@@ -4,7 +4,7 @@ Dragg is a Next.js App Router application backed by Supabase Auth and Supabase P
 
 ## Application flow
 
-- Public users land on `/` and sign in with Google OAuth through Supabase Auth.
+- Public users land on `/` and sign in with Google OAuth or email/password through Supabase Auth.
 - Supabase SSR clients live in `lib/supabase/server.ts`, `lib/supabase/client.ts`, and `lib/supabase/proxy.ts`.
 - `proxy.ts` refreshes Supabase session cookies for app requests.
 - Authenticated routes are wrapped by `AppShell`, which verifies Supabase claims and user data before rendering.
@@ -15,8 +15,9 @@ Dragg is a Next.js App Router application backed by Supabase Auth and Supabase P
 
 ## Routes
 
-- `/`: Google OAuth login screen. Authenticated users are redirected to `/dashboard`.
-- `/auth/callback`: Supabase OAuth code exchange with guarded same-origin redirect handling.
+- `/`: Google OAuth and email/password login screen. Authenticated users are redirected to `/dashboard`.
+- `/auth/callback`: Supabase OAuth and email recovery code exchange with guarded same-origin redirect handling.
+- `/auth/update-password`: password update screen for authenticated recovery sessions.
 - `/dashboard`: summary cards, transaction form, budget split, trends, latest transactions, and quick actions.
 - `/transactions`: transaction list with update/delete flows.
 - `/transactions/new`: focused new transaction flow.

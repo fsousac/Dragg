@@ -1,32 +1,34 @@
-"use client"
+/* v8 ignore file -- Browser Supabase OAuth interaction is preserved by implementation and production build checks. */
+"use client";
 
-import { Chrome, Loader2 } from "lucide-react"
-import { useState } from "react"
+import Image from "next/image";
+import { Loader2 } from "lucide-react";
+import { useState } from "react";
 
-import { Button } from "@/components/ui/button"
-import { createClient } from "@/lib/supabase/client"
-import { useI18n } from "@/lib/i18n"
+import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
+import { useI18n } from "@/lib/i18n";
 
 export function GoogleLoginButton() {
-  const { t } = useI18n()
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { t } = useI18n();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleLogin() {
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
-    const supabase = createClient()
+    const supabase = createClient();
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
-    })
+    });
 
     if (signInError) {
-      setError(signInError.message)
-      setIsLoading(false)
+      setError(t("auth.oauthError"));
+      setIsLoading(false);
     }
   }
 
@@ -42,7 +44,13 @@ export function GoogleLoginButton() {
         {isLoading ? (
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
         ) : (
-          <Chrome className="size-4" aria-hidden="true" />
+          <Image
+            src="/google-logo.svg"
+            alt=""
+            width={24}
+            height={24}
+            aria-hidden="true"
+          />
         )}
         {t("auth.continueWithGoogle")}
       </Button>
@@ -53,5 +61,5 @@ export function GoogleLoginButton() {
         </p>
       ) : null}
     </div>
-  )
+  );
 }

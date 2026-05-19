@@ -145,6 +145,8 @@ The table supports LGPD workflows for access, export, correction, deletion, cons
 - `private.validate_transaction_owner_refs()` prevents transactions from referencing categories or payment methods owned by another user.
 - `on_auth_user_created` runs after inserts on `auth.users`.
 
+Email/password signups and Google OAuth signups both insert users into `auth.users`, so both flows use the same `on_auth_user_created` onboarding trigger. Do not duplicate default profile, category, or payment-method setup in frontend code.
+
 ## Applying migrations
 
 Preferred:
