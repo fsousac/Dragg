@@ -208,6 +208,11 @@ export type SummaryData = {
   predictedExpenses: number;
   totalSaved: number;
   currentBalance: number;
+  trends: {
+    totalExpenses: number;
+    totalIncome: number;
+    totalSaved: number;
+  };
 };
 
 export type BudgetData = Record<
@@ -976,32 +981,6 @@ function getLastMonthKeys(month: string | undefined, count: number) {
   });
 }
 
-function getMonthlySavingsBalance(transactions: Transaction[]) {
-  const income = transactions
-    .filter((transaction) => transaction.type === "income")
-    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
-  const savings = transactions
-    .filter((transaction) => transaction.type === "saving")
-    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
-  const needsSpent = transactions
-    .filter(
-      (transaction) =>
-        transaction.type === "expense" && transaction.group === "needs",
-    )
-    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
-  const wantsSpent = transactions
-    .filter(
-      (transaction) =>
-        transaction.type === "expense" && transaction.group === "wants",
-    )
-    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
-  const excessExpenses =
-    Math.max(needsSpent - income * BUDGET_GROUP_RATIOS.needs, 0) +
-    Math.max(wantsSpent - income * BUDGET_GROUP_RATIOS.wants, 0);
-
-  return savings - excessExpenses;
-}
-
 function getMonthlyFinanceSummary(transactions: Transaction[]) {
   const income = transactions
     .filter((transaction) => transaction.type === "income")
@@ -1035,27 +1014,6 @@ function getMonthlyFinanceSummary(transactions: Transaction[]) {
     income,
     savings: grossSavings - excessExpenses,
   };
-}
-
-function getCumulativeSavingsBalance(
-  transactions: Transaction[],
-  month: string,
-) {
-  const months = [
-    ...new Set(
-      transactions
-        .map((transaction) => getFinancialMonth(transaction))
-        .filter((financialMonth) => financialMonth <= month),
-    ),
-  ];
-
-  return months.reduce((sum, financialMonth) => {
-    const monthlyTransactions = transactions.filter(
-      (transaction) => getFinancialMonth(transaction) === financialMonth,
-    );
-
-    return sum + getMonthlySavingsBalance(monthlyTransactions);
-  }, 0);
 }
 
 function getSafeReportPeriod(periodMonths?: number) {
@@ -2493,22 +2451,66 @@ export async function listTransactions(options?: {
   throw new Error(`Unable to load transactions: ${error.message}`);
 }
 
+async function getTotalSavedForMonth(
+  selectedMonth: string,
+  userContext: Awaited<ReturnType<typeof getUserContext>>,
+) {
+  const { data, error } = await userContext.supabase.rpc(
+    "calculate_total_saved",
+    {
+      p_selected_month: `${selectedMonth}-01`,
+    },
+  );
+
+  if (error) {
+    throw new Error(`Unable to calculate total saved: ${error.message}`);
+  }
+
+  return Number(data ?? 0);
+}
+
+function sumTransactionsByType(
+  transactions: Transaction[],
+  type: TransactionType,
+) {
+  return transactions
+    .filter((transaction) => transaction.type === type)
+    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+}
+
+function getPercentageChange(currentValue: number, previousValue: number) {
+  if (previousValue === 0) {
+    return currentValue === 0 ? 0 : 100;
+  }
+
+  return Number(
+    (((currentValue - previousValue) / Math.abs(previousValue)) * 100).toFixed(
+      1,
+    ),
+  );
+}
+
 export async function getDashboardData(
   month?: string,
   userContext?: Awaited<ReturnType<typeof getUserContext>>,
 ): Promise<DashboardData> {
   const selectedMonth = normalizeMonthValue(month);
+  const previousMonth = getPreviousMonthValue(selectedMonth);
   const monthBuckets = getLastSixMonthKeys(selectedMonth);
   const ctx = userContext ?? (await getUserContext());
   const [
     transactions,
+    previousTransactions,
     scheduledTransactions,
     trendTransactions,
     displayTransactions,
     displayScheduledTransactions,
+    totalSaved,
+    previousTotalSaved,
     { categories, paymentMethods },
   ] = await Promise.all([
     listTransactions({ month: selectedMonth, userContext: ctx }),
+    listTransactions({ month: previousMonth, userContext: ctx }),
     listTransactions({
       includeFuture: true,
       month: selectedMonth,
@@ -2530,14 +2532,10 @@ export async function getDashboardData(
       month: selectedMonth,
       userContext: ctx,
     }),
+    getTotalSavedForMonth(selectedMonth, ctx),
+    getTotalSavedForMonth(previousMonth, ctx),
     getTransactionFormOptions({ userContext: ctx }),
   ]);
-  const incomeTransactions = transactions.filter(
-    (transaction) => transaction.type === "income",
-  );
-  const expenseTransactions = transactions.filter(
-    (transaction) => transaction.type === "expense",
-  );
   const trendExpenseTransactions = trendTransactions.filter(
     (transaction) => transaction.type === "expense",
   );
@@ -2545,23 +2543,20 @@ export async function getDashboardData(
     (transaction) => transaction.type === "expense",
   );
 
-  const totalIncome = incomeTransactions.reduce(
-    (sum, transaction) => sum + Math.abs(transaction.amount),
-    0,
+  const totalIncome = sumTransactionsByType(transactions, "income");
+  const totalExpenses = sumTransactionsByType(transactions, "expense");
+  const previousTotalIncome = sumTransactionsByType(
+    previousTransactions,
+    "income",
   );
-  const totalExpenses = expenseTransactions.reduce(
-    (sum, transaction) => sum + Math.abs(transaction.amount),
-    0,
+  const previousTotalExpenses = sumTransactionsByType(
+    previousTransactions,
+    "expense",
   );
   const predictedExpenses = scheduledExpenseTransactions.reduce(
     (sum, transaction) => sum + Math.abs(transaction.amount),
     0,
   );
-  const totalSaved = getCumulativeSavingsBalance(
-    trendTransactions,
-    selectedMonth,
-  );
-
   const plannedUsageByGroup = sumBudgetUsageByGroup(scheduledTransactions);
   const budgetData = calculateBudgetData(totalIncome, plannedUsageByGroup);
 
@@ -2646,6 +2641,14 @@ export async function getDashboardData(
       totalExpenses,
       totalIncome,
       totalSaved,
+      trends: {
+        totalExpenses: getPercentageChange(
+          totalExpenses,
+          previousTotalExpenses,
+        ),
+        totalIncome: getPercentageChange(totalIncome, previousTotalIncome),
+        totalSaved: getPercentageChange(totalSaved, previousTotalSaved),
+      },
     },
   };
 }
