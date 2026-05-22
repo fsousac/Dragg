@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  type CreateInvoiceAdvancePaymentInput,
   type CreatePaymentMethodInput,
   type CreateSubscriptionInput,
   type PaymentInvoiceItem,
@@ -58,6 +59,9 @@ import { useI18n } from "@/lib/i18n";
 
 type PaymentsScreenProps = {
   categories: TransactionFormCategory[];
+  createInvoiceAdvancePaymentAction: (
+    data: CreateInvoiceAdvancePaymentInput,
+  ) => Promise<void>;
   createPaymentMethodAction: (data: CreatePaymentMethodInput) => Promise<void>;
   createSubscriptionAction: (data: CreateSubscriptionInput) => Promise<void>;
   deletePaymentMethodAction: (paymentMethodId: string) => Promise<void>;
@@ -114,6 +118,7 @@ function formatCurrencyInput(value: string) {
 
 export function PaymentsScreen({
   categories,
+  createInvoiceAdvancePaymentAction,
   createPaymentMethodAction,
   createSubscriptionAction,
   deletePaymentMethodAction,
@@ -168,6 +173,17 @@ export function PaymentsScreen({
     useState<SubscriptionOverviewItem | null>(null);
   const [selectedInvoice, setSelectedInvoice] =
     useState<PaymentInvoiceItem | null>(null);
+  const invoicePaymentMethodOptions = transactionPaymentMethods.filter(
+    (paymentMethod) => paymentMethod.type !== "credit",
+  );
+  const [invoicePaymentForm, setInvoicePaymentForm] = useState({
+    amount: "",
+    date: new Date().toISOString().slice(0, 10),
+    paymentMethod:
+      invoicePaymentMethodOptions[0]?.id ??
+      transactionPaymentMethods[0]?.id ??
+      "none",
+  });
   const today = new Date().toISOString().slice(0, 10);
   const dueThreshold = (() => {
     const threshold = new Date();
@@ -195,6 +211,59 @@ export function PaymentsScreen({
   };
 
   const shouldShowDueBadge = (dateValue: string) => dateValue > today;
+
+  const openInvoiceDialog = (invoice: PaymentInvoiceItem) => {
+    setSelectedInvoice(invoice);
+    setInvoicePaymentForm({
+      amount: "",
+      date: today,
+      paymentMethod:
+        invoicePaymentMethodOptions[0]?.id ??
+        transactionPaymentMethods[0]?.id ??
+        "none",
+    });
+  };
+
+  const handleCreateInvoiceAdvancePayment = () => {
+    if (!selectedInvoice) return;
+
+    const amount = parseCurrencyInput(invoicePaymentForm.amount);
+
+    if (amount <= 0) {
+      toast.error(t("payments.invoiceAdvanceAmountRequired"));
+      return;
+    }
+
+    if (amount > selectedInvoice.amount) {
+      toast.error(t("payments.invoiceAdvanceAmountTooHigh"));
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await createInvoiceAdvancePaymentAction({
+          amount,
+          date: invoicePaymentForm.date,
+          invoiceId: selectedInvoice.id,
+          paymentMethod: invoicePaymentForm.paymentMethod,
+        });
+        toast.success(t("payments.invoiceAdvanceSuccess"));
+        setSelectedInvoice(null);
+        setInvoicePaymentForm({
+          amount: "",
+          date: today,
+          paymentMethod:
+            invoicePaymentMethodOptions[0]?.id ??
+            transactionPaymentMethods[0]?.id ??
+            "none",
+        });
+        router.refresh();
+      } catch (error) {
+        console.error("Error creating invoice advance payment:", error);
+        toast.error(t("payments.invoiceAdvanceError"));
+      }
+    });
+  };
 
   const getSubscriptionStatus = (subscription: SubscriptionOverviewItem) => {
     if (subscription.status === "paused") return "paused" as const;
@@ -496,7 +565,7 @@ export function PaymentsScreen({
                       key={invoice.id}
                       type="button"
                       className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left text-foreground transition-colors hover:bg-accent/50"
-                      onClick={() => setSelectedInvoice(invoice)}
+                      onClick={() => openInvoiceDialog(invoice)}
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted/40 text-foreground">
@@ -885,6 +954,35 @@ export function PaymentsScreen({
                 </div>
               </div>
 
+              {selectedInvoice.paidAmount > 0 ? (
+                <div className="grid gap-3 rounded-lg border border-border bg-muted/20 p-4 sm:grid-cols-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      {t("payments.invoiceTotal")}
+                    </p>
+                    <p className="mt-1 text-sm font-medium">
+                      {formatCurrency(selectedInvoice.totalAmount)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      {t("payments.invoicePaid")}
+                    </p>
+                    <p className="mt-1 text-sm font-medium">
+                      {formatCurrency(selectedInvoice.paidAmount)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      {t("payments.invoiceRemaining")}
+                    </p>
+                    <p className="mt-1 text-sm font-medium">
+                      {formatCurrency(selectedInvoice.amount)}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="overflow-hidden rounded-lg border border-border">
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-border bg-muted/30 px-4 py-3 text-sm font-medium">
                   <span>{t("transaction.invoicePurchases")}</span>
@@ -924,8 +1022,108 @@ export function PaymentsScreen({
                   ))}
                 </div>
               </div>
+
+              <div className="grid gap-3 rounded-lg border border-border bg-muted/20 p-4">
+                <div>
+                  <p className="text-sm font-medium">
+                    {t("payments.invoiceAdvanceTitle")}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t("payments.invoiceAdvanceDescription")}
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                  <div className="grid gap-2">
+                    <Label htmlFor="invoice-advance-amount">
+                      {t("payments.details.amount")}
+                    </Label>
+                    <Input
+                      id="invoice-advance-amount"
+                      inputMode="decimal"
+                      value={invoicePaymentForm.amount}
+                      onBlur={() =>
+                        setInvoicePaymentForm((current) => ({
+                          ...current,
+                          amount: formatCurrencyInput(current.amount),
+                        }))
+                      }
+                      onChange={(event) =>
+                        setInvoicePaymentForm((current) => ({
+                          ...current,
+                          amount: sanitizeCurrencyInput(event.target.value),
+                        }))
+                      }
+                      placeholder="0,00"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>{t("payments.details.paymentMethod")}</Label>
+                    <Select
+                      value={invoicePaymentForm.paymentMethod}
+                      onValueChange={(value) =>
+                        setInvoicePaymentForm((current) => ({
+                          ...current,
+                          paymentMethod: value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(invoicePaymentMethodOptions.length
+                          ? invoicePaymentMethodOptions
+                          : transactionPaymentMethods
+                        ).map((paymentMethod) => (
+                          <SelectItem
+                            key={paymentMethod.id}
+                            value={paymentMethod.id}
+                          >
+                            {t(paymentMethod.label)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="invoice-advance-date">
+                      {t("payments.details.transactionDate")}
+                    </Label>
+                    <Input
+                      id="invoice-advance-date"
+                      type="date"
+                      value={invoicePaymentForm.date}
+                      onChange={(event) =>
+                        setInvoicePaymentForm((current) => ({
+                          ...current,
+                          date: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           ) : null}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSelectedInvoice(null)}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="button"
+              disabled={isPending}
+              onClick={handleCreateInvoiceAdvancePayment}
+            >
+              {isPending
+                ? t("payments.invoiceAdvanceSaving")
+                : t("payments.invoiceAdvanceConfirm")}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

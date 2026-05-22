@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import {
   createCategory,
+  createInvoiceAdvancePayment,
   createPaymentMethod,
   createSubscription,
   createTransaction,
@@ -14,6 +15,7 @@ import {
   deleteTransaction,
   setSubscriptionPaused,
   type CreateCategoryInput,
+  type CreateInvoiceAdvancePaymentInput,
   type CreatePaymentMethodInput,
   type CreateSubscriptionInput,
   type NewTransactionInput,
@@ -117,6 +119,21 @@ const createPaymentMethodActionSchema = updatePaymentMethodActionSchema
   .omit({ id: true })
   .strict();
 
+const createInvoiceAdvancePaymentActionSchema = z
+  .object({
+    amount: z.number().finite().positive().max(1_000_000_000),
+    date: dateSchema,
+    invoiceId: z
+      .string()
+      .trim()
+      .regex(
+        /^credit-card-invoice:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:\d{4}-\d{2}$/i,
+        "Invalid invoice",
+      ),
+    paymentMethod: z.string().trim().min(0).max(64),
+  })
+  .strict();
+
 const updateTransactionActionSchema = z
   .object({
     amount: z.number().finite().positive().max(1_000_000_000),
@@ -175,6 +192,21 @@ export async function createTransactionAction(data: NewTransactionInput) {
   revalidatePath("/dashboard");
   revalidatePath("/transactions");
   revalidatePath("/transactions/new");
+}
+
+export async function createInvoiceAdvancePaymentAction(
+  data: CreateInvoiceAdvancePaymentInput,
+) {
+  const parsed = createInvoiceAdvancePaymentActionSchema.parse(data);
+
+  await createInvoiceAdvancePayment({
+    ...parsed,
+    paymentMethod: parsed.paymentMethod || "none",
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/payments");
+  revalidatePath("/transactions");
 }
 
 export async function createSubscriptionAction(data: CreateSubscriptionInput) {

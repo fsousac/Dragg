@@ -34,7 +34,9 @@ export type CreditCardInvoicePurchase = {
 export type CreditCardInvoiceDetails = {
   closingDate: string;
   dueDate: string;
+  paidAmount: number;
   paymentMethodKey: string;
   purchases: CreditCardInvoicePurchase[];
+  totalAmount: number;
   startsAt: string;
 };

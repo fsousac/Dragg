@@ -2,6 +2,7 @@ import { AppShell } from "@/components/dashboard/app-shell";
 import { PaymentsScreen } from "@/components/dashboard/payments-screen";
 import {
   createPaymentMethodAction,
+  createInvoiceAdvancePaymentAction,
   createSubscriptionAction,
   deletePaymentMethodAction,
   deleteSubscriptionAction,
@@ -56,6 +57,7 @@ export default async function PaymentsPage({
     <AppShell>
       <PaymentsScreen
         categories={transactionFormOptions.categories}
+        createInvoiceAdvancePaymentAction={createInvoiceAdvancePaymentAction}
         createPaymentMethodAction={createPaymentMethodAction}
         createSubscriptionAction={createSubscriptionAction}
         deletePaymentMethodAction={deletePaymentMethodAction}

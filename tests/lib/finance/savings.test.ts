@@ -43,7 +43,7 @@ describe("calculateTotalSaved", () => {
     expect(result.totalSaved).toBe(591.01);
   });
 
-  it("sums only positive leftovers from closed months", () => {
+  it("sums closed month balances, including deficits", () => {
     const result = calculateTotalSaved({
       selectedMonth: "2026-05",
       transactions: [
@@ -54,7 +54,7 @@ describe("calculateTotalSaved", () => {
       ],
     });
 
-    expect(result.totalClosedMonthLeftover).toBe(800);
+    expect(result.totalClosedMonthLeftover).toBe(700);
     expect(result.closedMonths).toEqual([
       {
         contributedLeftover: 800,
@@ -65,7 +65,7 @@ describe("calculateTotalSaved", () => {
         savings: 0,
       },
       {
-        contributedLeftover: 0,
+        contributedLeftover: -100,
         expenses: 2600,
         finalBalance: -100,
         income: 2500,
@@ -106,7 +106,7 @@ describe("calculateTotalSaved", () => {
     expect(result.totalSaved).toBe(1791.01);
   });
 
-  it("does not let a current month with high spending reduce accumulated total", () => {
+  it("debits a current month deficit from accumulated savings", () => {
     const result = calculateTotalSaved({
       selectedMonth: "2026-05",
       transactions: [
@@ -120,7 +120,7 @@ describe("calculateTotalSaved", () => {
 
     expect(result.totalInvested).toBe(500);
     expect(result.totalClosedMonthLeftover).toBe(500);
-    expect(result.totalSaved).toBe(1000);
+    expect(result.totalSaved).toBe(0);
   });
 
   it("subtracts saving transactions from leftover to avoid double-counting", () => {
@@ -141,7 +141,7 @@ describe("calculateTotalSaved", () => {
     expect(result.totalSaved).toBe(1000);
   });
 
-  it("contributes zero leftover for a closed month with negative final balance", () => {
+  it("debits a closed month deficit from accumulated savings", () => {
     const result = calculateTotalSaved({
       selectedMonth: "2026-05",
       transactions: [
@@ -151,10 +151,11 @@ describe("calculateTotalSaved", () => {
     });
 
     expect(result.closedMonths[0]).toMatchObject({
-      contributedLeftover: 0,
+      contributedLeftover: -300,
       finalBalance: -300,
     });
-    expect(result.totalSaved).toBe(0);
+    expect(result.totalClosedMonthLeftover).toBe(-300);
+    expect(result.totalSaved).toBe(-300);
   });
 
   it("handles months with no transactions", () => {
@@ -184,7 +185,7 @@ describe("calculateTotalSaved", () => {
         savings: 0,
       },
       {
-        contributedLeftover: 0,
+        contributedLeftover: -700,
         expenses: 700,
         finalBalance: -700,
         income: 0,
@@ -234,7 +235,7 @@ describe("calculateTotalSaved", () => {
       "2025-12",
       "2026-01",
     ]);
-    expect(result.totalClosedMonthLeftover).toBe(1000);
+    expect(result.totalClosedMonthLeftover).toBe(600);
   });
 
   it("accumulates multiple closed months iteratively", () => {
@@ -253,8 +254,8 @@ describe("calculateTotalSaved", () => {
     });
 
     expect(result.totalInvested).toBe(150);
-    expect(result.totalClosedMonthLeftover).toBe(700);
-    expect(result.totalSaved).toBe(850);
+    expect(result.totalClosedMonthLeftover).toBe(400);
+    expect(result.totalSaved).toBe(550);
     expect(result.closedMonths.map((month) => month.month)).toEqual([
       "2026-02",
       "2026-03",

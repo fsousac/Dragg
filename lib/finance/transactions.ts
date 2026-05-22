@@ -18,7 +18,11 @@ import {
   buildExpensesByCategoryData,
   type ExpensesByCategoryItem,
 } from "@/lib/finance/category-aggregation";
-import { createCreditCardInvoiceTransactions } from "@/lib/finance/credit-card-invoices";
+import {
+  getInvoiceAdvancePaymentInvoiceId,
+  getInvoiceAdvancePaymentNote,
+  withCreditCardInvoiceTransactions,
+} from "@/lib/finance/credit-card-invoices";
 import {
   getPaymentMethodDetail,
   type PaymentMethodDetail,
@@ -182,6 +186,13 @@ export type CreatePaymentMethodInput = {
   type: UpdatePaymentMethodInput["type"];
 };
 
+export type CreateInvoiceAdvancePaymentInput = {
+  amount: number;
+  date: string;
+  invoiceId: string;
+  paymentMethod: string;
+};
+
 export type UpdateTransactionInput = {
   id: string;
   type: TransactionType;
@@ -284,9 +295,11 @@ export type PaymentInvoiceItem = {
   dueDate: string;
   id: string;
   invoice: CreditCardInvoiceDetails;
+  paidAmount: number;
   paymentMethodKey: string;
   purchaseCount: number;
   status: PaymentsDueStatus;
+  totalAmount: number;
 };
 
 export type PaymentBillItem = {
@@ -817,54 +830,6 @@ function markPlannedTransactions(transactions: Transaction[]) {
   );
 }
 
-function withCreditCardInvoiceTransactions(
-  sourceTransactions: Transaction[],
-  visibleTransactions: Transaction[],
-  month: string,
-) {
-  const creditPaymentMethods = new Map<
-    string,
-    {
-      closingDay: number | null;
-      dueDay: number | null;
-      id: string;
-      labelKey: string;
-    }
-  >();
-
-  for (const transaction of sourceTransactions) {
-    if (
-      transaction.paymentMethodId &&
-      transaction.paymentMethodKey &&
-      transaction.paymentMethodType === "credit"
-    ) {
-      creditPaymentMethods.set(transaction.paymentMethodId, {
-        closingDay: transaction.paymentMethodClosingDay ?? null,
-        dueDay: transaction.paymentMethodDueDay ?? null,
-        id: transaction.paymentMethodId,
-        labelKey: transaction.paymentMethodKey,
-      });
-    }
-  }
-
-  const { invoices, purchaseIds } = createCreditCardInvoiceTransactions({
-    month,
-    paymentMethods: [...creditPaymentMethods.values()],
-    transactions: sourceTransactions,
-  });
-
-  if (!invoices.length) {
-    return visibleTransactions;
-  }
-
-  return [
-    ...visibleTransactions.filter(
-      (transaction) => !purchaseIds.has(transaction.id),
-    ),
-    ...invoices,
-  ];
-}
-
 function toTransaction(row: TransactionRow): Transaction {
   const amount = Number(row.amount);
   const group =
@@ -1332,9 +1297,11 @@ export async function getPaymentsDueData(
         dueDate: invoice.dueDate,
         id: transaction.id,
         invoice,
+        paidAmount: invoice.paidAmount,
         paymentMethodKey: invoice.paymentMethodKey,
         purchaseCount: invoice.purchases.length,
         status: getPaymentsDueStatus(invoice.dueDate, today),
+        totalAmount: invoice.totalAmount,
       };
     })
     .sort((left, right) => left.dueDate.localeCompare(right.dueDate));
@@ -1393,6 +1360,7 @@ export async function getPaymentsDueData(
       (transaction) =>
         transaction.type === "expense" &&
         !transaction.isCreditCardInvoice &&
+        !getInvoiceAdvancePaymentInvoiceId(transaction) &&
         !transaction.notes?.startsWith("subscription") &&
         (transaction.paymentMethodType === "boleto" ||
           transaction.paymentMethodType === "bank"),
@@ -1684,6 +1652,97 @@ export async function createTransaction(input: NewTransactionInput) {
 
   if (error) {
     throw new Error(`Unable to save transaction: ${error.message}`);
+  }
+}
+
+function parseCreditCardInvoiceId(invoiceId: string) {
+  const match = invoiceId.match(
+    /^credit-card-invoice:([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}):(\d{4}-\d{2})$/i,
+  );
+
+  if (!match) {
+    throw new Error("Invoice is invalid.");
+  }
+
+  return {
+    month: match[2],
+    paymentMethodId: match[1],
+  };
+}
+
+export async function createInvoiceAdvancePayment(
+  input: CreateInvoiceAdvancePaymentInput,
+) {
+  const ctx = await getUserContext();
+  const { createdAt, supabase, userId } = ctx;
+  const amount = Math.abs(input.amount);
+  assertPositiveFiniteAmount(amount, "Amount");
+
+  const date = toIsoDate(input.date);
+  assertValidIsoDate(date);
+  assertDateNotBeforeUserCreated(date, createdAt);
+
+  const { month, paymentMethodId: invoicePaymentMethodId } =
+    parseCreditCardInvoiceId(input.invoiceId);
+  const paymentMethodId = normalizeNullableId(
+    input.paymentMethod,
+    "Payment method",
+  );
+
+  const [{ data: invoicePaymentMethod, error: invoicePaymentMethodError }] =
+    await Promise.all([
+      supabase
+        .from("payment_methods")
+        .select("id, type")
+        .eq("id", invoicePaymentMethodId)
+        .eq("user_id", userId)
+        .maybeSingle(),
+      assertUserPaymentMethod(supabase, userId, paymentMethodId),
+    ]);
+
+  if (invoicePaymentMethodError) {
+    throw new Error(
+      `Unable to validate invoice: ${invoicePaymentMethodError.message}`,
+    );
+  }
+
+  if (!invoicePaymentMethod || invoicePaymentMethod.type !== "credit") {
+    throw new Error("Invoice is invalid.");
+  }
+
+  const invoices = await listTransactions({
+    includeCreditCardInvoices: true,
+    includeFuture: true,
+    month,
+    useFinancialMonth: false,
+    userContext: ctx,
+  });
+  const invoice = invoices.find(
+    (transaction) =>
+      transaction.isCreditCardInvoice && transaction.id === input.invoiceId,
+  );
+
+  if (!invoice) {
+    throw new Error("Invoice is already paid or unavailable.");
+  }
+
+  if (amount > Math.abs(invoice.amount)) {
+    throw new Error("Advance payment cannot exceed the remaining invoice.");
+  }
+
+  const { error } = await supabase.from("transactions").insert({
+    amount,
+    category_id: null,
+    date,
+    description: "transaction.invoiceAdvancePayment",
+    kind: "expense" satisfies DbTransactionKind,
+    notes: getInvoiceAdvancePaymentNote(input.invoiceId),
+    payment_method_id: paymentMethodId,
+    user_id: userId,
+  });
+
+  if (error) {
+    throw new Error(`Unable to save invoice advance payment: ${error.message}`);
   }
 }
 
@@ -2332,6 +2391,7 @@ export async function deleteTransaction(transactionId: string) {
 
 export async function listTransactions(options?: {
   includeCreditCardInvoices?: boolean;
+  preserveCreditCardInvoicePurchases?: boolean;
   includePrevious?: boolean;
   includeFuture?: boolean;
   month?: string;
@@ -2393,11 +2453,13 @@ export async function listTransactions(options?: {
       : transactions;
     const resultTransactions =
       includeCreditCardInvoices && monthRange
-        ? withCreditCardInvoiceTransactions(
-            transactions,
-            filteredTransactions,
-            monthRange.month,
-          )
+        ? withCreditCardInvoiceTransactions({
+            month: monthRange.month,
+            preservePurchases:
+              options?.preserveCreditCardInvoicePurchases ?? false,
+            sourceTransactions: transactions,
+            visibleTransactions: filteredTransactions,
+          })
         : filteredTransactions;
 
     return includeFuture
@@ -2436,11 +2498,13 @@ export async function listTransactions(options?: {
       : transactions;
     const resultTransactions =
       includeCreditCardInvoices && monthRange
-        ? withCreditCardInvoiceTransactions(
-            transactions,
-            filteredTransactions,
-            monthRange.month,
-          )
+        ? withCreditCardInvoiceTransactions({
+            month: monthRange.month,
+            preservePurchases:
+              options?.preserveCreditCardInvoicePurchases ?? false,
+            sourceTransactions: transactions,
+            visibleTransactions: filteredTransactions,
+          })
         : filteredTransactions;
 
     return includeFuture

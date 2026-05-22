@@ -35,6 +35,7 @@ export default async function TransactionsPage({
       includePrevious: showPrevious,
       includeFuture: true,
       month: selectedMonth,
+      preserveCreditCardInvoicePurchases: true,
       useFinancialMonth: false,
     }),
     getTransactionFormOptions(),
