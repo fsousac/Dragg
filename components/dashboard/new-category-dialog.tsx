@@ -6,6 +6,7 @@ import { Plus, Tag } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { CurrencyInput } from "@/components/dashboard/form-inputs/currency-input";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -66,30 +67,6 @@ const emojiOptions = [
   { emoji: "🏷️", label: "Outros" },
 ];
 
-function sanitizeCurrencyInput(value: string) {
-  const normalizedSeparator = value.replace(/\./g, ",");
-  const sanitizedValue = normalizedSeparator.replace(/[^\d,]/g, "");
-  const [integerPart, ...decimalParts] = sanitizedValue.split(",");
-
-  if (decimalParts.length === 0) {
-    return integerPart;
-  }
-
-  return `${integerPart},${decimalParts.join("")}`;
-}
-
-function parseCurrencyInput(value: string) {
-  return Number(value.replace(",", ".")) || 0;
-}
-
-function formatCurrencyInput(value: string) {
-  if (!value) {
-    return "";
-  }
-
-  return parseCurrencyInput(value).toFixed(2).replace(".", ",");
-}
-
 export function NewCategoryDialog({
   category,
   children,
@@ -106,7 +83,7 @@ export function NewCategoryDialog({
   const [icon, setIcon] = useState("🏷️");
   const [name, setName] = useState("");
   const [group, setGroup] = useState<CategoryGroup>("needs");
-  const [monthlyLimit, setMonthlyLimit] = useState("");
+  const [monthlyLimit, setMonthlyLimit] = useState(0);
   const isEditing = Boolean(category);
 
   const open = controlledOpen ?? internalOpen;
@@ -119,11 +96,7 @@ export function NewCategoryDialog({
     setIcon(category?.icon ?? "🏷️");
     setName(category?.showName === false ? "" : (category?.name ?? ""));
     setGroup(category?.group ?? "needs");
-    setMonthlyLimit(
-      category?.monthlyLimit
-        ? String(category.monthlyLimit).replace(".", ",")
-        : "",
-    );
+    setMonthlyLimit(category?.monthlyLimit ?? 0);
   };
 
   useEffect(() => {
@@ -131,11 +104,7 @@ export function NewCategoryDialog({
       setIcon(category?.icon ?? "🏷️");
       setName(category?.showName === false ? "" : (category?.name ?? ""));
       setGroup(category?.group ?? "needs");
-      setMonthlyLimit(
-        category?.monthlyLimit
-          ? String(category.monthlyLimit).replace(".", ",")
-          : "",
-      );
+      setMonthlyLimit(category?.monthlyLimit ?? 0);
     }
   }, [open, category]);
 
@@ -154,7 +123,7 @@ export function NewCategoryDialog({
       const payload = {
         group,
         icon,
-        monthlyLimit: parseCurrencyInput(monthlyLimit),
+        monthlyLimit,
         name: submittedName,
       };
 
@@ -259,23 +228,12 @@ export function NewCategoryDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category-limit">
-                {t("category.monthlyLimit")}
-              </Label>
-              <Input
+              <CurrencyInput
                 id="category-limit"
-                inputMode="decimal"
-                pattern="[0-9]*[,.]?[0-9]*"
-                placeholder="0,00"
+                label={t("category.monthlyLimit")}
                 value={monthlyLimit}
-                onChange={(event) =>
-                  setMonthlyLimit(sanitizeCurrencyInput(event.target.value))
-                }
-                onBlur={() =>
-                  setMonthlyLimit((currentValue) =>
-                    formatCurrencyInput(currentValue),
-                  )
-                }
+                onValueChange={setMonthlyLimit}
+                labelClassName="normal-case tracking-normal text-foreground"
               />
             </div>
           </div>

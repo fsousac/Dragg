@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { withSelectedMonth } from "@/components/dashboard/month-route";
 import { type TransactionFormData } from "@/components/dashboard/transaction-form";
+import { CurrencyInput } from "@/components/dashboard/form-inputs/currency-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,7 +64,7 @@ import { TransactionForm } from "./transaction-form";
 type SortOption = "date-desc" | "date-asc" | "amount-desc" | "amount-asc";
 
 type EditableTransaction = {
-  amount: string;
+  amount: number;
   category: string;
   date: string;
   description: string;
@@ -89,7 +90,7 @@ function getInitialFormState(
   incomeCategoryId: string,
 ): EditableTransaction {
   return {
-    amount: Math.abs(transaction.amount).toFixed(2),
+    amount: Math.abs(transaction.amount),
     category:
       transaction.type === "income"
         ? incomeCategoryId
@@ -100,20 +101,6 @@ function getInitialFormState(
     paymentMethod: transaction.paymentMethodId ?? "none",
     type: transaction.type,
   };
-}
-
-function parseAmountInput(value: string) {
-  return Number(value.replace(",", ".")) || 0;
-}
-
-function sanitizeAmountInput(value: string) {
-  const normalizedSeparator = value.replace(/\./g, ",");
-  const sanitizedValue = normalizedSeparator.replace(/[^\d,]/g, "");
-  const [integerPart, ...decimalParts] = sanitizedValue.split(",");
-
-  return decimalParts.length
-    ? `${integerPart},${decimalParts.join("")}`
-    : integerPart;
 }
 
 export function TransactionsScreen({
@@ -279,7 +266,7 @@ export function TransactionsScreen({
     startTransition(async () => {
       try {
         await updateTransactionAction({
-          amount: parseAmountInput(formData.amount),
+          amount: formData.amount,
           category: formData.category,
           date: formData.date,
           description: formData.description,
@@ -679,19 +666,17 @@ export function TransactionsScreen({
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="transaction-amount">
-                    {t("transaction.amount")}
-                  </Label>
-                  <Input
+                  <CurrencyInput
                     id="transaction-amount"
-                    inputMode="decimal"
+                    label={t("transaction.amount")}
                     value={formData.amount}
-                    onChange={(event) =>
+                    onValueChange={(amount) =>
                       setFormData({
                         ...formData,
-                        amount: sanitizeAmountInput(event.target.value),
+                        amount,
                       })
                     }
+                    labelClassName="normal-case tracking-normal text-foreground"
                   />
                 </div>
               </div>
@@ -724,6 +709,7 @@ export function TransactionsScreen({
                     onChange={(event) =>
                       setFormData({ ...formData, date: event.target.value })
                     }
+                    className="w-full max-w-full min-w-0 appearance-none overflow-hidden pr-3 text-left [&::-webkit-calendar-picker-indicator]:shrink-0 [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:overflow-hidden [&::-webkit-date-and-time-value]:text-left"
                   />
                 </div>
                 <div className="space-y-2">

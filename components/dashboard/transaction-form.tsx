@@ -17,6 +17,7 @@ import { NewCategoryDialog } from "@/components/dashboard/new-category-dialog";
 import { CompactInput } from "@/components/dashboard/form-inputs/compact-input";
 import { CompactSelect } from "@/components/dashboard/form-inputs/compact-select";
 import { CompactTextarea } from "@/components/dashboard/form-inputs/compact-textarea";
+import { CurrencyInput } from "@/components/dashboard/form-inputs/currency-input";
 import { withSelectedMonth } from "@/components/dashboard/month-route";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -62,7 +63,6 @@ export function TransactionForm({
   const today = format(new Date(), "dd/MM/yyyy");
   const todayDateInputValue = format(new Date(), "yyyy-MM-dd");
 
-  const [amountInputValue, setAmountInputValue] = useState("");
   const [errors, setErrors] = useState<
     Partial<Record<keyof TransactionFormData, string>>
   >({});
@@ -166,25 +166,6 @@ export function TransactionForm({
     return isValid(parsedDate) ? format(parsedDate, "dd/MM/yyyy") : "";
   };
 
-  const sanitizeAmountInput = (value: string) => {
-    const normalizedSeparator = value.replace(/\./g, ",");
-    const sanitizedValue = normalizedSeparator.replace(/[^\d,]/g, "");
-    const [integerPart, ...decimalParts] = sanitizedValue.split(",");
-    const decimalPart = decimalParts.join("");
-
-    if (decimalParts.length === 0) {
-      return integerPart;
-    }
-
-    return `${integerPart},${decimalPart}`;
-  };
-
-  const parseAmountInput = (value: string) =>
-    Number(value.replace(",", ".")) || 0;
-
-  const formatAmountInput = (value: number) =>
-    value.toFixed(2).replace(".", ",");
-
   const validateForm = () => {
     const newErrors: typeof errors = {};
     const parsedDate = parseDateValue(formData.date);
@@ -217,7 +198,6 @@ export function TransactionForm({
       description: "",
       notes: "",
     });
-    setAmountInputValue("");
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -239,10 +219,11 @@ export function TransactionForm({
   };
 
   const paymentMethodOptions = useMemo(
-    () => paymentMethods.map((paymentMethod) => ({
-      value: paymentMethod.id,
-      label: t(paymentMethod.label),
-    })),
+    () =>
+      paymentMethods.map((paymentMethod) => ({
+        value: paymentMethod.id,
+        label: t(paymentMethod.label),
+      })),
     [paymentMethods, t],
   );
 
@@ -341,30 +322,19 @@ export function TransactionForm({
             </div>
           </div>
 
-          <CompactInput
+          <CurrencyInput
             label={t("transaction.amount")}
             id="amount"
-            type="text"
-            inputMode="decimal"
-            pattern="[0-9]*[,.]?[0-9]*"
-            placeholder="0,00"
-            value={amountInputValue}
-            onChange={(event) => {
-              const nextAmountInputValue = sanitizeAmountInput(
-                event.target.value,
-              );
-              setAmountInputValue(nextAmountInputValue);
+            value={formData.amount}
+            onValueChange={(amount) =>
               setFormData({
                 ...formData,
-                amount: parseAmountInput(nextAmountInputValue),
-              });
-            }}
-            onBlur={() => {
-              if (!amountInputValue) return;
-              setAmountInputValue(formatAmountInput(formData.amount));
-            }}
+                amount,
+              })
+            }
             icon={<DollarSign className="w-4 h-4" />}
             error={errors.amount}
+            inputClassName="rounded-lg border-border/60"
           />
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-4 lg:gap-4">
@@ -479,7 +449,7 @@ export function TransactionForm({
                 }
                 icon={<Calendar className="w-4 h-4" />}
                 error={errors.date}
-                inputClassName="max-w-full min-w-0 appearance-none overflow-hidden pr-3 [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left"
+                inputClassName="w-full max-w-full min-w-0 appearance-none overflow-hidden pr-3 text-left [&::-webkit-calendar-picker-indicator]:shrink-0 [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:overflow-hidden [&::-webkit-date-and-time-value]:text-left"
               />
             </div>
 

@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { CurrencyInput } from "@/components/dashboard/form-inputs/currency-input";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -52,7 +53,7 @@ export function NewPaymentMethodDialog({
   const [name, setName] = useState("");
   const [type, setType] = useState<CreatePaymentMethodInput["type"]>("debit");
   const [closingDay, setClosingDay] = useState("");
-  const [creditLimit, setCreditLimit] = useState("");
+  const [creditLimit, setCreditLimit] = useState(0);
   const [dueDay, setDueDay] = useState("");
   const open = controlledOpen ?? internalOpen;
   const setOpen = (nextOpen: boolean) => {
@@ -65,26 +66,10 @@ export function NewPaymentMethodDialog({
       setName("");
       setType("debit");
       setClosingDay("");
-      setCreditLimit("");
+      setCreditLimit(0);
       setDueDay("");
     }
   }, [open]);
-
-  function sanitizeCurrencyInput(value: string) {
-    const normalizedSeparator = value.replace(/\./g, ",");
-    const sanitizedValue = normalizedSeparator.replace(/[^\d,]/g, "");
-    const [integerPart, ...decimalParts] = sanitizedValue.split(",");
-
-    if (decimalParts.length === 0) {
-      return integerPart;
-    }
-
-    return `${integerPart},${decimalParts.join("")}`;
-  }
-
-  function parseCurrencyInput(value: string) {
-    return Number(value.replace(",", ".")) || 0;
-  }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -100,8 +85,7 @@ export function NewPaymentMethodDialog({
       await createPaymentMethodAction({
         name: submittedName,
         type: type,
-        creditLimit:
-          type === "credit" ? parseCurrencyInput(creditLimit) : undefined,
+        creditLimit: type === "credit" ? creditLimit : undefined,
         closingDay:
           type === "credit" && closingDay ? Number(closingDay) : undefined,
         dueDay: type === "credit" && dueDay ? Number(dueDay) : undefined,
@@ -166,18 +150,12 @@ export function NewPaymentMethodDialog({
           {type === "credit" ? (
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="credit-limit">
-                  {t("paymentMethod.creditLimit")}
-                </Label>
-                <Input
+                <CurrencyInput
                   id="credit-limit"
-                  inputMode="decimal"
-                  pattern="[0-9]*[,.]?[0-9]*"
-                  placeholder="0,00"
+                  label={t("paymentMethod.creditLimit")}
                   value={creditLimit}
-                  onChange={(e) =>
-                    setCreditLimit(sanitizeCurrencyInput(e.target.value))
-                  }
+                  onValueChange={setCreditLimit}
+                  labelClassName="normal-case tracking-normal text-foreground"
                 />
               </div>
               <div className="space-y-2">

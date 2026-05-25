@@ -1,7 +1,7 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
-import { type SupabaseClient } from "@supabase/supabase-js";
+import { type SupabaseClient, type User } from "@supabase/supabase-js";
 
 import {
   type CreditCardInvoiceDetails,
@@ -31,6 +31,19 @@ import { createClient } from "@/lib/supabase/server";
 
 export { buildExpensesByCategoryData };
 export type { ExpensesByCategoryItem };
+
+export type AuthenticatedUserClaims = {
+  email?: string;
+  sub: string;
+} & Record<string, unknown>;
+
+export type AuthenticatedUserContext = {
+  claims: AuthenticatedUserClaims;
+  createdAt: string | null;
+  supabase: SupabaseClient;
+  user: User;
+  userId: string;
+};
 
 type DbCategoryGroup = Exclude<TransactionGroup, "income">;
 type DbTransactionKind = TransactionType;
@@ -623,7 +636,7 @@ function toPaymentMethodLabelKey(
 
 export async function getUserContext(
   supabaseClient?: SupabaseClient | Promise<SupabaseClient>,
-) {
+): Promise<AuthenticatedUserContext> {
   const supabase = supabaseClient
     ? await (supabaseClient as Promise<SupabaseClient>)
     : await createClient();
@@ -632,14 +645,19 @@ export async function getUserContext(
     supabase.auth.getUser(),
   ]);
 
-  if (!claimsData?.claims?.sub) {
+  const claims = claimsData?.claims as AuthenticatedUserClaims | undefined;
+  const user = userData.user;
+
+  if (!claims?.sub || !user) {
     redirect("/");
   }
 
   return {
-    createdAt: userData.user?.created_at ?? null,
+    claims,
+    createdAt: user.created_at ?? null,
     supabase,
-    userId: claimsData.claims.sub,
+    user,
+    userId: claims.sub,
   };
 }
 
