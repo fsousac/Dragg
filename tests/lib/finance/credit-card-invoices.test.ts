@@ -222,6 +222,45 @@ describe("credit card invoices", () => {
     ]);
   });
 
+  it("returns visible transactions unchanged when there are no invoice rows", () => {
+    const debitPurchase = makeTransaction({
+      amount: -20,
+      date: "2026-05-03",
+      id: "debit-purchase",
+      paymentMethodId: "debit-1",
+      paymentMethodKey: "Debit",
+      paymentMethodType: "debit",
+    });
+    const visibleTransactions = [debitPurchase];
+
+    expect(
+      withCreditCardInvoiceTransactions({
+        month: "2026-05",
+        sourceTransactions: [debitPurchase],
+        visibleTransactions,
+      }),
+    ).toBe(visibleTransactions);
+  });
+
+  it("handles credit purchases without configured invoice days", () => {
+    const creditPurchase = makeTransaction({
+      amount: -20,
+      date: "2026-05-03",
+      id: "unconfigured-credit-purchase",
+      paymentMethodClosingDay: undefined,
+      paymentMethodDueDay: undefined,
+    });
+    const visibleTransactions = [creditPurchase];
+
+    expect(
+      withCreditCardInvoiceTransactions({
+        month: "2026-05",
+        sourceTransactions: [creditPurchase],
+        visibleTransactions,
+      }),
+    ).toBe(visibleTransactions);
+  });
+
   it("removes purchases by default when replacing them with invoice rows", () => {
     const purchase = makeTransaction({
       amount: -100,

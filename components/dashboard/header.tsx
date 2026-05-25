@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -17,9 +18,12 @@ import {
   withSelectedMonth,
 } from "@/components/dashboard/month-route";
 import { useI18n } from "@/lib/i18n";
+import {
+  getGreetingPeriodFromHour,
+  type GreetingPeriod,
+} from "@/lib/time/greeting";
 
 interface HeaderProps {
-  greeting?: string;
   initials?: string;
   userAvatarUrl?: string | null;
   userName?: string;
@@ -56,6 +60,23 @@ function capitalizeFirstLetter(value: string) {
   return value
     ? `${value.charAt(0).toLocaleUpperCase()}${value.slice(1)}`
     : value;
+}
+
+function LocalTimeGreeting() {
+  const { t } = useI18n();
+  const [period, setPeriod] = useState<GreetingPeriod | null>(null);
+
+  useEffect(() => {
+    setPeriod(getGreetingPeriodFromHour(new Date().getHours()));
+  }, []);
+
+  return (
+    <span>
+      {period
+        ? t(`dashboard.greeting.${period}`)
+        : t("dashboard.greeting.fallback")}
+    </span>
+  );
 }
 
 export function Header({
@@ -97,7 +118,7 @@ export function Header({
       <div className="hidden lg:flex items-center justify-between px-8 py-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            {t("dashboard.greeting")}, {userName} 👋
+            <LocalTimeGreeting />, {userName} 👋
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             {t("dashboard.headerDescription")}

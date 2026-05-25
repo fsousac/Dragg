@@ -13,6 +13,7 @@ import {
 import { CompactInput } from "@/components/dashboard/form-inputs/compact-input";
 import { CompactSelect } from "@/components/dashboard/form-inputs/compact-select";
 import { CompactTextarea } from "@/components/dashboard/form-inputs/compact-textarea";
+import { CurrencyInput } from "@/components/dashboard/form-inputs/currency-input";
 import {
   getCurrentMonthValue,
   getMonthFromSearchParams,
@@ -340,6 +341,20 @@ describe("dashboard component rendering", () => {
           type="date"
           icon={<span>calendar</span>}
           inputClassName="custom-input"
+        />
+        <CurrencyInput
+          id="currency"
+          label="Currency"
+          value={25}
+          onValueChange={() => undefined}
+          icon={<span>money</span>}
+          error="Required"
+        />
+        <CurrencyInput
+          id="plain-currency"
+          label="Plain currency"
+          value={0}
+          onValueChange={() => undefined}
         />
         <CompactTextarea
           id="notes"
