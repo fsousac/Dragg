@@ -21,6 +21,8 @@ This document describes the current application-level security expectations. It 
 - Server-side queries also scope reads and writes by authenticated `user_id`.
 - Server Actions validate runtime input because client-side TypeScript types are not trusted.
 - Mutations that receive category, payment method, transaction, subscription, or goal IDs must verify ownership before writing.
+- Installment group deletion and prepayment first load the selected transaction under the authenticated `user_id`, then mutate only IDs from installment rows loaded with the same `user_id` and `installment_group_id`.
+- Subscription occurrence deletion derives matching occurrence IDs from an authenticated-user scoped query and does not delete by description or notes without the `user_id` filter.
 - Database triggers also reject transactions that reference another user's category or payment method.
 
 ## Runtime validation

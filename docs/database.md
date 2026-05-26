@@ -18,6 +18,8 @@ The current committed schema defines these Supabase tables:
 
 - `001_init.sql`: creates the finance schema, indexes, initial RLS policies, profile/category/payment-method defaults, and the initial auth user seed trigger.
 - `002_security_lgpd_hardening.sql`: adds `updated_at` and `deleted_at` columns, moves helper functions into the private schema, adds privacy requests, hardens grants and RLS policies, validates transaction ownership references, and adds LGPD-oriented comments.
+- `005_add_installment_group_metadata.sql`: adds stable installment grouping metadata and an authenticated-user scoped installment group index.
+- `006_add_installment_prepayment_metadata.sql`: adds installment prepayment metadata and an authenticated-user scoped prepayment month index.
 
 ## What belongs in the repository
 
@@ -85,13 +87,22 @@ The application has backward-compatible fallbacks for older environments that do
 - `date`
 - `description`
 - `kind`
+- `installment_group_id`
+- `installment_number`
+- `installment_total`
+- `advanced_to_month`
+- `advanced_at`
 - `notes`
 - `payment_method_id`
 - `created_at`
 - `updated_at`
 - `deleted_at`
 
-Installments and subscriptions are modeled as multiple transaction rows. Subscription rows use `notes` values beginning with `subscription`; paused subscriptions use `subscription paused`.
+Installments and subscriptions are modeled as multiple transaction rows. Installment rows from the same original purchase share `installment_group_id`, use 1-based `installment_number`, and store the original purchase count in `installment_total`. Installment groups are still user-owned transaction rows and must always be queried with the authenticated user's scope.
+
+Installment prepayment uses `advanced_to_month` and `advanced_at`. The original transaction `date`, category, payment method, and installment metadata are preserved for auditability. Payment and invoice views use `advanced_to_month` as the payment context so advanced installments appear in the target month and no longer appear as future obligations.
+
+Subscription rows use `notes` values beginning with `subscription`; paused subscriptions use `subscription paused`.
 
 ## Monthly budget fields in the schema
 

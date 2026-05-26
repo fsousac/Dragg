@@ -27,6 +27,14 @@ import {
   getPaymentMethodDetail,
   type PaymentMethodDetail,
 } from "@/lib/finance/payment-method-overview";
+import {
+  createInstallmentMetadata,
+  isInstallmentTransaction,
+  selectInstallmentsForDeletion,
+  selectInstallmentsForPrepayment,
+  type InstallmentDeleteScope,
+  type InstallmentPrepaymentScope,
+} from "@/lib/finance/installments";
 import { createClient } from "@/lib/supabase/server";
 
 export { buildExpensesByCategoryData };
@@ -70,9 +78,14 @@ type PaymentMethodRow = {
 type TransactionRow = {
   id: string;
   amount: number | string;
+  advanced_at?: string | null;
+  advanced_to_month?: string | null;
   date: string;
   description: string;
   kind: DbTransactionKind;
+  installment_group_id?: string | null;
+  installment_number?: number | string | null;
+  installment_total?: number | string | null;
   notes: string | null;
   categories: CategoryRow | null;
   category_id: string | null;
@@ -215,6 +228,30 @@ export type UpdateTransactionInput = {
   paymentMethod: string;
   description: string;
   notes?: string;
+};
+
+export type DeleteInstallmentsInput = {
+  scope: InstallmentDeleteScope;
+  transactionId: string;
+};
+
+export type AdvanceInstallmentsInput = {
+  scope?: InstallmentPrepaymentScope;
+  targetMonth: string;
+  transactionId: string;
+};
+
+export type InstallmentPrepaymentPreview = {
+  count: number;
+  targetMonth: string;
+  totalAmount: number;
+};
+
+export type SubscriptionDeleteScope = "single" | "this_and_following_unpaid";
+
+export type DeleteSubscriptionOccurrencesInput = {
+  scope: SubscriptionDeleteScope;
+  transactionId: string;
 };
 
 export type UpdatePaymentMethodInput = {
@@ -416,7 +453,12 @@ const transactionSelect = `
   date,
   description,
   amount,
+  advanced_at,
+  advanced_to_month,
   kind,
+  installment_group_id,
+  installment_number,
+  installment_total,
   notes,
   category_id,
   payment_method_id,
@@ -443,12 +485,44 @@ const transactionSelectWithoutCategoryIcon = `
   description,
   amount,
   kind,
+  installment_group_id,
+  installment_number,
+  installment_total,
   notes,
   category_id,
   payment_method_id,
   categories (
     id,
     name,
+    group_type,
+    is_default,
+    monthly_limit
+  ),
+  payment_methods (
+    id,
+    name,
+    closing_day,
+    due_day,
+    type
+  )
+`;
+
+const transactionSelectWithoutAdvancedMetadata = `
+  id,
+  date,
+  description,
+  amount,
+  kind,
+  installment_group_id,
+  installment_number,
+  installment_total,
+  notes,
+  category_id,
+  payment_method_id,
+  categories (
+    id,
+    name,
+    icon,
     group_type,
     is_default,
     monthly_limit
@@ -831,6 +905,12 @@ function filterByTransactionMonth(
   includePrevious = false,
 ) {
   return transactions.filter((transaction) => {
+    if (transaction.advancedToMonth) {
+      return includePrevious
+        ? transaction.advancedToMonth <= month
+        : transaction.advancedToMonth === month;
+    }
+
     const transactionMonth = transaction.date.slice(0, 7);
     return includePrevious
       ? transactionMonth <= month
@@ -868,6 +948,8 @@ function toTransaction(row: TransactionRow): Transaction {
 
   return {
     id: row.id,
+    advancedAt: row.advanced_at ?? null,
+    advancedToMonth: row.advanced_to_month ?? null,
     amount: signedAmount,
     categoryId: row.category_id,
     categoryKey: categoryName,
@@ -878,6 +960,11 @@ function toTransaction(row: TransactionRow): Transaction {
       row.kind === "income"
         ? groupIcons.income
         : toCategoryIcon(rawCategoryName, row.categories?.icon),
+    installmentGroupId: row.installment_group_id ?? null,
+    installmentNumber:
+      row.installment_number == null ? null : Number(row.installment_number),
+    installmentTotal:
+      row.installment_total == null ? null : Number(row.installment_total),
     notes: row.notes,
     paymentMethodId: row.payment_method_id,
     paymentMethodClosingDay:
@@ -1233,7 +1320,10 @@ export async function listPaymentMethodOverview(
 export async function listSubscriptionOverview(): Promise<
   SubscriptionOverviewItem[]
 > {
-  const transactions = await listTransactions({ includeFuture: true });
+  const transactions = await listTransactions({
+    includeFuture: true,
+    includePausedSubscriptions: true,
+  });
   const today = getTodayValue();
   const subscriptionTransactions = transactions
     .filter((transaction) => transaction.notes?.startsWith("subscription"))
@@ -1609,13 +1699,15 @@ export async function createTransaction(input: NewTransactionInput) {
     throw new Error("Installment count is invalid.");
   }
 
-  const occurrenceCount = input.type === "expense" ? installmentCount : 1;
-  const installmentAmount =
-    installmentCount > 1
-      ? Number((amount / installmentCount).toFixed(2))
-      : amount;
+  const isInstallmentPurchase =
+    input.type === "expense" && installmentCount > 1;
+  const occurrenceCount = isInstallmentPurchase ? installmentCount : 1;
+  const installmentGroupId = isInstallmentPurchase ? crypto.randomUUID() : null;
+  const installmentAmount = isInstallmentPurchase
+    ? Number((amount / installmentCount).toFixed(2))
+    : amount;
   const totalRoundedInstallments = Number(
-    (installmentAmount * installmentCount).toFixed(2),
+    (installmentAmount * occurrenceCount).toFixed(2),
   );
   const installmentRemainder = Number(
     (amount - totalRoundedInstallments).toFixed(2),
@@ -1631,12 +1723,21 @@ export async function createTransaction(input: NewTransactionInput) {
       String(occurrenceDate.getMonth() + 1).padStart(2, "0"),
       String(occurrenceDate.getDate()).padStart(2, "0"),
     ].join("-");
-    const scheduleNote =
-      installmentCount > 1 ? `${index + 1}/${installmentCount}` : null;
+    const installmentMetadata =
+      isInstallmentPurchase && installmentGroupId
+        ? createInstallmentMetadata({
+            groupId: installmentGroupId,
+            installmentNumber: index + 1,
+            installmentTotal: installmentCount,
+          })
+        : null;
+    const scheduleNote = installmentMetadata
+      ? `${installmentMetadata.installmentNumber}/${installmentMetadata.installmentTotal}`
+      : null;
     const finalNotes =
       [scheduleNote, notes].filter(Boolean).join(" - ") || null;
     const rowAmount =
-      index === installmentCount - 1
+      index === occurrenceCount - 1
         ? Number((installmentAmount + installmentRemainder).toFixed(2))
         : installmentAmount;
 
@@ -1644,10 +1745,12 @@ export async function createTransaction(input: NewTransactionInput) {
       amount: rowAmount,
       category_id: categoryId,
       date: dateValue,
-      description:
-        installmentCount > 1
-          ? `${description} (${index + 1}/${installmentCount})`
-          : description,
+      description: installmentMetadata
+        ? `${description} (${index + 1}/${installmentCount})`
+        : description,
+      installment_group_id: installmentMetadata?.installmentGroupId ?? null,
+      installment_number: installmentMetadata?.installmentNumber ?? null,
+      installment_total: installmentMetadata?.installmentTotal ?? null,
       kind,
       notes: finalNotes,
       payment_method_id: paymentMethodId,
@@ -2407,8 +2510,288 @@ export async function deleteTransaction(transactionId: string) {
   }
 }
 
+async function getUserTransactionById(
+  supabase: SupabaseClient,
+  userId: string,
+  transactionId: string,
+) {
+  const { data, error } = await supabase
+    .from("transactions")
+    .select(transactionSelect)
+    .eq("id", transactionId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Unable to load transaction: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error("Transaction not found.");
+  }
+
+  return toTransaction(data as unknown as TransactionRow);
+}
+
+async function getInstallmentGroupTransactions(
+  supabase: SupabaseClient,
+  userId: string,
+  installmentGroupId: string,
+) {
+  const { data, error } = await supabase
+    .from("transactions")
+    .select(transactionSelect)
+    .eq("user_id", userId)
+    .eq("installment_group_id", installmentGroupId);
+
+  if (error) {
+    throw new Error(`Unable to load installments: ${error.message}`);
+  }
+
+  return ((data ?? []) as unknown as TransactionRow[]).map(toTransaction);
+}
+
+export async function deleteInstallments(input: DeleteInstallmentsInput) {
+  assertUuid(input.transactionId, "Transaction");
+  const { supabase, userId } = await getUserContext();
+
+  if (input.scope === "single") {
+    await deleteTransaction(input.transactionId);
+    return;
+  }
+
+  const selectedTransaction = await getUserTransactionById(
+    supabase,
+    userId,
+    input.transactionId,
+  );
+
+  if (!isInstallmentTransaction(selectedTransaction)) {
+    await deleteTransaction(input.transactionId);
+    return;
+  }
+
+  const installments = await getInstallmentGroupTransactions(
+    supabase,
+    userId,
+    selectedTransaction.installmentGroupId as string,
+  );
+  const selectedInstallments = selectInstallmentsForDeletion({
+    scope: input.scope,
+    selectedTransaction,
+    transactions: installments,
+  });
+  const selectedIds = selectedInstallments.map((transaction) => transaction.id);
+
+  if (!selectedIds.length) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("user_id", userId)
+    .eq(
+      "installment_group_id",
+      selectedTransaction.installmentGroupId as string,
+    )
+    .in("id", selectedIds);
+
+  if (error) {
+    throw new Error(`Unable to delete installments: ${error.message}`);
+  }
+}
+
+export async function advanceInstallments(input: AdvanceInstallmentsInput) {
+  assertUuid(input.transactionId, "Transaction");
+
+  if (!input.targetMonth.match(/^\d{4}-\d{2}$/)) {
+    throw new Error("Target month is invalid.");
+  }
+
+  const { supabase, userId } = await getUserContext();
+  const selectedTransaction = await getUserTransactionById(
+    supabase,
+    userId,
+    input.transactionId,
+  );
+
+  if (!isInstallmentTransaction(selectedTransaction)) {
+    throw new Error("Transaction is not an installment.");
+  }
+
+  const installments = await getInstallmentGroupTransactions(
+    supabase,
+    userId,
+    selectedTransaction.installmentGroupId as string,
+  );
+  const selectedInstallments = selectInstallmentsForPrepayment({
+    currentMonth: input.targetMonth,
+    scope: input.scope ?? "remaining",
+    selectedTransaction,
+    transactions: installments,
+  });
+  const selectedIds = selectedInstallments.map((transaction) => transaction.id);
+
+  if (!selectedIds.length) {
+    throw new Error("No remaining future installments to advance.");
+  }
+
+  const { error } = await supabase
+    .from("transactions")
+    .update({
+      advanced_at: new Date().toISOString(),
+      advanced_to_month: input.targetMonth,
+    })
+    .eq("user_id", userId)
+    .eq(
+      "installment_group_id",
+      selectedTransaction.installmentGroupId as string,
+    )
+    .in("id", selectedIds);
+
+  if (error) {
+    throw new Error(`Unable to advance installments: ${error.message}`);
+  }
+}
+
+export async function previewInstallmentPrepayment(
+  input: AdvanceInstallmentsInput,
+): Promise<InstallmentPrepaymentPreview> {
+  assertUuid(input.transactionId, "Transaction");
+
+  if (!input.targetMonth.match(/^\d{4}-\d{2}$/)) {
+    throw new Error("Target month is invalid.");
+  }
+
+  const { supabase, userId } = await getUserContext();
+  const selectedTransaction = await getUserTransactionById(
+    supabase,
+    userId,
+    input.transactionId,
+  );
+
+  if (!isInstallmentTransaction(selectedTransaction)) {
+    throw new Error("Transaction is not an installment.");
+  }
+
+  const installments = await getInstallmentGroupTransactions(
+    supabase,
+    userId,
+    selectedTransaction.installmentGroupId as string,
+  );
+  const selectedInstallments = selectInstallmentsForPrepayment({
+    currentMonth: input.targetMonth,
+    scope: input.scope ?? "remaining",
+    selectedTransaction,
+    transactions: installments,
+  });
+  const totalAmount = selectedInstallments.reduce(
+    (sum, transaction) => sum + Math.abs(transaction.amount),
+    0,
+  );
+
+  return {
+    count: selectedInstallments.length,
+    targetMonth: input.targetMonth,
+    totalAmount: Number(totalAmount.toFixed(2)),
+  };
+}
+
+function getSubscriptionGroupQuery(
+  supabase: SupabaseClient,
+  userId: string,
+  subscription: SubscriptionReferenceRow,
+) {
+  let query = supabase
+    .from("transactions")
+    .select("id, date")
+    .eq("user_id", userId)
+    .eq("description", subscription.description)
+    .like("notes", "subscription%");
+
+  query = subscription.category_id
+    ? query.eq("category_id", subscription.category_id)
+    : query.is("category_id", null);
+
+  query = subscription.payment_method_id
+    ? query.eq("payment_method_id", subscription.payment_method_id)
+    : query.is("payment_method_id", null);
+
+  return query;
+}
+
+export async function deleteSubscriptionOccurrences(
+  input: DeleteSubscriptionOccurrencesInput,
+) {
+  assertUuid(input.transactionId, "Transaction");
+  const { supabase, userId } = await getUserContext();
+  const { data: reference, error: referenceError } = await supabase
+    .from("transactions")
+    .select("id, description, category_id, payment_method_id, notes")
+    .eq("id", input.transactionId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (referenceError) {
+    throw new Error(`Unable to load subscription: ${referenceError.message}`);
+  }
+
+  const subscription = reference as SubscriptionReferenceRow | null;
+
+  if (!subscription?.notes?.startsWith("subscription")) {
+    throw new Error("Subscription is invalid.");
+  }
+
+  if (input.scope === "single") {
+    await deleteTransaction(input.transactionId);
+    return;
+  }
+
+  const { data, error } = await getSubscriptionGroupQuery(
+    supabase,
+    userId,
+    subscription,
+  ).order("date", { ascending: true });
+
+  if (error) {
+    throw new Error(`Unable to load subscription charges: ${error.message}`);
+  }
+
+  const occurrences = (data ?? []) as SubscriptionOccurrenceRow[];
+  const selectedOccurrence = occurrences.find(
+    (occurrence) => occurrence.id === input.transactionId,
+  );
+
+  if (!selectedOccurrence) {
+    throw new Error("Subscription occurrence not found.");
+  }
+
+  const today = getTodayValue();
+  const selectedIds = occurrences
+    .filter(
+      (occurrence) =>
+        occurrence.id === input.transactionId ||
+        (occurrence.date > selectedOccurrence.date && occurrence.date >= today),
+    )
+    .map((occurrence) => occurrence.id);
+
+  const { error: deleteError } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("user_id", userId)
+    .in("id", selectedIds);
+
+  if (deleteError) {
+    throw new Error(
+      `Unable to delete subscription charges: ${deleteError.message}`,
+    );
+  }
+}
+
 export async function listTransactions(options?: {
   includeCreditCardInvoices?: boolean;
+  includePausedSubscriptions?: boolean;
   preserveCreditCardInvoicePurchases?: boolean;
   includePrevious?: boolean;
   includeFuture?: boolean;
@@ -2463,9 +2846,37 @@ export async function listTransactions(options?: {
   const { data, error } = await query;
 
   if (!error) {
-    const transactions = ((data ?? []) as unknown as TransactionRow[]).map(
-      toTransaction,
-    );
+    const rows = [...((data ?? []) as unknown as TransactionRow[])];
+
+    if (monthRange && includeFuture) {
+      const { data: advancedData, error: advancedError } = await supabase
+        .from("transactions")
+        .select(transactionSelect)
+        .eq("user_id", userId)
+        .eq("advanced_to_month", monthRange.month)
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false });
+
+      if (advancedError && advancedError.code !== "42703") {
+        throw new Error(
+          `Unable to load advanced installments: ${advancedError.message}`,
+        );
+      }
+
+      for (const row of (advancedData ?? []) as unknown as TransactionRow[]) {
+        if (!rows.some((existingRow) => existingRow.id === row.id)) {
+          rows.push(row);
+        }
+      }
+    }
+
+    const transactions = rows
+      .map(toTransaction)
+      .filter(
+        (transaction) =>
+          options?.includePausedSubscriptions ||
+          !transaction.notes?.startsWith("subscription paused"),
+      );
     const filteredTransactions = monthRange
       ? filterByMonth(transactions, monthRange.month, includePrevious)
       : transactions;
@@ -2486,6 +2897,60 @@ export async function listTransactions(options?: {
   }
 
   if (error.code === "42703") {
+    let metadataFallbackQuery = supabase
+      .from("transactions")
+      .select(transactionSelectWithoutAdvancedMetadata)
+      .eq("user_id", userId)
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (monthRange) {
+      metadataFallbackQuery = metadataFallbackQuery.lte("date", monthRange.end);
+      if (!includePrevious && queryStart) {
+        metadataFallbackQuery = metadataFallbackQuery.gte("date", queryStart);
+      }
+    } else if (!includeFuture) {
+      metadataFallbackQuery = metadataFallbackQuery.lte("date", getTodayValue());
+    }
+
+    const { data: metadataFallbackData, error: metadataFallbackError } =
+      await metadataFallbackQuery;
+
+    if (!metadataFallbackError) {
+      const transactions = (
+        (metadataFallbackData ?? []) as unknown as TransactionRow[]
+      )
+        .map(toTransaction)
+        .filter(
+          (transaction) =>
+            options?.includePausedSubscriptions ||
+            !transaction.notes?.startsWith("subscription paused"),
+        );
+      const filteredTransactions = monthRange
+        ? filterByMonth(transactions, monthRange.month, includePrevious)
+        : transactions;
+      const resultTransactions =
+        includeCreditCardInvoices && monthRange
+          ? withCreditCardInvoiceTransactions({
+              month: monthRange.month,
+              preservePurchases:
+                options?.preserveCreditCardInvoicePurchases ?? false,
+              sourceTransactions: transactions,
+              visibleTransactions: filteredTransactions,
+            })
+          : filteredTransactions;
+
+      return includeFuture
+        ? markPlannedTransactions(resultTransactions)
+        : resultTransactions;
+    }
+
+    if (metadataFallbackError.code !== "42703") {
+      throw new Error(
+        `Unable to load transactions: ${metadataFallbackError.message}`,
+      );
+    }
+
     let fallbackQuery = supabase
       .from("transactions")
       .select(transactionSelectWithoutCategoryIcon)
@@ -2508,9 +2973,13 @@ export async function listTransactions(options?: {
       throw new Error(`Unable to load transactions: ${fallbackError.message}`);
     }
 
-    const transactions = (
-      (fallbackData ?? []) as unknown as TransactionRow[]
-    ).map(toTransaction);
+    const transactions = ((fallbackData ?? []) as unknown as TransactionRow[])
+      .map(toTransaction)
+      .filter(
+        (transaction) =>
+          options?.includePausedSubscriptions ||
+          !transaction.notes?.startsWith("subscription paused"),
+      );
     const filteredTransactions = monthRange
       ? filterByMonth(transactions, monthRange.month, includePrevious)
       : transactions;

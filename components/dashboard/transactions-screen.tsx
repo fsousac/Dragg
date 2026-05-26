@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  CalendarArrowDown,
   ArrowDownRight,
   ArrowUpRight,
   ArrowUpDown,
@@ -21,6 +22,16 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { withSelectedMonth } from "@/components/dashboard/month-route";
 import { type TransactionFormData } from "@/components/dashboard/transaction-form";
 import { CurrencyInput } from "@/components/dashboard/form-inputs/currency-input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,12 +61,20 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { type Transaction, type TransactionType } from "@/lib/data";
 import {
+  isInstallmentTransaction,
+  type InstallmentDeleteScope,
+} from "@/lib/finance/installments";
+import {
+  type AdvanceInstallmentsInput,
   type TransactionFormCategory,
   type TransactionFormPaymentMethod,
   type CreateCategoryInput,
   type NewTransactionInput,
   type UpdateTransactionInput,
   type CreatePaymentMethodInput,
+  type DeleteInstallmentsInput,
+  type DeleteSubscriptionOccurrencesInput,
+  type InstallmentPrepaymentPreview,
 } from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -73,13 +92,26 @@ type EditableTransaction = {
   type: TransactionType;
 };
 
+type InstallmentDeleteRequest = {
+  scope: InstallmentDeleteScope;
+  transaction: Transaction;
+};
+
 type TransactionsScreenProps = {
   categories: TransactionFormCategory[];
+  advanceInstallmentsAction: (data: AdvanceInstallmentsInput) => Promise<void>;
   createCategoryAction: (data: CreateCategoryInput) => Promise<void>;
   createPaymentMethodAction?: (data: CreatePaymentMethodInput) => Promise<void>;
   createTransactionAction: (data: NewTransactionInput) => Promise<void>;
+  deleteInstallmentsAction: (data: DeleteInstallmentsInput) => Promise<void>;
+  deleteSubscriptionOccurrencesAction: (
+    data: DeleteSubscriptionOccurrencesInput,
+  ) => Promise<void>;
   deleteTransactionAction: (transactionId: string) => Promise<void>;
   paymentMethods: TransactionFormPaymentMethod[];
+  previewInstallmentPrepaymentAction: (
+    data: AdvanceInstallmentsInput,
+  ) => Promise<InstallmentPrepaymentPreview>;
   showPrevious: boolean;
   transactions: Transaction[];
   updateTransactionAction: (data: UpdateTransactionInput) => Promise<void>;
@@ -104,12 +136,16 @@ function getInitialFormState(
 }
 
 export function TransactionsScreen({
+  advanceInstallmentsAction,
   categories,
   createCategoryAction,
   createPaymentMethodAction,
   createTransactionAction,
+  deleteInstallmentsAction,
+  deleteSubscriptionOccurrencesAction,
   deleteTransactionAction,
   paymentMethods,
+  previewInstallmentPrepaymentAction,
   showPrevious,
   transactions,
   updateTransactionAction,
@@ -128,12 +164,36 @@ export function TransactionsScreen({
   const [pendingTransactionId, setPendingTransactionId] = useState<
     string | null
   >(null);
+  const [installmentDeleteRequest, setInstallmentDeleteRequest] =
+    useState<InstallmentDeleteRequest | null>(null);
   const [isPending, startTransition] = useTransition();
   const transactionsHref = withSelectedMonth("/transactions", searchParams);
   const today = new Date().toISOString().slice(0, 10);
   const previousTransactionsHref = `${transactionsHref}${
     transactionsHref.includes("?") ? "&" : "?"
   }history=1`;
+  const selectedMonth =
+    searchParams.get("month") ?? new Date().toISOString().slice(0, 7);
+
+  const isSubscriptionTransaction = (transaction: Transaction) =>
+    transaction.notes?.startsWith("subscription") ?? false;
+
+  const getInstallmentDeleteDescriptionKey = (
+    scope: InstallmentDeleteScope,
+  ) => {
+    if (scope === "all") return "transactions.installments.deleteAllConfirm";
+    if (scope === "this_and_following") {
+      return "transactions.installments.deleteThisAndFollowingConfirm";
+    }
+    return "transactions.installments.deleteOnlyThisConfirm";
+  };
+  const getInstallmentDeleteTitleKey = (scope: InstallmentDeleteScope) => {
+    if (scope === "all") return "transactions.installments.deleteAllTitle";
+    if (scope === "this_and_following") {
+      return "transactions.installments.deleteThisAndFollowingTitle";
+    }
+    return "transactions.installments.deleteOnlyThisTitle";
+  };
 
   const categoryOptions = useMemo(
     () =>
@@ -237,6 +297,118 @@ export function TransactionsScreen({
       } catch (error) {
         console.error("Error deleting transaction:", error);
         toast.error(t("transaction.deleteError"));
+      } finally {
+        setPendingTransactionId(null);
+      }
+    });
+  };
+
+  const handleDeleteInstallments = (
+    transaction: Transaction,
+    scope: InstallmentDeleteScope,
+  ) => {
+    setInstallmentDeleteRequest({ scope, transaction });
+  };
+
+  const confirmDeleteInstallments = () => {
+    if (!installmentDeleteRequest) return;
+
+    setPendingTransactionId(installmentDeleteRequest.transaction.id);
+    startTransition(async () => {
+      try {
+        await deleteInstallmentsAction({
+          scope: installmentDeleteRequest.scope,
+          transactionId: installmentDeleteRequest.transaction.id,
+        });
+        toast.success(t("transaction.deleteSuccess"));
+        setInstallmentDeleteRequest(null);
+        closeTransactionDialog();
+        router.refresh();
+      } catch (error) {
+        console.error("Error deleting installments:", error);
+        toast.error(t("transaction.deleteError"));
+      } finally {
+        setPendingTransactionId(null);
+      }
+    });
+  };
+
+  const handleDeleteSubscriptionOccurrences = (
+    transaction: Transaction,
+    scope: DeleteSubscriptionOccurrencesInput["scope"],
+  ) => {
+    const confirmed = window.confirm(
+      t(
+        scope === "single"
+          ? "transactions.subscriptions.deleteOnlyThisConfirm"
+          : "transactions.subscriptions.deleteThisAndFollowingUnpaidConfirm",
+      ),
+    );
+
+    if (!confirmed) return;
+
+    setPendingTransactionId(transaction.id);
+    startTransition(async () => {
+      try {
+        await deleteSubscriptionOccurrencesAction({
+          scope,
+          transactionId: transaction.id,
+        });
+        toast.success(t("transaction.deleteSuccess"));
+        closeTransactionDialog();
+        router.refresh();
+      } catch (error) {
+        console.error("Error deleting subscription occurrences:", error);
+        toast.error(t("transaction.deleteError"));
+      } finally {
+        setPendingTransactionId(null);
+      }
+    });
+  };
+
+  const handleAdvanceInstallments = (transaction: Transaction) => {
+    if (!isInstallmentTransaction(transaction)) return;
+
+    setPendingTransactionId(transaction.id);
+    startTransition(async () => {
+      try {
+        const preview = await previewInstallmentPrepaymentAction({
+          scope: "remaining",
+          targetMonth: selectedMonth,
+          transactionId: transaction.id,
+        });
+
+        if (preview.count === 0) {
+          toast.error(t("transactions.installments.advanceNone"));
+          return;
+        }
+
+        const confirmed = window.confirm(
+          t("transactions.installments.advanceConfirmDescription")
+            .replace("{count}", String(preview.count))
+            .replace("{amount}", formatCurrency(preview.totalAmount))
+            .replace(
+              "{month}",
+              formatDate(`${preview.targetMonth}-01`, {
+                month: "long",
+                year: "numeric",
+              }),
+            ),
+        );
+
+        if (!confirmed) return;
+
+        await advanceInstallmentsAction({
+          scope: "remaining",
+          targetMonth: selectedMonth,
+          transactionId: transaction.id,
+        });
+        toast.success(t("transactions.installments.advanceSuccess"));
+        closeTransactionDialog();
+        router.refresh();
+      } catch (error) {
+        console.error("Error advancing installments:", error);
+        toast.error(t("transactions.installments.advanceError"));
       } finally {
         setPendingTransactionId(null);
       }
@@ -359,6 +531,8 @@ export function TransactionsScreen({
               const isCreditCardInvoice = Boolean(
                 transaction.isCreditCardInvoice,
               );
+              const isInstallment = isInstallmentTransaction(transaction);
+              const isSubscription = isSubscriptionTransaction(transaction);
               const shouldPresentAsPlanned =
                 isPlanned && transaction.date > today;
               const invoiceLabelKey =
@@ -475,19 +649,124 @@ export function TransactionsScreen({
                           <Pencil className="size-4" />
                           {t("common.edit")}
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          variant="destructive"
-                          disabled={
-                            isPending && pendingTransactionId === transaction.id
-                          }
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleDeleteTransaction(transaction);
-                          }}
-                        >
-                          <Trash2 className="size-4" />
-                          {t("common.delete")}
-                        </DropdownMenuItem>
+                        {isInstallment ? (
+                          <>
+                            <DropdownMenuItem
+                              disabled={
+                                isPending &&
+                                pendingTransactionId === transaction.id
+                              }
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleAdvanceInstallments(transaction);
+                              }}
+                            >
+                              <CalendarArrowDown className="size-4" />
+                              {t("transactions.installments.advanceRemaining")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              disabled={
+                                isPending &&
+                                pendingTransactionId === transaction.id
+                              }
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDeleteInstallments(transaction, "single");
+                              }}
+                            >
+                              <Trash2 className="size-4" />
+                              {t("transactions.installments.deleteOnlyThis")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              disabled={
+                                isPending &&
+                                pendingTransactionId === transaction.id
+                              }
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDeleteInstallments(
+                                  transaction,
+                                  "this_and_following",
+                                );
+                              }}
+                            >
+                              <Trash2 className="size-4" />
+                              {t(
+                                "transactions.installments.deleteThisAndFollowing",
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              disabled={
+                                isPending &&
+                                pendingTransactionId === transaction.id
+                              }
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDeleteInstallments(transaction, "all");
+                              }}
+                            >
+                              <Trash2 className="size-4" />
+                              {t("transactions.installments.deleteAll")}
+                            </DropdownMenuItem>
+                          </>
+                        ) : isSubscription ? (
+                          <>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              disabled={
+                                isPending &&
+                                pendingTransactionId === transaction.id
+                              }
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDeleteSubscriptionOccurrences(
+                                  transaction,
+                                  "single",
+                                );
+                              }}
+                            >
+                              <Trash2 className="size-4" />
+                              {t("transactions.subscriptions.deleteOnlyThis")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              disabled={
+                                isPending &&
+                                pendingTransactionId === transaction.id
+                              }
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDeleteSubscriptionOccurrences(
+                                  transaction,
+                                  "this_and_following_unpaid",
+                                );
+                              }}
+                            >
+                              <Trash2 className="size-4" />
+                              {t(
+                                "transactions.subscriptions.deleteThisAndFollowingUnpaid",
+                              )}
+                            </DropdownMenuItem>
+                          </>
+                        ) : (
+                          <DropdownMenuItem
+                            variant="destructive"
+                            disabled={
+                              isPending &&
+                              pendingTransactionId === transaction.id
+                            }
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDeleteTransaction(transaction);
+                            }}
+                          >
+                            <Trash2 className="size-4" />
+                            {t("common.delete")}
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
@@ -787,14 +1066,44 @@ export function TransactionsScreen({
           <DialogFooter className="gap-2 sm:justify-between">
             {selectedTransaction &&
               !selectedTransaction.isCreditCardInvoice && (
-                <Button
-                  variant="destructive"
-                  disabled={isPending}
-                  onClick={() => handleDeleteTransaction(selectedTransaction)}
-                >
-                  <Trash2 className="size-4" />
-                  {t("common.delete")}
-                </Button>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button
+                    variant="destructive"
+                    disabled={isPending}
+                    onClick={() => {
+                      if (isInstallmentTransaction(selectedTransaction)) {
+                        handleDeleteInstallments(selectedTransaction, "single");
+                        return;
+                      }
+
+                      if (isSubscriptionTransaction(selectedTransaction)) {
+                        handleDeleteSubscriptionOccurrences(
+                          selectedTransaction,
+                          "single",
+                        );
+                        return;
+                      }
+
+                      handleDeleteTransaction(selectedTransaction);
+                    }}
+                  >
+                    <Trash2 className="size-4" />
+                    {t("common.delete")}
+                  </Button>
+                  {isInstallmentTransaction(selectedTransaction) ? (
+                    <Button
+                      variant="outline"
+                      disabled={isPending}
+                      className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() =>
+                        handleDeleteInstallments(selectedTransaction, "all")
+                      }
+                    >
+                      <Trash2 className="size-4" />
+                      {t("transactions.installments.deleteAll")}
+                    </Button>
+                  ) : null}
+                </div>
               )}
             <div className="flex flex-col-reverse gap-2 sm:flex-row">
               <Button
@@ -820,6 +1129,49 @@ export function TransactionsScreen({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={Boolean(installmentDeleteRequest)}
+        onOpenChange={(open) => {
+          if (!open && !isPending) {
+            setInstallmentDeleteRequest(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {installmentDeleteRequest
+                ? t(getInstallmentDeleteTitleKey(installmentDeleteRequest.scope))
+                : null}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {installmentDeleteRequest
+                ? t(
+                    getInstallmentDeleteDescriptionKey(
+                      installmentDeleteRequest.scope,
+                    ),
+                  )
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault();
+                confirmDeleteInstallments();
+              }}
+            >
+              {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={isNewTransactionOpen}
