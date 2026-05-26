@@ -27,6 +27,7 @@ import {
   getPaymentMethodDetail,
   type PaymentMethodDetail,
 } from "@/lib/finance/payment-method-overview";
+import { createInstallmentMetadata } from "@/lib/finance/installments";
 import { createClient } from "@/lib/supabase/server";
 
 export { buildExpensesByCategoryData };
@@ -73,6 +74,9 @@ type TransactionRow = {
   date: string;
   description: string;
   kind: DbTransactionKind;
+  installment_group_id?: string | null;
+  installment_number?: number | string | null;
+  installment_total?: number | string | null;
   notes: string | null;
   categories: CategoryRow | null;
   category_id: string | null;
@@ -417,6 +421,9 @@ const transactionSelect = `
   description,
   amount,
   kind,
+  installment_group_id,
+  installment_number,
+  installment_total,
   notes,
   category_id,
   payment_method_id,
@@ -443,6 +450,9 @@ const transactionSelectWithoutCategoryIcon = `
   description,
   amount,
   kind,
+  installment_group_id,
+  installment_number,
+  installment_total,
   notes,
   category_id,
   payment_method_id,
@@ -878,6 +888,11 @@ function toTransaction(row: TransactionRow): Transaction {
       row.kind === "income"
         ? groupIcons.income
         : toCategoryIcon(rawCategoryName, row.categories?.icon),
+    installmentGroupId: row.installment_group_id ?? null,
+    installmentNumber:
+      row.installment_number == null ? null : Number(row.installment_number),
+    installmentTotal:
+      row.installment_total == null ? null : Number(row.installment_total),
     notes: row.notes,
     paymentMethodId: row.payment_method_id,
     paymentMethodClosingDay:
@@ -1609,13 +1624,14 @@ export async function createTransaction(input: NewTransactionInput) {
     throw new Error("Installment count is invalid.");
   }
 
-  const occurrenceCount = input.type === "expense" ? installmentCount : 1;
-  const installmentAmount =
-    installmentCount > 1
-      ? Number((amount / installmentCount).toFixed(2))
-      : amount;
+  const isInstallmentPurchase = input.type === "expense" && installmentCount > 1;
+  const occurrenceCount = isInstallmentPurchase ? installmentCount : 1;
+  const installmentGroupId = isInstallmentPurchase ? crypto.randomUUID() : null;
+  const installmentAmount = isInstallmentPurchase
+    ? Number((amount / installmentCount).toFixed(2))
+    : amount;
   const totalRoundedInstallments = Number(
-    (installmentAmount * installmentCount).toFixed(2),
+    (installmentAmount * occurrenceCount).toFixed(2),
   );
   const installmentRemainder = Number(
     (amount - totalRoundedInstallments).toFixed(2),
@@ -1631,12 +1647,21 @@ export async function createTransaction(input: NewTransactionInput) {
       String(occurrenceDate.getMonth() + 1).padStart(2, "0"),
       String(occurrenceDate.getDate()).padStart(2, "0"),
     ].join("-");
-    const scheduleNote =
-      installmentCount > 1 ? `${index + 1}/${installmentCount}` : null;
+    const installmentMetadata =
+      isInstallmentPurchase && installmentGroupId
+        ? createInstallmentMetadata({
+            groupId: installmentGroupId,
+            installmentNumber: index + 1,
+            installmentTotal: installmentCount,
+          })
+        : null;
+    const scheduleNote = installmentMetadata
+      ? `${installmentMetadata.installmentNumber}/${installmentMetadata.installmentTotal}`
+      : null;
     const finalNotes =
       [scheduleNote, notes].filter(Boolean).join(" - ") || null;
     const rowAmount =
-      index === installmentCount - 1
+      index === occurrenceCount - 1
         ? Number((installmentAmount + installmentRemainder).toFixed(2))
         : installmentAmount;
 
@@ -1645,9 +1670,12 @@ export async function createTransaction(input: NewTransactionInput) {
       category_id: categoryId,
       date: dateValue,
       description:
-        installmentCount > 1
+        installmentMetadata
           ? `${description} (${index + 1}/${installmentCount})`
           : description,
+      installment_group_id: installmentMetadata?.installmentGroupId ?? null,
+      installment_number: installmentMetadata?.installmentNumber ?? null,
+      installment_total: installmentMetadata?.installmentTotal ?? null,
       kind,
       notes: finalNotes,
       payment_method_id: paymentMethodId,

@@ -3,6 +3,7 @@ import {
   type CreditCardInvoicePurchase,
   type Transaction,
 } from "@/lib/data";
+import { getInstallmentLabel } from "@/lib/finance/installments";
 
 type CreditCardInvoicePaymentMethod = {
   closingDay?: number | null;
@@ -116,6 +117,7 @@ export function getCreditCardInvoiceCycle(options: {
 
 export function extractInstallmentLabel(transaction: Transaction) {
   return (
+    getInstallmentLabel(transaction) ??
     transaction.notes?.match(/\b\d+\/\d+\b/)?.[0] ??
     transaction.descriptionKey.match(/\b\d+\/\d+\b/)?.[0] ??
     null

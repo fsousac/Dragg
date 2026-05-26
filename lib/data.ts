@@ -19,6 +19,9 @@ export interface Transaction {
   paymentMethodType?: string | null;
   isPlanned?: boolean;
   isCreditCardInvoice?: boolean;
+  installmentGroupId?: string | null;
+  installmentNumber?: number | null;
+  installmentTotal?: number | null;
   invoice?: CreditCardInvoiceDetails;
 }
 

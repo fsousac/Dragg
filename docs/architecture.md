@@ -31,7 +31,7 @@ Dragg is a Next.js App Router application backed by Supabase Auth and Supabase P
 ## Finance model
 
 - Transactions are income, expense, or saving records.
-- Expenses can be split into installments; each occurrence is stored as its own transaction.
+- Expenses can be split into installments; each occurrence is stored as its own transaction and grouped by shared installment metadata.
 - Monthly subscriptions are represented by future transaction rows whose `notes` start with `subscription`.
 - Categories belong to one authenticated user and are grouped by Needs, Wants, Savings, or Income.
 - Categories can include emoji icons and monthly limits.
