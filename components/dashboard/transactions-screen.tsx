@@ -13,13 +13,13 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  Search,
   Trash2,
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/dashboard/page-header";
-import { withSelectedMonth } from "@/components/dashboard/month-route";
 import { type TransactionFormData } from "@/components/dashboard/transaction-form";
 import { CurrencyInput } from "@/components/dashboard/form-inputs/currency-input";
 import {
@@ -108,14 +108,23 @@ type TransactionsScreenProps = {
     data: DeleteSubscriptionOccurrencesInput,
   ) => Promise<void>;
   deleteTransactionAction: (transactionId: string) => Promise<void>;
+  nextInvoiceTransactions: Transaction[];
   paymentMethods: TransactionFormPaymentMethod[];
   previewInstallmentPrepaymentAction: (
     data: AdvanceInstallmentsInput,
   ) => Promise<InstallmentPrepaymentPreview>;
+  showNextInvoice: boolean;
   showPrevious: boolean;
   transactions: Transaction[];
   updateTransactionAction: (data: UpdateTransactionInput) => Promise<void>;
 };
+
+function normalizeSearchValue(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
 
 function getInitialFormState(
   transaction: Transaction,
@@ -144,8 +153,10 @@ export function TransactionsScreen({
   deleteInstallmentsAction,
   deleteSubscriptionOccurrencesAction,
   deleteTransactionAction,
+  nextInvoiceTransactions,
   paymentMethods,
   previewInstallmentPrepaymentAction,
+  showNextInvoice,
   showPrevious,
   transactions,
   updateTransactionAction,
@@ -153,9 +164,10 @@ export function TransactionsScreen({
   const { formatCurrency, formatDate, t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const searchQuery = "";
-  const typeFilter = "all";
-  const categoryFilter = "all";
+  const [searchQuery, setSearchQuery] = useState("");
+  const [groupFilter, setGroupFilter] = useState<Transaction["group"] | "all">(
+    "all",
+  );
   const [sortOption, setSortOption] = useState<SortOption>("date-desc");
   const [isNewTransactionOpen, setIsNewTransactionOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] =
@@ -167,13 +179,25 @@ export function TransactionsScreen({
   const [installmentDeleteRequest, setInstallmentDeleteRequest] =
     useState<InstallmentDeleteRequest | null>(null);
   const [isPending, startTransition] = useTransition();
-  const transactionsHref = withSelectedMonth("/transactions", searchParams);
-  const today = new Date().toISOString().slice(0, 10);
-  const previousTransactionsHref = `${transactionsHref}${
-    transactionsHref.includes("?") ? "&" : "?"
-  }history=1`;
+  const [isNextInvoiceVisible, setIsNextInvoiceVisible] =
+    useState(showNextInvoice);
+  const [isSearchPanelOpen, setIsSearchPanelOpen] = useState(false);
   const selectedMonth =
     searchParams.get("month") ?? new Date().toISOString().slice(0, 7);
+  const transactionsHref = useMemo(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("month", selectedMonth);
+
+    return `/transactions?${params.toString()}`;
+  }, [searchParams, selectedMonth]);
+  const today = new Date().toISOString().slice(0, 10);
+  const previousTransactionsHref = useMemo(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("month", selectedMonth);
+    params.set("history", "1");
+
+    return `/transactions?${params.toString()}`;
+  }, [searchParams, selectedMonth]);
 
   const isSubscriptionTransaction = (transaction: Transaction) =>
     transaction.notes?.startsWith("subscription") ?? false;
@@ -237,17 +261,46 @@ export function TransactionsScreen({
     [paymentMethods, t],
   );
 
+  const groupOptions = useMemo(
+    () => [
+      { label: t("common.all"), value: "all" as const },
+      { label: t("data.group.needs"), value: "needs" as const },
+      { label: t("data.group.wants"), value: "wants" as const },
+      { label: t("data.group.savings"), value: "savings" as const },
+      { label: t("data.group.income"), value: "income" as const },
+    ],
+    [t],
+  );
+
+  const normalizedQuery = normalizeSearchValue(searchQuery.trim());
+
   const filteredTransactions = useMemo(() => {
     const filtered = transactions.filter((transaction) => {
-      const description = t(transaction.descriptionKey).toLowerCase();
-      const category = t(transaction.categoryKey).toLowerCase();
-      const query = searchQuery.toLowerCase();
+      if (groupFilter !== "all" && transaction.group !== groupFilter) {
+        return false;
+      }
 
-      return (
-        (description.includes(query) || category.includes(query)) &&
-        (typeFilter === "all" || transaction.type === typeFilter) &&
-        (categoryFilter === "all" || transaction.categoryKey === categoryFilter)
-      );
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      const invoiceLabelKey =
+        transaction.invoice?.paymentMethodKey ?? transaction.paymentMethodKey;
+      const searchTerms = [
+        transaction.isCreditCardInvoice
+          ? invoiceLabelKey
+            ? `${t("transaction.creditCardInvoiceFor")} ${t(invoiceLabelKey)}`
+            : t("transaction.creditCardInvoice")
+          : t(transaction.descriptionKey),
+        t(transaction.categoryKey),
+        t(`data.group.${transaction.group}`),
+        transaction.notes ?? "",
+        invoiceLabelKey ? t(invoiceLabelKey) : "",
+      ]
+        .map(normalizeSearchValue)
+        .join(" ");
+
+      return searchTerms.includes(normalizedQuery);
     });
 
     return [...filtered].sort((left, right) => {
@@ -266,7 +319,39 @@ export function TransactionsScreen({
         ? leftDate - rightDate
         : rightDate - leftDate;
     });
-  }, [categoryFilter, searchQuery, sortOption, t, transactions, typeFilter]);
+  }, [groupFilter, normalizedQuery, sortOption, t, transactions]);
+
+  const filteredNextInvoiceTransactions = useMemo(
+    () =>
+      nextInvoiceTransactions.filter((transaction) => {
+        if (groupFilter !== "all" && transaction.group !== groupFilter) {
+          return false;
+        }
+
+        if (!normalizedQuery) {
+          return true;
+        }
+
+        const invoiceLabelKey =
+          transaction.invoice?.paymentMethodKey ?? transaction.paymentMethodKey;
+        const searchTerms = [
+          transaction.isCreditCardInvoice
+            ? invoiceLabelKey
+              ? `${t("transaction.creditCardInvoiceFor")} ${t(invoiceLabelKey)}`
+              : t("transaction.creditCardInvoice")
+            : t(transaction.descriptionKey),
+          t(transaction.categoryKey),
+          t(`data.group.${transaction.group}`),
+          transaction.notes ?? "",
+          invoiceLabelKey ? t(invoiceLabelKey) : "",
+        ]
+          .map(normalizeSearchValue)
+          .join(" ");
+
+        return searchTerms.includes(normalizedQuery);
+      }),
+    [groupFilter, normalizedQuery, nextInvoiceTransactions, t],
+  );
 
   const openTransactionDialog = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
@@ -281,6 +366,61 @@ export function TransactionsScreen({
     if (isPending) return;
     setSelectedTransaction(null);
     setFormData(null);
+  };
+
+  const handleAdvanceInstallmentsById = (transactionId: string) => {
+    const transaction = transactions.find(
+      (candidate) => candidate.id === transactionId,
+    );
+
+    if (!transaction || !isInstallmentTransaction(transaction)) {
+      return;
+    }
+
+    setPendingTransactionId(transaction.id);
+    startTransition(async () => {
+      try {
+        const preview = await previewInstallmentPrepaymentAction({
+          scope: "remaining",
+          targetMonth: selectedMonth,
+          transactionId: transaction.id,
+        });
+
+        if (preview.count === 0) {
+          toast.error(t("transactions.installments.advanceNone"));
+          return;
+        }
+
+        const confirmed = window.confirm(
+          t("transactions.installments.advanceConfirmDescription")
+            .replace("{count}", String(preview.count))
+            .replace("{amount}", formatCurrency(preview.totalAmount))
+            .replace(
+              "{month}",
+              formatDate(`${preview.targetMonth}-01`, {
+                month: "long",
+                year: "numeric",
+              }),
+            ),
+        );
+
+        if (!confirmed) return;
+
+        await advanceInstallmentsAction({
+          scope: "remaining",
+          targetMonth: selectedMonth,
+          transactionId: transaction.id,
+        });
+        toast.success(t("transactions.installments.advanceSuccess"));
+        closeTransactionDialog();
+        router.refresh();
+      } catch (error) {
+        console.error("Error advancing installments:", error);
+        toast.error(t("transactions.installments.advanceError"));
+      } finally {
+        setPendingTransactionId(null);
+      }
+    });
   };
 
   const handleDeleteTransaction = (transaction: Transaction) => {
@@ -366,55 +506,6 @@ export function TransactionsScreen({
     });
   };
 
-  const handleAdvanceInstallments = (transaction: Transaction) => {
-    if (!isInstallmentTransaction(transaction)) return;
-
-    setPendingTransactionId(transaction.id);
-    startTransition(async () => {
-      try {
-        const preview = await previewInstallmentPrepaymentAction({
-          scope: "remaining",
-          targetMonth: selectedMonth,
-          transactionId: transaction.id,
-        });
-
-        if (preview.count === 0) {
-          toast.error(t("transactions.installments.advanceNone"));
-          return;
-        }
-
-        const confirmed = window.confirm(
-          t("transactions.installments.advanceConfirmDescription")
-            .replace("{count}", String(preview.count))
-            .replace("{amount}", formatCurrency(preview.totalAmount))
-            .replace(
-              "{month}",
-              formatDate(`${preview.targetMonth}-01`, {
-                month: "long",
-                year: "numeric",
-              }),
-            ),
-        );
-
-        if (!confirmed) return;
-
-        await advanceInstallmentsAction({
-          scope: "remaining",
-          targetMonth: selectedMonth,
-          transactionId: transaction.id,
-        });
-        toast.success(t("transactions.installments.advanceSuccess"));
-        closeTransactionDialog();
-        router.refresh();
-      } catch (error) {
-        console.error("Error advancing installments:", error);
-        toast.error(t("transactions.installments.advanceError"));
-      } finally {
-        setPendingTransactionId(null);
-      }
-    });
-  };
-
   const handleNewTransactionSubmit = async (data: TransactionFormData) => {
     const input: NewTransactionInput = {
       amount: data.amount,
@@ -476,55 +567,231 @@ export function TransactionsScreen({
       />
 
       <Card className="border-border bg-card card-shadow">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">
-              {filteredTransactions.length} {t("screen.transactions.count")}
-            </CardTitle>
-            <div className="flex items-center gap-1">
+        <CardHeader className="space-y-4 pb-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <CardTitle className="text-lg">
+                {filteredTransactions.length} {t("screen.transactions.count")}
+              </CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t("screen.transactions.description")}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 lg:flex-nowrap">
               <Button
+                type="button"
                 variant="ghost"
-                size="sm"
-                className="h-8 gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
-                onClick={() =>
-                  setSortOption(
-                    sortOption === "date-desc" ? "date-asc" : "date-desc",
-                  )
-                }
+                size="icon"
+                className="size-8 lg:hidden"
+                onClick={() => setIsSearchPanelOpen((current) => !current)}
+                aria-label={t("screen.transactions.searchLabel")}
               >
-                {t("common.date")}
-                {sortOption === "date-desc" ? (
-                  <ChevronDown className="size-3.5" />
-                ) : sortOption === "date-asc" ? (
-                  <ChevronUp className="size-3.5" />
-                ) : (
-                  <ArrowUpDown className="size-3.5 opacity-50" />
-                )}
+                <Search className="size-4" />
               </Button>
-              <span className="text-border">|</span>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
-                onClick={() =>
-                  setSortOption(
-                    sortOption === "amount-desc" ? "amount-asc" : "amount-desc",
-                  )
-                }
+                className="h-7 shrink-0 rounded-md border border-border/60 px-2 text-[11px] font-medium text-muted-foreground hover:text-foreground lg:px-3"
+                onClick={() => setIsNextInvoiceVisible((current) => !current)}
               >
-                {t("common.amount")}
-                {sortOption === "amount-desc" ? (
-                  <ChevronDown className="size-3.5" />
-                ) : sortOption === "amount-asc" ? (
-                  <ChevronUp className="size-3.5" />
-                ) : (
-                  <ArrowUpDown className="size-3.5 opacity-50" />
-                )}
+                {isNextInvoiceVisible
+                  ? t("screen.transactions.hideNextInvoice")
+                  : t("screen.transactions.showNextInvoice")}
+              </Button>
+              <div className="ml-auto flex items-center gap-2 whitespace-nowrap">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+                  onClick={() =>
+                    setSortOption(
+                      sortOption === "date-desc" ? "date-asc" : "date-desc",
+                    )
+                  }
+                >
+                  {t("common.date")}
+                  {sortOption === "date-desc" ? (
+                    <ChevronDown className="size-3.5" />
+                  ) : sortOption === "date-asc" ? (
+                    <ChevronUp className="size-3.5" />
+                  ) : (
+                    <ArrowUpDown className="size-3.5 opacity-50" />
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+                  onClick={() =>
+                    setSortOption(
+                      sortOption === "amount-desc"
+                        ? "amount-asc"
+                        : "amount-desc",
+                    )
+                  }
+                >
+                  {t("common.amount")}
+                  {sortOption === "amount-desc" ? (
+                    <ChevronDown className="size-3.5" />
+                  ) : sortOption === "amount-asc" ? (
+                    <ChevronUp className="size-3.5" />
+                  ) : (
+                    <ArrowUpDown className="size-3.5 opacity-50" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div
+            className={cn(
+              "grid gap-1",
+              isSearchPanelOpen ? "grid" : "hidden lg:grid",
+            )}
+            id="header-inf"
+          >
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(160px,220px)] lg:items-start">
+              <div className="space-y-2 lg:order-2">
+                <Label
+                  htmlFor="transaction-group"
+                  className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground w-full"
+                >
+                  {t("screen.transactions.group")}
+                </Label>
+                <Select
+                  value={groupFilter}
+                  onValueChange={(value) =>
+                    setGroupFilter(value as Transaction["group"] | "all")
+                  }
+                >
+                  <SelectTrigger id="transaction-group">
+                    <SelectValue placeholder={t("screen.transactions.group")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {groupOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2 lg:order-1 lg:col-span-1">
+                <Label
+                  htmlFor="transaction-search"
+                  className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground"
+                >
+                  {t("screen.transactions.searchLabel")}
+                </Label>
+                <Input
+                  id="transaction-search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder={t("screen.transactions.searchPlaceholder")}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-10 px-0 text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setSearchQuery("");
+                  setGroupFilter("all");
+                }}
+                disabled={!searchQuery && groupFilter === "all"}
+              >
+                {t("screen.transactions.clearFilters")}
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="space-y-4 p-0">
+          {isNextInvoiceVisible &&
+          filteredNextInvoiceTransactions.length > 0 ? (
+            <div className="border-b border-border bg-muted/20 px-4 py-3 lg:px-6 lg:py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    {t("screen.transactions.nextInvoice")}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {t("screen.transactions.nextInvoiceDescription")}
+                  </p>
+                </div>
+                <Badge variant="secondary" className="shrink-0">
+                  {filteredNextInvoiceTransactions.length}
+                </Badge>
+              </div>
+              <div className="mt-3 overflow-hidden rounded-xl border border-border bg-card">
+                <div className="divide-y divide-border">
+                  {filteredNextInvoiceTransactions.map((transaction) => {
+                    const invoiceLabelKey =
+                      transaction.invoice?.paymentMethodKey ??
+                      transaction.paymentMethodKey;
+                    const transactionTitle = invoiceLabelKey
+                      ? `${t("transaction.creditCardInvoiceFor")} ${t(invoiceLabelKey)}`
+                      : t("transaction.creditCardInvoice");
+
+                    return (
+                      <button
+                        key={transaction.id}
+                        type="button"
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left opacity-50 transition-colors hover:bg-accent/30 hover:opacity-80 lg:gap-4 lg:px-5"
+                        onClick={() => openTransactionDialog(transaction)}
+                      >
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-xl lg:size-11 lg:text-2xl">
+                          {transaction.icon}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-medium text-foreground">
+                              {transactionTitle}
+                            </p>
+                            <Badge
+                              variant="secondary"
+                              className="shrink-0 border-border bg-muted px-2 py-0 text-[10px] font-medium text-muted-foreground"
+                            >
+                              {t("screen.transactions.nextInvoice")}
+                            </Badge>
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] leading-5 text-muted-foreground">
+                            <span>{t(transaction.categoryKey)}</span>
+                            <span>·</span>
+                            <span>
+                              {formatDate(transaction.date, {
+                                day: "numeric",
+                                month: "short",
+                              })}
+                            </span>
+                            <span>·</span>
+                            <span>{t(`data.group.${transaction.group}`)}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <p className="text-xs font-medium tabular-nums text-foreground/80 lg:text-sm">
+                            {transaction.amount > 0 ? "+" : ""}
+                            {formatCurrency(Math.abs(transaction.amount))}
+                          </p>
+                          <Badge
+                            variant="secondary"
+                            className="shrink-0 text-[10px]"
+                          >
+                            {t("common.view")}
+                          </Badge>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <div className="divide-y divide-border">
             {filteredTransactions.map((transaction) => {
               const isPlanned = Boolean(transaction.isPlanned);
@@ -652,19 +919,6 @@ export function TransactionsScreen({
                         {isInstallment ? (
                           <>
                             <DropdownMenuItem
-                              disabled={
-                                isPending &&
-                                pendingTransactionId === transaction.id
-                              }
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleAdvanceInstallments(transaction);
-                              }}
-                            >
-                              <CalendarArrowDown className="size-4" />
-                              {t("transactions.installments.advanceRemaining")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
                               variant="destructive"
                               disabled={
                                 isPending &&
@@ -696,20 +950,6 @@ export function TransactionsScreen({
                               {t(
                                 "transactions.installments.deleteThisAndFollowing",
                               )}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              variant="destructive"
-                              disabled={
-                                isPending &&
-                                pendingTransactionId === transaction.id
-                              }
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleDeleteInstallments(transaction, "all");
-                              }}
-                            >
-                              <Trash2 className="size-4" />
-                              {t("transactions.installments.deleteAll")}
                             </DropdownMenuItem>
                           </>
                         ) : isSubscription ? (
@@ -777,9 +1017,7 @@ export function TransactionsScreen({
               <Button asChild size="sm" variant="outline">
                 <Link
                   href={
-                    showPrevious
-                      ? withSelectedMonth("/transactions", searchParams)
-                      : previousTransactionsHref
+                    showPrevious ? transactionsHref : previousTransactionsHref
                   }
                 >
                   {showPrevious
@@ -869,35 +1107,64 @@ export function TransactionsScreen({
                     </span>
                   </div>
                   <div className="divide-y divide-border">
-                    {selectedTransaction.invoice.purchases.map((purchase) => (
-                      <div
-                        key={purchase.id}
-                        className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto]"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <p className="truncate text-sm font-medium">
-                              {t(purchase.descriptionKey)}
+                    {selectedTransaction.invoice.purchases.map((purchase) => {
+                      const installmentTransaction = transactions.find(
+                        (transaction) => transaction.id === purchase.id,
+                      );
+                      const canAdvanceInstallment = Boolean(
+                        installmentTransaction &&
+                        isInstallmentTransaction(installmentTransaction),
+                      );
+
+                      return (
+                        <div
+                          key={purchase.id}
+                          className="grid gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <p className="truncate text-sm font-medium">
+                                {t(purchase.descriptionKey)}
+                              </p>
+                              {purchase.installmentLabel ? (
+                                <Badge variant="secondary" className="shrink-0">
+                                  {purchase.installmentLabel}
+                                </Badge>
+                              ) : null}
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {formatDate(purchase.date, {
+                                day: "numeric",
+                                month: "short",
+                              })}{" "}
+                              · {t(purchase.categoryKey)}
                             </p>
-                            {purchase.installmentLabel ? (
-                              <Badge variant="secondary" className="shrink-0">
-                                {purchase.installmentLabel}
-                              </Badge>
+                          </div>
+                          <div className="flex items-center justify-end gap-2 sm:flex-row-reverse sm:gap-3">
+                            <p className="text-sm font-semibold tabular-nums sm:text-right">
+                              {formatCurrency(purchase.amount)}
+                            </p>
+                            {canAdvanceInstallment && installmentTransaction ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="size-9 shrink-0 text-muted-foreground"
+                                disabled={
+                                  isPending &&
+                                  pendingTransactionId === purchase.id
+                                }
+                                onClick={() =>
+                                  handleAdvanceInstallmentsById(purchase.id)
+                                }
+                              >
+                                <CalendarArrowDown className="size-4" />
+                              </Button>
                             ) : null}
                           </div>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {formatDate(purchase.date, {
-                              day: "numeric",
-                              month: "short",
-                            })}{" "}
-                            · {t(purchase.categoryKey)}
-                          </p>
                         </div>
-                        <p className="text-sm font-semibold tabular-nums sm:text-right">
-                          {formatCurrency(purchase.amount)}
-                        </p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1090,19 +1357,6 @@ export function TransactionsScreen({
                     <Trash2 className="size-4" />
                     {t("common.delete")}
                   </Button>
-                  {isInstallmentTransaction(selectedTransaction) ? (
-                    <Button
-                      variant="outline"
-                      disabled={isPending}
-                      className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() =>
-                        handleDeleteInstallments(selectedTransaction, "all")
-                      }
-                    >
-                      <Trash2 className="size-4" />
-                      {t("transactions.installments.deleteAll")}
-                    </Button>
-                  ) : null}
                 </div>
               )}
             <div className="flex flex-col-reverse gap-2 sm:flex-row">
@@ -1142,7 +1396,11 @@ export function TransactionsScreen({
           <AlertDialogHeader>
             <AlertDialogTitle>
               {installmentDeleteRequest
-                ? t(getInstallmentDeleteTitleKey(installmentDeleteRequest.scope))
+                ? t(
+                    getInstallmentDeleteTitleKey(
+                      installmentDeleteRequest.scope,
+                    ),
+                  )
                 : null}
             </AlertDialogTitle>
             <AlertDialogDescription>

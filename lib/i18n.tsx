@@ -82,7 +82,8 @@ const messages = {
       "Password is too weak. Use at least 8 characters with lowercase, uppercase, a number, and a symbol.",
     "auth.updatePassword": "Update password",
     "auth.updatePasswordError": "Password could not be updated.",
-    "auth.updatePasswordInstructions": "Choose a new password for your account.",
+    "auth.updatePasswordInstructions":
+      "Choose a new password for your account.",
     "common.comingSoon": "Coming soon",
     "common.selectMonth": "Select month",
     "common.viewAll": "View All",
@@ -476,10 +477,18 @@ const messages = {
     "screen.transactions.add": "Add Transaction",
     "screen.transactions.count": "Transactions",
     "screen.transactions.description": "View and manage all your transactions",
-    "screen.transactions.search": "Search transactions...",
+    "screen.transactions.clearFilters": "Clear filters",
+    "screen.transactions.group": "Group",
+    "screen.transactions.hideNextInvoice": "Hide next invoice",
+    "screen.transactions.nextInvoice": "Next invoice",
+    "screen.transactions.nextInvoiceDescription":
+      "Preview the next credit card invoice without counting it in the totals.",
+    "screen.transactions.searchLabel": "Search transactions",
+    "screen.transactions.searchPlaceholder": "Name, group, or note",
     "screen.transactions.hidePrevious": "Hide previous",
     "screen.transactions.planned": "Planned",
     "screen.transactions.plannedInvoice": "Planned invoice",
+    "screen.transactions.showNextInvoice": "Show next invoice",
     "screen.transactions.showPrevious": "Show previous",
     "screen.transactions.sort": "Sort",
     "screen.transactions.sortAmountAsc": "Amount: low to high",
@@ -519,8 +528,7 @@ const messages = {
     "transaction.installmentCount": "Number of installments",
     "transactions.installments.advanceConfirmDescription":
       "Advance {count} remaining installments totaling {amount} to {month}?",
-    "transactions.installments.advanceError":
-      "Failed to advance installments.",
+    "transactions.installments.advanceError": "Failed to advance installments.",
     "transactions.installments.advanceRemaining": "Advance remaining",
     "transactions.installments.advanceNone":
       "There are no remaining future installments to advance.",
@@ -530,19 +538,17 @@ const messages = {
     "transactions.installments.deleteAllConfirm":
       "This will delete all installments from this purchase.",
     "transactions.installments.deleteAllTitle": "Delete all installments?",
-    "transactions.installments.deleteOnlyThis": "Delete only this installment",
+    "transactions.installments.deleteOnlyThis": "Delete this installment",
     "transactions.installments.deleteOnlyThisConfirm":
       "This will delete only the selected installment.",
-    "transactions.installments.deleteOnlyThisTitle":
-      "Delete this installment?",
+    "transactions.installments.deleteOnlyThisTitle": "Delete this installment?",
     "transactions.installments.deleteThisAndFollowing":
       "Delete this and following installments",
     "transactions.installments.deleteThisAndFollowingConfirm":
       "This will delete this installment and the following installments from the same purchase.",
     "transactions.installments.deleteThisAndFollowingTitle":
       "Delete this and following installments?",
-    "transactions.subscriptions.deleteOnlyThis":
-      "Delete only this occurrence",
+    "transactions.subscriptions.deleteOnlyThis": "Delete this occurrence",
     "transactions.subscriptions.deleteOnlyThisConfirm":
       "This will delete only the selected subscription occurrence.",
     "transactions.subscriptions.deleteThisAndFollowingUnpaid":
@@ -630,11 +636,13 @@ const messages = {
     "auth.passwordRequirementUppercase": "Uma letra maiúscula",
     "auth.passwordRequired": "Informe sua senha.",
     "auth.passwordUpdated": "Senha atualizada com sucesso.",
-    "auth.rateLimitError": "Muitas tentativas. Aguarde um momento e tente novamente.",
+    "auth.rateLimitError":
+      "Muitas tentativas. Aguarde um momento e tente novamente.",
     "auth.redirectNotAllowed":
       "Esta URL do app não está permitida no Supabase. Adicione em Authentication → URL Configuration.",
     "auth.resetPassword": "Redefinir senha",
-    "auth.resetPasswordError": "Não foi possível enviar o email de redefinição.",
+    "auth.resetPasswordError":
+      "Não foi possível enviar o email de redefinição.",
     "auth.resetPasswordInstructions":
       "Informe seu email e enviaremos instruções para redefinir sua senha.",
     "auth.showPassword": "Mostrar senha",
@@ -993,7 +1001,8 @@ const messages = {
     "payments.invoiceAdvanceConfirm": "Confirmar adiantamento",
     "payments.invoiceAdvanceDescription":
       "Cria uma transação para pagar parte desta fatura agora.",
-    "payments.invoiceAdvanceError": "Não foi possível registrar o adiantamento.",
+    "payments.invoiceAdvanceError":
+      "Não foi possível registrar o adiantamento.",
     "payments.invoiceAdvanceSaving": "Registrando...",
     "payments.invoiceAdvanceSuccess": "Adiantamento registrado com sucesso.",
     "payments.invoiceAdvanceTitle": "Adiantamento da fatura",
@@ -1057,10 +1066,18 @@ const messages = {
     "screen.transactions.count": "Transações",
     "screen.transactions.description":
       "Veja e gerencie todas as suas transações",
-    "screen.transactions.search": "Buscar transações...",
+    "screen.transactions.clearFilters": "Limpar filtros",
+    "screen.transactions.group": "Grupo",
+    "screen.transactions.hideNextInvoice": "Ocultar próxima fatura",
+    "screen.transactions.nextInvoice": "Próxima fatura",
+    "screen.transactions.nextInvoiceDescription":
+      "Visualize a próxima fatura do cartão sem contar no total.",
+    "screen.transactions.searchLabel": "Pesquisar transações",
+    "screen.transactions.searchPlaceholder": "Nome, grupo ou observação",
     "screen.transactions.hidePrevious": "Ocultar anteriores",
     "screen.transactions.planned": "Prevista",
     "screen.transactions.plannedInvoice": "Fatura prevista",
+    "screen.transactions.showNextInvoice": "Mostrar próxima fatura",
     "screen.transactions.showPrevious": "Mostrar anteriores",
     "screen.transactions.sort": "Ordenar",
     "screen.transactions.sortAmountAsc": "Valor: menor primeiro",
@@ -1111,19 +1128,17 @@ const messages = {
     "transactions.installments.deleteAllConfirm":
       "Isso excluirá todas as parcelas desta compra.",
     "transactions.installments.deleteAllTitle": "Excluir todas as parcelas?",
-    "transactions.installments.deleteOnlyThis": "Excluir somente esta parcela",
+    "transactions.installments.deleteOnlyThis": "Excluir esta parcela",
     "transactions.installments.deleteOnlyThisConfirm":
       "Isso excluirá somente a parcela selecionada.",
-    "transactions.installments.deleteOnlyThisTitle":
-      "Excluir esta parcela?",
+    "transactions.installments.deleteOnlyThisTitle": "Excluir esta parcela?",
     "transactions.installments.deleteThisAndFollowing":
       "Excluir esta e as próximas parcelas",
     "transactions.installments.deleteThisAndFollowingConfirm":
       "Isso excluirá esta parcela e as próximas parcelas da mesma compra.",
     "transactions.installments.deleteThisAndFollowingTitle":
       "Excluir esta e as próximas parcelas?",
-    "transactions.subscriptions.deleteOnlyThis":
-      "Excluir somente esta ocorrência",
+    "transactions.subscriptions.deleteOnlyThis": "Excluir esta ocorrência",
     "transactions.subscriptions.deleteOnlyThisConfirm":
       "Isso excluirá somente a ocorrência selecionada da assinatura.",
     "transactions.subscriptions.deleteThisAndFollowingUnpaid":

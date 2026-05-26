@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createInstallmentMetadata,
+  getInstallmentPrepaymentSummary,
   getInstallmentLabel,
   groupTransactionsByInstallmentGroup,
   isInstallmentTransaction,
@@ -184,6 +185,28 @@ describe("installment helpers", () => {
     ).toEqual(["installment-2", "installment-3"]);
   });
 
+  it("does not select previous, unrelated, or non-installment rows for scoped deletion", () => {
+    const selected = installment({ id: "installment-2", installmentNumber: 2 });
+
+    expect(
+      selectInstallmentsForDeletion({
+        scope: "this_and_following",
+        selectedTransaction: selected,
+        transactions: [
+          installment({ id: "installment-1", installmentNumber: 1 }),
+          selected,
+          installment({ id: "installment-3", installmentNumber: 3 }),
+          installment({
+            id: "other-group",
+            installmentGroupId: "group-2",
+            installmentNumber: 3,
+          }),
+          { id: "standalone" },
+        ],
+      }).map((transaction) => transaction.id),
+    ).toEqual(["installment-2", "installment-3"]);
+  });
+
   it("selects all installments for all deletion", () => {
     const selected = installment({ id: "installment-2", installmentNumber: 2 });
 
@@ -255,6 +278,60 @@ describe("installment helpers", () => {
         ],
       }).map((transaction) => transaction.id),
     ).toEqual(["installment-3", "installment-4"]);
+  });
+
+  it("summarizes available installment prepayment quantity and amount", () => {
+    const selected = installment({
+      date: "2026-05-10",
+      id: "installment-1",
+      installmentNumber: 1,
+      installmentTotal: 4,
+    });
+    const available = selectInstallmentsForPrepayment({
+      currentMonth: "2026-05",
+      selectedTransaction: selected,
+      transactions: [
+        selected,
+        installment({
+          amount: -33.33,
+          date: "2026-06-10",
+          id: "installment-2",
+          installmentNumber: 2,
+          installmentTotal: 4,
+        }),
+        installment({
+          amount: -33.34,
+          date: "2026-07-10",
+          id: "installment-3",
+          installmentNumber: 3,
+          installmentTotal: 4,
+        }),
+        installment({
+          advancedToMonth: "2026-05",
+          amount: -33.33,
+          date: "2026-08-10",
+          id: "already-advanced",
+          installmentNumber: 4,
+          installmentTotal: 4,
+        }),
+      ],
+    });
+
+    expect(getInstallmentPrepaymentSummary(available)).toEqual({
+      count: 2,
+      totalAmount: 66.67,
+    });
+  });
+
+  it("treats missing installment amounts as zero in prepayment summaries", () => {
+    expect(
+      getInstallmentPrepaymentSummary([
+        installment({ id: "without-amount" }),
+      ]),
+    ).toEqual({
+      count: 1,
+      totalAmount: 0,
+    });
   });
 
   it("prepayment ignores installments that were already advanced", () => {

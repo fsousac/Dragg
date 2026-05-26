@@ -1,5 +1,6 @@
 export type TransactionLike = {
   advancedToMonth?: string | null;
+  amount?: number | null;
   date?: string | null;
   id?: string;
   installmentGroupId?: string | null;
@@ -160,6 +161,20 @@ export function selectInstallmentsForPrepayment<
       return isSelectedOrAfter && transactionMonth > input.currentMonth;
     })
     .sort(compareInstallmentOrder);
+}
+
+export function getInstallmentPrepaymentSummary<
+  TTransaction extends TransactionLike,
+>(installments: TTransaction[]) {
+  const totalAmount = installments.reduce(
+    (sum, transaction) => sum + Math.abs(Number(transaction.amount ?? 0)),
+    0,
+  );
+
+  return {
+    count: installments.length,
+    totalAmount: Number(totalAmount.toFixed(2)),
+  };
 }
 
 export function createInstallmentMetadata(options: {

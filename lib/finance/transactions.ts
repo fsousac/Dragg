@@ -29,12 +29,17 @@ import {
 } from "@/lib/finance/payment-method-overview";
 import {
   createInstallmentMetadata,
+  getInstallmentPrepaymentSummary,
   isInstallmentTransaction,
   selectInstallmentsForDeletion,
   selectInstallmentsForPrepayment,
   type InstallmentDeleteScope,
   type InstallmentPrepaymentScope,
 } from "@/lib/finance/installments";
+import {
+  selectSubscriptionOccurrencesForDeletion,
+  shouldShowSubscriptionOccurrenceInTransactionHistory,
+} from "@/lib/finance/subscriptions";
 import { createClient } from "@/lib/supabase/server";
 
 export { buildExpensesByCategoryData };
@@ -2686,15 +2691,12 @@ export async function previewInstallmentPrepayment(
     selectedTransaction,
     transactions: installments,
   });
-  const totalAmount = selectedInstallments.reduce(
-    (sum, transaction) => sum + Math.abs(transaction.amount),
-    0,
-  );
+  const summary = getInstallmentPrepaymentSummary(selectedInstallments);
 
   return {
-    count: selectedInstallments.length,
+    count: summary.count,
     targetMonth: input.targetMonth,
-    totalAmount: Number(totalAmount.toFixed(2)),
+    totalAmount: summary.totalAmount,
   };
 }
 
@@ -2767,14 +2769,12 @@ export async function deleteSubscriptionOccurrences(
     throw new Error("Subscription occurrence not found.");
   }
 
-  const today = getTodayValue();
-  const selectedIds = occurrences
-    .filter(
-      (occurrence) =>
-        occurrence.id === input.transactionId ||
-        (occurrence.date > selectedOccurrence.date && occurrence.date >= today),
-    )
-    .map((occurrence) => occurrence.id);
+  const selectedIds = selectSubscriptionOccurrencesForDeletion({
+    occurrences,
+    scope: input.scope,
+    selectedOccurrence,
+    today: getTodayValue(),
+  }).map((occurrence) => occurrence.id);
 
   const { error: deleteError } = await supabase
     .from("transactions")
@@ -2874,8 +2874,11 @@ export async function listTransactions(options?: {
       .map(toTransaction)
       .filter(
         (transaction) =>
-          options?.includePausedSubscriptions ||
-          !transaction.notes?.startsWith("subscription paused"),
+          !transaction.notes?.startsWith("subscription") ||
+          shouldShowSubscriptionOccurrenceInTransactionHistory({
+            includePausedSubscriptions: options?.includePausedSubscriptions,
+            occurrence: transaction,
+          }),
       );
     const filteredTransactions = monthRange
       ? filterByMonth(transactions, monthRange.month, includePrevious)
@@ -2923,8 +2926,11 @@ export async function listTransactions(options?: {
         .map(toTransaction)
         .filter(
           (transaction) =>
-            options?.includePausedSubscriptions ||
-            !transaction.notes?.startsWith("subscription paused"),
+            !transaction.notes?.startsWith("subscription") ||
+            shouldShowSubscriptionOccurrenceInTransactionHistory({
+              includePausedSubscriptions: options?.includePausedSubscriptions,
+              occurrence: transaction,
+            }),
         );
       const filteredTransactions = monthRange
         ? filterByMonth(transactions, monthRange.month, includePrevious)
@@ -2977,8 +2983,11 @@ export async function listTransactions(options?: {
       .map(toTransaction)
       .filter(
         (transaction) =>
-          options?.includePausedSubscriptions ||
-          !transaction.notes?.startsWith("subscription paused"),
+          !transaction.notes?.startsWith("subscription") ||
+          shouldShowSubscriptionOccurrenceInTransactionHistory({
+            includePausedSubscriptions: options?.includePausedSubscriptions,
+            occurrence: transaction,
+          }),
       );
     const filteredTransactions = monthRange
       ? filterByMonth(transactions, monthRange.month, includePrevious)
