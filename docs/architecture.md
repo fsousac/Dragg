@@ -32,7 +32,9 @@ Dragg is a Next.js App Router application backed by Supabase Auth and Supabase P
 
 - Transactions are income, expense, or saving records.
 - Expenses can be split into installments; each occurrence is stored as its own transaction and grouped by shared installment metadata.
-- Monthly subscriptions are represented by future transaction rows whose `notes` start with `subscription`.
+- Installment deletion supports single, selected-and-following, and full-group scopes. Installment prepayment preserves the original transaction dates and writes `advanced_to_month` metadata so payment/invoice views move the obligation without changing purchase competence.
+- Monthly subscriptions are represented by future transaction rows whose `notes` start with `subscription`. There is no explicit paid/unpaid column, so scoped subscription deletion removes the selected occurrence and matching future rows while preserving earlier history.
+- Paused subscription rows use `subscription paused` notes and are hidden from transaction/payment views while remaining available to subscription overview logic.
 - Categories belong to one authenticated user and are grouped by Needs, Wants, Savings, or Income.
 - Categories can include emoji icons and monthly limits.
 - The dashboard computes the 50/30/20 split from the selected month's income and planned usage.

@@ -4,20 +4,27 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import {
+  advanceInstallments,
   createCategory,
   createInvoiceAdvancePayment,
   createPaymentMethod,
   createSubscription,
   createTransaction,
   deleteCategory,
+  deleteInstallments,
   deletePaymentMethod,
   deleteSubscription,
+  deleteSubscriptionOccurrences,
   deleteTransaction,
+  previewInstallmentPrepayment,
   setSubscriptionPaused,
   type CreateCategoryInput,
   type CreateInvoiceAdvancePaymentInput,
   type CreatePaymentMethodInput,
   type CreateSubscriptionInput,
+  type AdvanceInstallmentsInput,
+  type DeleteInstallmentsInput,
+  type DeleteSubscriptionOccurrencesInput,
   type NewTransactionInput,
   type UpdateCategoryInput,
   type UpdatePaymentMethodInput,
@@ -144,6 +151,28 @@ const updateTransactionActionSchema = z
     notes: safeOptionalNotesSchema,
     paymentMethod: z.string().trim().min(0).max(64),
     type: z.enum(["expense", "income", "saving"]),
+  })
+  .strict();
+
+const deleteInstallmentsActionSchema = z
+  .object({
+    scope: z.enum(["single", "this_and_following", "all"]),
+    transactionId: uuidSchema,
+  })
+  .strict();
+
+const advanceInstallmentsActionSchema = z
+  .object({
+    scope: z.enum(["remaining", "selected_and_remaining"]).optional(),
+    targetMonth: z.string().trim().regex(/^\d{4}-\d{2}$/, "Invalid month"),
+    transactionId: uuidSchema,
+  })
+  .strict();
+
+const deleteSubscriptionOccurrencesActionSchema = z
+  .object({
+    scope: z.enum(["single", "this_and_following_unpaid"]),
+    transactionId: uuidSchema,
   })
   .strict();
 
@@ -323,5 +352,45 @@ export async function deleteTransactionAction(transactionId: string) {
   await deleteTransaction(parsedTransactionId);
 
   revalidatePath("/dashboard");
+  revalidatePath("/transactions");
+}
+
+export async function deleteInstallmentsAction(data: DeleteInstallmentsInput) {
+  const parsed = deleteInstallmentsActionSchema.parse(data);
+
+  await deleteInstallments(parsed);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/payments");
+  revalidatePath("/transactions");
+}
+
+export async function advanceInstallmentsAction(data: AdvanceInstallmentsInput) {
+  const parsed = advanceInstallmentsActionSchema.parse(data);
+
+  await advanceInstallments(parsed);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/payments");
+  revalidatePath("/transactions");
+}
+
+export async function previewInstallmentPrepaymentAction(
+  data: AdvanceInstallmentsInput,
+) {
+  const parsed = advanceInstallmentsActionSchema.parse(data);
+
+  return previewInstallmentPrepayment(parsed);
+}
+
+export async function deleteSubscriptionOccurrencesAction(
+  data: DeleteSubscriptionOccurrencesInput,
+) {
+  const parsed = deleteSubscriptionOccurrencesActionSchema.parse(data);
+
+  await deleteSubscriptionOccurrences(parsed);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/payments");
   revalidatePath("/transactions");
 }

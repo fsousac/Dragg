@@ -22,6 +22,8 @@ export interface Transaction {
   installmentGroupId?: string | null;
   installmentNumber?: number | null;
   installmentTotal?: number | null;
+  advancedToMonth?: string | null;
+  advancedAt?: string | null;
   invoice?: CreditCardInvoiceDetails;
 }
 

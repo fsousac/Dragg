@@ -312,6 +312,53 @@ describe("credit card invoices", () => {
     });
   });
 
+  it("counts advanced installments in the target invoice month only", () => {
+    const advancedInstallment = makeTransaction({
+      advancedToMonth: "2026-05",
+      amount: -120,
+      date: "2026-08-10",
+      id: "advanced-installment",
+      installmentGroupId: "group-1",
+      installmentNumber: 4,
+      installmentTotal: 6,
+    });
+
+    const mayInvoice = createCreditCardInvoiceTransactions({
+      month: "2026-05",
+      paymentMethods: [
+        {
+          closingDay: 7,
+          dueDay: 14,
+          id: "card-1",
+          labelKey: "Card",
+        },
+      ],
+      transactions: [advancedInstallment],
+    });
+    const augustInvoice = createCreditCardInvoiceTransactions({
+      month: "2026-08",
+      paymentMethods: [
+        {
+          closingDay: 7,
+          dueDay: 14,
+          id: "card-1",
+          labelKey: "Card",
+        },
+      ],
+      transactions: [advancedInstallment],
+    });
+
+    expect(mayInvoice.invoices[0]).toMatchObject({
+      amount: -120,
+      id: "credit-card-invoice:card-1:2026-05",
+    });
+    expect(mayInvoice.invoices[0].invoice.purchases).toHaveLength(1);
+    expect(mayInvoice.invoices[0].invoice.purchases[0].categoryKey).toBe(
+      "data.category.shopping",
+    );
+    expect(augustInvoice.invoices).toEqual([]);
+  });
+
   it("removes invoice purchases when advance payments fully pay the invoice", () => {
     const purchase = makeTransaction({
       amount: -100,

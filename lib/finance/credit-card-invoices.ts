@@ -163,8 +163,10 @@ export function createCreditCardInvoiceTransactions(options: {
           transaction.paymentMethodType === "credit" &&
           transaction.type === "expense" &&
           !getInvoiceAdvancePaymentInvoiceId(transaction) &&
-          transaction.date >= cycle.startsAt &&
-          transaction.date <= cycle.closingDate,
+          (transaction.advancedToMonth
+            ? transaction.advancedToMonth === options.month
+            : transaction.date >= cycle.startsAt &&
+              transaction.date <= cycle.closingDate),
       )
       .sort((left, right) => left.date.localeCompare(right.date));
 

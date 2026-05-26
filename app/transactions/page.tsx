@@ -6,8 +6,12 @@ import {
 } from "@/lib/finance/transactions";
 import {
   createCategoryAction,
+  advanceInstallmentsAction,
   createTransactionAction,
+  deleteInstallmentsAction,
+  deleteSubscriptionOccurrencesAction,
   deleteTransactionAction,
+  previewInstallmentPrepaymentAction,
   updateTransactionAction,
   createPaymentMethodAction,
 } from "@/app/transactions/actions";
@@ -48,7 +52,11 @@ export default async function TransactionsPage({
         createCategoryAction={createCategoryAction}
         createPaymentMethodAction={createPaymentMethodAction}
         createTransactionAction={createTransactionAction}
+        advanceInstallmentsAction={advanceInstallmentsAction}
+        deleteInstallmentsAction={deleteInstallmentsAction}
+        deleteSubscriptionOccurrencesAction={deleteSubscriptionOccurrencesAction}
         deleteTransactionAction={deleteTransactionAction}
+        previewInstallmentPrepaymentAction={previewInstallmentPrepaymentAction}
         paymentMethods={transactionFormOptions.paymentMethods}
         showPrevious={showPrevious}
         transactions={transactions}

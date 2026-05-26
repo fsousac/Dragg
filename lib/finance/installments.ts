@@ -1,8 +1,20 @@
 export type TransactionLike = {
+  advancedToMonth?: string | null;
+  date?: string | null;
+  id?: string;
   installmentGroupId?: string | null;
   installmentNumber?: number | null;
   installmentTotal?: number | null;
 };
+
+export type InstallmentDeleteScope =
+  | "single"
+  | "this_and_following"
+  | "all";
+
+export type InstallmentPrepaymentScope =
+  | "remaining"
+  | "selected_and_remaining";
 
 export type InstallmentMetadata = {
   installmentGroupId: string | null;
@@ -58,6 +70,96 @@ export function groupTransactionsByInstallmentGroup<
   }
 
   return groups;
+}
+
+function isSameInstallmentGroup(
+  transaction: TransactionLike,
+  selectedTransaction: TransactionLike,
+) {
+  return (
+    isInstallmentTransaction(transaction) &&
+    isInstallmentTransaction(selectedTransaction) &&
+    transaction.installmentGroupId === selectedTransaction.installmentGroupId
+  );
+}
+
+function compareInstallmentOrder(
+  left: TransactionLike,
+  right: TransactionLike,
+) {
+  const installmentOrder =
+    Number(left.installmentNumber) - Number(right.installmentNumber);
+
+  if (installmentOrder !== 0) {
+    return installmentOrder;
+  }
+
+  return String(left.date ?? "").localeCompare(String(right.date ?? ""));
+}
+
+export function selectInstallmentsForDeletion<
+  TTransaction extends TransactionLike,
+>(input: {
+  scope: InstallmentDeleteScope;
+  selectedTransaction: TTransaction;
+  transactions: TTransaction[];
+}) {
+  if (input.scope === "single") {
+    return [input.selectedTransaction];
+  }
+
+  if (!isInstallmentTransaction(input.selectedTransaction)) {
+    return [input.selectedTransaction];
+  }
+
+  const sameGroup = input.transactions
+    .filter((transaction) =>
+      isSameInstallmentGroup(transaction, input.selectedTransaction),
+    )
+    .sort(compareInstallmentOrder);
+
+  if (input.scope === "all") {
+    return sameGroup;
+  }
+
+  return sameGroup.filter(
+    (transaction) =>
+      Number(transaction.installmentNumber) >=
+      Number(input.selectedTransaction.installmentNumber),
+  );
+}
+
+export function selectInstallmentsForPrepayment<
+  TTransaction extends TransactionLike,
+>(input: {
+  currentMonth: string;
+  scope?: InstallmentPrepaymentScope;
+  selectedTransaction: TTransaction;
+  transactions: TTransaction[];
+}) {
+  if (!isInstallmentTransaction(input.selectedTransaction)) {
+    return [];
+  }
+
+  const scope = input.scope ?? "remaining";
+  const selectedNumber = Number(input.selectedTransaction.installmentNumber);
+
+  return input.transactions
+    .filter((transaction) =>
+      isSameInstallmentGroup(transaction, input.selectedTransaction),
+    )
+    .filter((transaction) => !transaction.advancedToMonth)
+    .filter((transaction) => {
+      const installmentNumber = Number(transaction.installmentNumber);
+      const isSelectedOrAfter =
+        scope === "selected_and_remaining"
+          ? installmentNumber >= selectedNumber
+          : installmentNumber > selectedNumber;
+      const transactionMonth = String(transaction.date ?? "").slice(0, 7);
+
+      return isSelectedOrAfter && transactionMonth > input.currentMonth;
+    })
+    .sort(compareInstallmentOrder);
 }
 
 export function createInstallmentMetadata(options: {

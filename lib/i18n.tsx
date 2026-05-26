@@ -517,6 +517,38 @@ const messages = {
     "transaction.installments": "Installments",
     "transaction.installmentsLabel": "Split in installments",
     "transaction.installmentCount": "Number of installments",
+    "transactions.installments.advanceConfirmDescription":
+      "Advance {count} remaining installments totaling {amount} to {month}?",
+    "transactions.installments.advanceError":
+      "Failed to advance installments.",
+    "transactions.installments.advanceRemaining": "Advance remaining",
+    "transactions.installments.advanceNone":
+      "There are no remaining future installments to advance.",
+    "transactions.installments.advanceSuccess":
+      "Installments advanced successfully.",
+    "transactions.installments.deleteAll": "Delete all installments",
+    "transactions.installments.deleteAllConfirm":
+      "This will delete all installments from this purchase.",
+    "transactions.installments.deleteAllTitle": "Delete all installments?",
+    "transactions.installments.deleteOnlyThis": "Delete only this installment",
+    "transactions.installments.deleteOnlyThisConfirm":
+      "This will delete only the selected installment.",
+    "transactions.installments.deleteOnlyThisTitle":
+      "Delete this installment?",
+    "transactions.installments.deleteThisAndFollowing":
+      "Delete this and following installments",
+    "transactions.installments.deleteThisAndFollowingConfirm":
+      "This will delete this installment and the following installments from the same purchase.",
+    "transactions.installments.deleteThisAndFollowingTitle":
+      "Delete this and following installments?",
+    "transactions.subscriptions.deleteOnlyThis":
+      "Delete only this occurrence",
+    "transactions.subscriptions.deleteOnlyThisConfirm":
+      "This will delete only the selected subscription occurrence.",
+    "transactions.subscriptions.deleteThisAndFollowingUnpaid":
+      "Delete this and following unpaid occurrences",
+    "transactions.subscriptions.deleteThisAndFollowingUnpaidConfirm":
+      "This will delete the selected subscription occurrence and matching future unpaid occurrences. Paid historical transactions are preserved.",
     "transaction.recurrence": "Recurrence",
     "transaction.recurrenceOption.monthly": "Monthly subscription",
     "transaction.recurrenceOption.none": "No recurrence",
@@ -1066,6 +1098,38 @@ const messages = {
     "transaction.installments": "Parcelado",
     "transaction.installmentsLabel": "Parcelar em parcelas",
     "transaction.installmentCount": "Número de parcelas",
+    "transactions.installments.advanceConfirmDescription":
+      "Adiantar {count} parcelas restantes, totalizando {amount}, para {month}?",
+    "transactions.installments.advanceError":
+      "Não foi possível adiantar as parcelas.",
+    "transactions.installments.advanceRemaining": "Adiantar restantes",
+    "transactions.installments.advanceNone":
+      "Não há parcelas futuras restantes para adiantar.",
+    "transactions.installments.advanceSuccess":
+      "Parcelas adiantadas com sucesso.",
+    "transactions.installments.deleteAll": "Excluir todas as parcelas",
+    "transactions.installments.deleteAllConfirm":
+      "Isso excluirá todas as parcelas desta compra.",
+    "transactions.installments.deleteAllTitle": "Excluir todas as parcelas?",
+    "transactions.installments.deleteOnlyThis": "Excluir somente esta parcela",
+    "transactions.installments.deleteOnlyThisConfirm":
+      "Isso excluirá somente a parcela selecionada.",
+    "transactions.installments.deleteOnlyThisTitle":
+      "Excluir esta parcela?",
+    "transactions.installments.deleteThisAndFollowing":
+      "Excluir esta e as próximas parcelas",
+    "transactions.installments.deleteThisAndFollowingConfirm":
+      "Isso excluirá esta parcela e as próximas parcelas da mesma compra.",
+    "transactions.installments.deleteThisAndFollowingTitle":
+      "Excluir esta e as próximas parcelas?",
+    "transactions.subscriptions.deleteOnlyThis":
+      "Excluir somente esta ocorrência",
+    "transactions.subscriptions.deleteOnlyThisConfirm":
+      "Isso excluirá somente a ocorrência selecionada da assinatura.",
+    "transactions.subscriptions.deleteThisAndFollowingUnpaid":
+      "Excluir esta e as próximas ocorrências não pagas",
+    "transactions.subscriptions.deleteThisAndFollowingUnpaidConfirm":
+      "Isso excluirá a ocorrência selecionada da assinatura e as ocorrências futuras não pagas correspondentes. Transações históricas pagas serão preservadas.",
     "transaction.recurrence": "Recorrência",
     "transaction.recurrenceOption.monthly": "Assinatura mensal",
     "transaction.recurrenceOption.none": "Sem recorrência",
