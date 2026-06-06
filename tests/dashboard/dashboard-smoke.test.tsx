@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { BudgetProgress } from "@/components/dashboard/budget-progress";
+import { BudgetsScreen } from "@/components/dashboard/budgets-screen";
 import {
   BudgetSplitChart,
   BudgetSplitTooltip,
@@ -120,12 +120,24 @@ describe("dashboard component rendering", () => {
 
   it("renders budget progress for every 50/30/20 group", () => {
     const html = renderWithI18n(
-      <BudgetProgress
+      <BudgetsScreen
         budgetData={{
-          needs: { budget: 1000, percentage: 40, spent: 400 },
-          savings: { budget: 400, percentage: 100, spent: 400 },
-          wants: { budget: 600, percentage: 125, spent: 750 },
+          needs: { budget: 1000, percentage: 40, plannedSpent: 500, spent: 400 },
+          savings: {
+            budget: 400,
+            percentage: 100,
+            plannedSpent: 400,
+            spent: 400,
+          },
+          wants: {
+            budget: 600,
+            percentage: 125,
+            plannedSpent: 800,
+            spent: 750,
+          },
         }}
+        budgetSplitData={[]}
+        categories={[]}
       />,
     );
 

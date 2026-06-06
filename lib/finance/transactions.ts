@@ -283,7 +283,7 @@ export type SummaryData = {
 
 export type BudgetData = Record<
   DbCategoryGroup,
-  { spent: number; budget: number; percentage: number }
+  { spent: number; plannedSpent: number; budget: number; percentage: number }
 >;
 
 export type BudgetSplitItem = {
@@ -312,6 +312,11 @@ export type ExpensesOverTimeItem = {
   monthKey: string;
   amount: number;
   plannedAmount?: number;
+};
+
+export type DailyExpensesOverTimeItem = {
+  amount: number;
+  date: string;
 };
 
 export type ReportMonthlyItem = {
@@ -387,6 +392,7 @@ export type DashboardData = TransactionFormOptions & {
   budgetSplitData: BudgetSplitItem[];
   expensesByCategory: ExpensesByCategoryItem[];
   expensesOverTime: ExpensesOverTimeItem[];
+  dailyExpensesOverTime: DailyExpensesOverTimeItem[];
   latestTransactions: Transaction[];
   summaryData: SummaryData;
 };
@@ -2870,16 +2876,14 @@ export async function listTransactions(options?: {
       }
     }
 
-    const transactions = rows
-      .map(toTransaction)
-      .filter(
-        (transaction) =>
-          !transaction.notes?.startsWith("subscription") ||
-          shouldShowSubscriptionOccurrenceInTransactionHistory({
-            includePausedSubscriptions: options?.includePausedSubscriptions,
-            occurrence: transaction,
-          }),
-      );
+    const transactions = rows.map(toTransaction).filter(
+      (transaction) =>
+        !transaction.notes?.startsWith("subscription") ||
+        shouldShowSubscriptionOccurrenceInTransactionHistory({
+          includePausedSubscriptions: options?.includePausedSubscriptions,
+          occurrence: transaction,
+        }),
+    );
     const filteredTransactions = monthRange
       ? filterByMonth(transactions, monthRange.month, includePrevious)
       : transactions;
@@ -2913,7 +2917,10 @@ export async function listTransactions(options?: {
         metadataFallbackQuery = metadataFallbackQuery.gte("date", queryStart);
       }
     } else if (!includeFuture) {
-      metadataFallbackQuery = metadataFallbackQuery.lte("date", getTodayValue());
+      metadataFallbackQuery = metadataFallbackQuery.lte(
+        "date",
+        getTodayValue(),
+      );
     }
 
     const { data: metadataFallbackData, error: metadataFallbackError } =
@@ -3117,8 +3124,9 @@ export async function getDashboardData(
     (sum, transaction) => sum + Math.abs(transaction.amount),
     0,
   );
+  const actualUsageByGroup = sumBudgetUsageByGroup(transactions);
   const plannedUsageByGroup = sumBudgetUsageByGroup(scheduledTransactions);
-  const budgetData = calculateBudgetData(totalIncome, plannedUsageByGroup);
+  const budgetData = calculateBudgetData(totalIncome, actualUsageByGroup, plannedUsageByGroup);
 
   const expensesByCategory = buildExpensesByCategoryData(
     scheduledExpenseTransactions,
@@ -3137,6 +3145,14 @@ export async function getDashboardData(
       .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0),
     monthKey: monthBucket.monthKey,
   }));
+
+  const dailyExpensesOverTime = transactions
+    .filter((transaction) => transaction.type === "expense")
+    .map((transaction) => ({
+      amount: Math.abs(transaction.amount),
+      date: transaction.date,
+    }))
+    .sort((left, right) => left.date.localeCompare(right.date));
 
   const budgetSplitData = [
     {
@@ -3169,6 +3185,7 @@ export async function getDashboardData(
     budgetData,
     budgetSplitData,
     categories,
+    dailyExpensesOverTime,
     expensesByCategory,
     expensesOverTime,
     // Merge recent actual transactions with scheduled (future) transactions,

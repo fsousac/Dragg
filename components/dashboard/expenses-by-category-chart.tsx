@@ -106,7 +106,7 @@ export function ExpensesByCategoryChart({
         {total > 0 ? (
           <div className="space-y-5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-[180px_1fr] md:items-center">
-              <div className="h-[170px] min-h-0 min-w-0">
+              <div className="h-42.5 min-h-0 min-w-0">
                 <ResponsiveContainer
                   width="100%"
                   height="100%"
@@ -213,7 +213,7 @@ export function ExpensesByCategoryChart({
             ))}
           </div>
         ) : (
-          <div className="flex h-[200px] items-center justify-center rounded-md border border-dashed border-border/70 bg-muted/20 text-sm text-muted-foreground">
+          <div className="flex h-50 items-center justify-center rounded-md border border-dashed border-border/70 bg-muted/20 text-sm text-muted-foreground">
             {t("common.noDataForPeriod")}
           </div>
         )}

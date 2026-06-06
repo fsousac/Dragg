@@ -34,7 +34,7 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <Card className="h-full bg-card border-border card-shadow flex flex-col">
+    <Card className="h-fit bg-card border-border card-shadow flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
           <CardTitle className="text-base lg:text-lg font-semibold text-foreground">

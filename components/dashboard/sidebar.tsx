@@ -61,6 +61,8 @@ export function Sidebar({
             alt=""
             width={28}
             height={28}
+            priority
+            loading="eager"
             className="size-7"
             aria-hidden="true"
           />

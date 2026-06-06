@@ -1,88 +1,227 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { calculateBudgetUsage } from "@/lib/finance/budget";
-import { type BudgetData } from "@/lib/finance/transactions";
-import { useI18n } from "@/lib/i18n";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
-type BudgetProgressProps = {
-  budgetData: BudgetData;
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
+type DailyExpenseInput = {
+  date: string;
+  amount: number;
 };
 
-export function BudgetProgress({ budgetData }: BudgetProgressProps) {
-  const { formatCurrency, t } = useI18n();
-  const budgets = [
-    {
-      nameKey: "data.group.needs",
-      ...budgetData.needs,
-      color: "#F97316",
+type DailyExpensesSplineChartProps = {
+  expensesOverTime: DailyExpenseInput[];
+  selectedMonth?: string;
+  currency?: string;
+  locale?: string;
+};
+
+function getMonthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getDaysInMonth(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+
+  return new Date(year, month, 0).getDate();
+}
+
+function getChartEndDay(selectedMonth: string) {
+  const today = new Date();
+  const currentMonth = getMonthKey(today);
+
+  if (selectedMonth === currentMonth) {
+    return today.getDate();
+  }
+
+  if (selectedMonth < currentMonth) {
+    return getDaysInMonth(selectedMonth);
+  }
+
+  return 0;
+}
+
+function formatCurrency(value: number, locale: string, currency: string) {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+export function DailyExpensesSplineChart({
+  expensesOverTime,
+  selectedMonth,
+  currency = "BRL",
+  locale = "pt-BR",
+}: DailyExpensesSplineChartProps) {
+  const fallbackMonth = getMonthKey(new Date());
+  const monthKey = selectedMonth ?? fallbackMonth;
+  const endDay = getChartEndDay(monthKey);
+
+  const expensesByDay = expensesOverTime.reduce<Record<number, number>>(
+    (accumulator, expense) => {
+      if (!expense.date.startsWith(monthKey)) {
+        return accumulator;
+      }
+
+      const day = new Date(`${expense.date}T00:00:00`).getDate();
+
+      accumulator[day] = (accumulator[day] ?? 0) + expense.amount;
+
+      return accumulator;
     },
-    {
-      nameKey: "data.group.wants",
-      ...budgetData.wants,
-      color: "#EC4899",
-    },
-    {
-      nameKey: "data.group.savings",
-      ...budgetData.savings,
-      color: "#8B5CF6",
-    },
-  ];
+    {},
+  );
+
+  const chartData = Array.from({ length: endDay }, (_, index) => {
+    const day = index + 1;
+    const amount = expensesByDay[day] ?? 0;
+
+    return {
+      day,
+      label: String(day).padStart(2, "0"),
+      amount,
+    };
+  });
+
+  const totalSpent = chartData.reduce((total, item) => total + item.amount, 0);
+  const averagePerDay = endDay > 0 ? totalSpent / endDay : 0;
 
   return (
-    <Card className="bg-card border-border card-shadow">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base lg:text-lg font-semibold text-foreground">
-          {t("dashboard.budgetProgress.title")}
-        </CardTitle>
-        <p className="text-xs lg:text-sm text-muted-foreground">
-          {t("dashboard.budgetProgress.description")}
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-4 lg:space-y-6">
-        {budgets.map((budget) => {
-          const usage = calculateBudgetUsage(budget.spent, budget.budget);
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <CardTitle>Daily spending</CardTitle>
+            <CardDescription>
+              Actual expenses by day in the selected month.
+            </CardDescription>
+          </div>
 
-          return (
-            <div key={budget.nameKey} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: budget.color }}
+          <div className="text-right">
+            <p className="text-xs text-muted-foreground">Average/day</p>
+            <p className="text-sm font-semibold">
+              {formatCurrency(averagePerDay, locale, currency)}
+            </p>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent>
+        <div className="h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart
+              data={chartData}
+              margin={{
+                top: 8,
+                right: 12,
+                left: 0,
+                bottom: 0,
+              }}
+            >
+              <defs>
+                <linearGradient
+                  id="dailyExpensesFill"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop
+                    offset="5%"
+                    stopColor="currentColor"
+                    stopOpacity={0.28}
                   />
-                  <span className="text-sm font-medium text-foreground">
-                    {t(budget.nameKey)}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <span className="text-sm font-semibold text-foreground">
-                    {formatCurrency(budget.spent)}
-                  </span>
-                  <span className="text-xs text-muted-foreground ml-1">
-                    / {formatCurrency(budget.budget)}
-                  </span>
-                </div>
-              </div>
-              <div className="relative">
-                <Progress
-                  value={usage.progressValue}
-                  className="h-2 lg:h-3 bg-accent"
-                  style={{
-                    // @ts-expect-error CSS variable
-                    "--progress-foreground": usage.isOverBudget
-                      ? "var(--destructive)"
-                      : budget.color,
-                  }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground text-right">
-                {usage.usagePercentage}% {t("common.used")}
-              </p>
-            </div>
-          );
-        })}
+                  <stop
+                    offset="95%"
+                    stopColor="currentColor"
+                    stopOpacity={0.02}
+                  />
+                </linearGradient>
+              </defs>
+
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                className="text-xs"
+              />
+
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                width={72}
+                className="text-xs"
+                tickFormatter={(value) =>
+                  formatCurrency(Number(value), locale, currency)
+                }
+              />
+
+              <Tooltip
+                cursor={{
+                  strokeDasharray: "3 3",
+                }}
+                formatter={(value) => [
+                  formatCurrency(Number(value), locale, currency),
+                  "Spent",
+                ]}
+                labelFormatter={(label) => `Day ${label}`}
+                contentStyle={{
+                  borderRadius: "0.75rem",
+                  border: "1px solid hsl(var(--border))",
+                  background: "hsl(var(--card))",
+                  color: "hsl(var(--card-foreground))",
+                }}
+              />
+
+              <Area
+                type="monotone"
+                dataKey="amount"
+                stroke="currentColor"
+                strokeWidth={2.5}
+                fill="url(#dailyExpensesFill)"
+                dot={false}
+                activeDot={{
+                  r: 5,
+                }}
+                className="text-primary"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+          <div className="rounded-lg border border-border bg-muted/30 p-3">
+            <p className="text-xs text-muted-foreground">Spent so far</p>
+            <p className="font-semibold">
+              {formatCurrency(totalSpent, locale, currency)}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-border bg-muted/30 p-3">
+            <p className="text-xs text-muted-foreground">Days shown</p>
+            <p className="font-semibold">{endDay}</p>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

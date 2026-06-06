@@ -17,16 +17,19 @@ describe("budget calculations", () => {
     expect(budgetData.needs).toEqual({
       budget: 2000,
       percentage: 60,
+      plannedSpent: 1200,
       spent: 1200,
     });
     expect(budgetData.wants).toEqual({
       budget: 1200,
       percentage: 38,
+      plannedSpent: 450,
       spent: 450,
     });
     expect(budgetData.savings).toEqual({
       budget: 800,
       percentage: 38,
+      plannedSpent: 300,
       spent: 300,
     });
   });
@@ -94,9 +97,9 @@ describe("budget calculations", () => {
         wants: 30,
       }),
     ).toEqual({
-      needs: { budget: 0, percentage: 0, spent: 0 },
-      savings: { budget: 0, percentage: 0, spent: 20 },
-      wants: { budget: 0, percentage: 0, spent: 30 },
+      needs: { budget: 0, percentage: 0, plannedSpent: 0, spent: 0 },
+      savings: { budget: 0, percentage: 0, plannedSpent: 20, spent: 20 },
+      wants: { budget: 0, percentage: 0, plannedSpent: 30, spent: 30 },
     });
   });
 
@@ -115,5 +118,80 @@ describe("budget calculations", () => {
       savings: 300,
       wants: 100,
     });
+  });
+
+  it("actual monthly total — uses only realized transactions", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const pastDate = "2000-01-01";
+    const futureDate = "2099-12-31";
+
+    const allTransactions = [
+      { amount: -500, group: "needs" as const, date: pastDate },
+      { amount: -200, group: "wants" as const, date: pastDate },
+      { amount: -100, group: "savings" as const, date: pastDate },
+      { amount: -999, group: "needs" as const, date: futureDate },
+    ];
+
+    const actualTransactions = allTransactions.filter(
+      (t) => t.date <= today,
+    );
+    const actualByGroup = sumBudgetUsageByGroup(actualTransactions);
+    const budgetData = calculateBudgetData(2000, actualByGroup);
+
+    expect(budgetData.needs.spent).toBe(500);
+    expect(budgetData.wants.spent).toBe(200);
+    expect(budgetData.savings.spent).toBe(100);
+  });
+
+  it("planned monthly total — includes future transactions", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const pastDate = "2000-01-01";
+    const futureDate = "2099-12-31";
+
+    const allTransactions = [
+      { amount: -500, group: "needs" as const, date: pastDate },
+      { amount: -200, group: "wants" as const, date: pastDate },
+      { amount: -100, group: "savings" as const, date: pastDate },
+      { amount: -999, group: "needs" as const, date: futureDate },
+    ];
+
+    const actualTransactions = allTransactions.filter(
+      (t) => t.date <= today,
+    );
+    const plannedTransactions = allTransactions;
+
+    const actualByGroup = sumBudgetUsageByGroup(actualTransactions);
+    const plannedByGroup = sumBudgetUsageByGroup(plannedTransactions);
+    const budgetData = calculateBudgetData(2000, actualByGroup, plannedByGroup);
+
+    expect(budgetData.needs.plannedSpent).toBe(1499);
+    expect(budgetData.wants.plannedSpent).toBe(200);
+    expect(budgetData.savings.plannedSpent).toBe(100);
+    expect(budgetData.needs.plannedSpent).toBeGreaterThanOrEqual(
+      budgetData.needs.spent,
+    );
+  });
+
+  it("Budgets totalSpent matches Dashboard totalExpenses", () => {
+    const transactions = [
+      { amount: -300, group: "needs" as const, type: "expense" as const },
+      { amount: -150, group: "wants" as const, type: "expense" as const },
+      { amount: -50, group: "savings" as const, type: "expense" as const },
+      { amount: 1000, group: "income" as const, type: "income" as const },
+    ];
+
+    const totalExpenses = transactions
+      .filter((t) => t.type === "expense")
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+    const actualByGroup = sumBudgetUsageByGroup(transactions);
+    const budgetData = calculateBudgetData(1000, actualByGroup);
+
+    const budgetTotalSpent =
+      budgetData.needs.spent +
+      budgetData.wants.spent +
+      budgetData.savings.spent;
+
+    expect(budgetTotalSpent).toBe(totalExpenses);
   });
 });

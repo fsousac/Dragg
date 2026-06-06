@@ -12,9 +12,12 @@ import {
   ChevronUp,
   MoreHorizontal,
   Pencil,
+  PiggyBank,
   Plus,
   Search,
   Trash2,
+  TrendingDown,
+  TrendingUp,
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -97,6 +100,19 @@ type InstallmentDeleteRequest = {
   transaction: Transaction;
 };
 
+type ConfirmRequest =
+  | { kind: "delete-transaction"; transaction: Transaction }
+  | {
+      kind: "advance-installments";
+      preview: InstallmentPrepaymentPreview;
+      transactionId: string;
+    }
+  | {
+      kind: "delete-subscription";
+      transaction: Transaction;
+      scope: DeleteSubscriptionOccurrencesInput["scope"];
+    };
+
 type TransactionsScreenProps = {
   categories: TransactionFormCategory[];
   advanceInstallmentsAction: (data: AdvanceInstallmentsInput) => Promise<void>;
@@ -178,6 +194,9 @@ export function TransactionsScreen({
   >(null);
   const [installmentDeleteRequest, setInstallmentDeleteRequest] =
     useState<InstallmentDeleteRequest | null>(null);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(
+    null,
+  );
   const [isPending, startTransition] = useTransition();
   const [isNextInvoiceVisible, setIsNextInvoiceVisible] =
     useState(showNextInvoice);
@@ -201,6 +220,19 @@ export function TransactionsScreen({
 
   const isSubscriptionTransaction = (transaction: Transaction) =>
     transaction.notes?.startsWith("subscription") ?? false;
+
+  const monthlySummary = useMemo(() => {
+    let income = 0;
+    let expenses = 0;
+    let savings = 0;
+    for (const tx of transactions) {
+      if (tx.isCreditCardInvoice) continue;
+      if (tx.type === "income") income += Math.abs(tx.amount);
+      else if (tx.type === "saving") savings += Math.abs(tx.amount);
+      else expenses += Math.abs(tx.amount);
+    }
+    return { income, expenses, savings, balance: income - expenses - savings };
+  }, [transactions]);
 
   const getInstallmentDeleteDescriptionKey = (
     scope: InstallmentDeleteScope,
@@ -391,29 +423,11 @@ export function TransactionsScreen({
           return;
         }
 
-        const confirmed = window.confirm(
-          t("transactions.installments.advanceConfirmDescription")
-            .replace("{count}", String(preview.count))
-            .replace("{amount}", formatCurrency(preview.totalAmount))
-            .replace(
-              "{month}",
-              formatDate(`${preview.targetMonth}-01`, {
-                month: "long",
-                year: "numeric",
-              }),
-            ),
-        );
-
-        if (!confirmed) return;
-
-        await advanceInstallmentsAction({
-          scope: "remaining",
-          targetMonth: selectedMonth,
+        setConfirmRequest({
+          kind: "advance-installments",
+          preview,
           transactionId: transaction.id,
         });
-        toast.success(t("transactions.installments.advanceSuccess"));
-        closeTransactionDialog();
-        router.refresh();
       } catch (error) {
         console.error("Error advancing installments:", error);
         toast.error(t("transactions.installments.advanceError"));
@@ -424,23 +438,7 @@ export function TransactionsScreen({
   };
 
   const handleDeleteTransaction = (transaction: Transaction) => {
-    const confirmed = window.confirm(t("transaction.deleteConfirm"));
-
-    if (!confirmed) return;
-
-    setPendingTransactionId(transaction.id);
-    startTransition(async () => {
-      try {
-        await deleteTransactionAction(transaction.id);
-        toast.success(t("transaction.deleteSuccess"));
-        router.refresh();
-      } catch (error) {
-        console.error("Error deleting transaction:", error);
-        toast.error(t("transaction.deleteError"));
-      } finally {
-        setPendingTransactionId(null);
-      }
-    });
+    setConfirmRequest({ kind: "delete-transaction", transaction });
   };
 
   const handleDeleteInstallments = (
@@ -473,37 +471,69 @@ export function TransactionsScreen({
     });
   };
 
+  const confirmAction = () => {
+    if (!confirmRequest) return;
+
+    if (confirmRequest.kind === "delete-transaction") {
+      setPendingTransactionId(confirmRequest.transaction.id);
+      startTransition(async () => {
+        try {
+          await deleteTransactionAction(confirmRequest.transaction.id);
+          toast.success(t("transaction.deleteSuccess"));
+          setConfirmRequest(null);
+          closeTransactionDialog();
+          router.refresh();
+        } catch (error) {
+          console.error("Error deleting transaction:", error);
+          toast.error(t("transaction.deleteError"));
+        } finally {
+          setPendingTransactionId(null);
+        }
+      });
+    } else if (confirmRequest.kind === "advance-installments") {
+      startTransition(async () => {
+        try {
+          await advanceInstallmentsAction({
+            scope: "remaining",
+            targetMonth: selectedMonth,
+            transactionId: confirmRequest.transactionId,
+          });
+          toast.success(t("transactions.installments.advanceSuccess"));
+          setConfirmRequest(null);
+          closeTransactionDialog();
+          router.refresh();
+        } catch (error) {
+          console.error("Error advancing installments:", error);
+          toast.error(t("transactions.installments.advanceError"));
+        }
+      });
+    } else if (confirmRequest.kind === "delete-subscription") {
+      setPendingTransactionId(confirmRequest.transaction.id);
+      startTransition(async () => {
+        try {
+          await deleteSubscriptionOccurrencesAction({
+            scope: confirmRequest.scope,
+            transactionId: confirmRequest.transaction.id,
+          });
+          toast.success(t("transaction.deleteSuccess"));
+          setConfirmRequest(null);
+          closeTransactionDialog();
+          router.refresh();
+        } catch (error) {
+          console.error("Error deleting subscription occurrences:", error);
+          toast.error(t("transaction.deleteError"));
+        } finally {
+          setPendingTransactionId(null);
+        }
+      });
+    }
+  };
+
   const handleDeleteSubscriptionOccurrences = (
     transaction: Transaction,
     scope: DeleteSubscriptionOccurrencesInput["scope"],
   ) => {
-    const confirmed = window.confirm(
-      t(
-        scope === "single"
-          ? "transactions.subscriptions.deleteOnlyThisConfirm"
-          : "transactions.subscriptions.deleteThisAndFollowingUnpaidConfirm",
-      ),
-    );
-
-    if (!confirmed) return;
-
-    setPendingTransactionId(transaction.id);
-    startTransition(async () => {
-      try {
-        await deleteSubscriptionOccurrencesAction({
-          scope,
-          transactionId: transaction.id,
-        });
-        toast.success(t("transaction.deleteSuccess"));
-        closeTransactionDialog();
-        router.refresh();
-      } catch (error) {
-        console.error("Error deleting subscription occurrences:", error);
-        toast.error(t("transaction.deleteError"));
-      } finally {
-        setPendingTransactionId(null);
-      }
-    });
+    setConfirmRequest({ kind: "delete-subscription", transaction, scope });
   };
 
   const handleNewTransactionSubmit = async (data: TransactionFormData) => {
@@ -566,43 +596,141 @@ export function TransactionsScreen({
         }
       />
 
+      {/* Summary chips */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 mb-3 ">
+        {[
+          {
+            icon: TrendingUp,
+            label: t("dashboard.summary.totalIncome"),
+            value: formatCurrency(monthlySummary.income),
+            iconBg: "bg-emerald-500/10",
+            iconColor: "text-emerald-600 dark:text-emerald-400",
+            valueColor: "text-emerald-600 dark:text-emerald-400",
+          },
+          {
+            icon: TrendingDown,
+            label: t("dashboard.summary.totalExpenses"),
+            value: formatCurrency(monthlySummary.expenses),
+            iconBg: "bg-rose-500/10",
+            iconColor: "text-rose-500 dark:text-rose-400",
+            valueColor: "text-foreground",
+          },
+          {
+            icon: PiggyBank,
+            label: t("dashboard.summary.totalSaved"),
+            value: formatCurrency(monthlySummary.savings),
+            iconBg: "bg-violet-500/10",
+            iconColor: "text-violet-600 dark:text-violet-400",
+            valueColor: "text-foreground",
+          },
+          {
+            icon: Wallet,
+            label: t("dashboard.summary.currentBalance"),
+            value: formatCurrency(monthlySummary.balance),
+            iconBg:
+              monthlySummary.balance >= 0
+                ? "bg-emerald-500/10"
+                : "bg-rose-500/10",
+            iconColor:
+              monthlySummary.balance >= 0
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-rose-500 dark:text-rose-400",
+            valueColor:
+              monthlySummary.balance >= 0
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-rose-500 dark:text-rose-400",
+          },
+        ].map((chip) => {
+          const Icon = chip.icon;
+          return (
+            <div
+              key={chip.label}
+              className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm"
+            >
+              <div
+                className={cn(
+                  "flex size-9 shrink-0 items-center justify-center rounded-xl",
+                  chip.iconBg,
+                )}
+              >
+                <Icon className={cn("size-4", chip.iconColor)} />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold text-muted-foreground">
+                  {chip.label}
+                </p>
+                <p
+                  className={cn(
+                    "mt-0.5 text-base font-bold tabular-nums not-sm:text-xs overflow-auto",
+                    chip.valueColor,
+                  )}
+                >
+                  {chip.value}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       <Card className="border-border bg-card card-shadow">
-        <CardHeader className="space-y-4 pb-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <CardHeader className="space-y-3 pb-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <CardTitle className="text-lg">
+              <CardTitle className="font-semibold text-2xl">
                 {filteredTransactions.length} {t("screen.transactions.count")}
               </CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {t("screen.transactions.description")}
-              </p>
             </div>
-            <div className="flex items-center gap-2 lg:flex-nowrap">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8 lg:hidden"
-                onClick={() => setIsSearchPanelOpen((current) => !current)}
-                aria-label={t("screen.transactions.searchLabel")}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Search */}
+              <div className="flex h-9 flex-1 items-center gap-2 rounded-xl border border-border bg-background px-3 lg:min-w-48">
+                <Search className="size-3.5 shrink-0 text-muted-foreground" />
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t("screen.transactions.searchPlaceholder")}
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <ChevronDown className="size-3.5 rotate-90" />
+                  </button>
+                )}
+              </div>
+
+              {/* Group filter */}
+              <Select
+                value={groupFilter}
+                onValueChange={(value) =>
+                  setGroupFilter(value as Transaction["group"] | "all")
+                }
               >
-                <Search className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 shrink-0 rounded-md border border-border/60 px-2 text-[11px] font-medium text-muted-foreground hover:text-foreground lg:px-3"
-                onClick={() => setIsNextInvoiceVisible((current) => !current)}
-              >
-                {isNextInvoiceVisible
-                  ? t("screen.transactions.hideNextInvoice")
-                  : t("screen.transactions.showNextInvoice")}
-              </Button>
-              <div className="ml-auto flex items-center gap-2 whitespace-nowrap">
+                <SelectTrigger className="h-9 w-auto min-w-32 rounded-xl border-border bg-background text-sm font-medium">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {groupOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Sort */}
+              <div className="flex items-center gap-1 rounded-xl border border-border bg-background px-1 py-1">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+                  className={cn(
+                    "h-7 gap-1 rounded-lg px-2.5 text-xs font-semibold",
+                    sortOption.startsWith("date")
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
                   onClick={() =>
                     setSortOption(
                       sortOption === "date-desc" ? "date-asc" : "date-desc",
@@ -611,17 +739,22 @@ export function TransactionsScreen({
                 >
                   {t("common.date")}
                   {sortOption === "date-desc" ? (
-                    <ChevronDown className="size-3.5" />
+                    <ChevronDown className="size-3" />
                   ) : sortOption === "date-asc" ? (
-                    <ChevronUp className="size-3.5" />
+                    <ChevronUp className="size-3" />
                   ) : (
-                    <ArrowUpDown className="size-3.5 opacity-50" />
+                    <ArrowUpDown className="size-3 opacity-50" />
                   )}
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+                  className={cn(
+                    "h-7 gap-1 rounded-lg px-2.5 text-xs font-semibold",
+                    sortOption.startsWith("amount")
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
                   onClick={() =>
                     setSortOption(
                       sortOption === "amount-desc"
@@ -632,81 +765,41 @@ export function TransactionsScreen({
                 >
                   {t("common.amount")}
                   {sortOption === "amount-desc" ? (
-                    <ChevronDown className="size-3.5" />
+                    <ChevronDown className="size-3" />
                   ) : sortOption === "amount-asc" ? (
-                    <ChevronUp className="size-3.5" />
+                    <ChevronUp className="size-3" />
                   ) : (
-                    <ArrowUpDown className="size-3.5 opacity-50" />
+                    <ArrowUpDown className="size-3 opacity-50" />
                   )}
                 </Button>
               </div>
-            </div>
-          </div>
 
-          <div
-            className={cn(
-              "grid gap-1",
-              isSearchPanelOpen ? "grid" : "hidden lg:grid",
-            )}
-            id="header-inf"
-          >
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(160px,220px)] lg:items-start">
-              <div className="space-y-2 lg:order-2">
-                <Label
-                  htmlFor="transaction-group"
-                  className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground w-full"
-                >
-                  {t("screen.transactions.group")}
-                </Label>
-                <Select
-                  value={groupFilter}
-                  onValueChange={(value) =>
-                    setGroupFilter(value as Transaction["group"] | "all")
-                  }
-                >
-                  <SelectTrigger id="transaction-group">
-                    <SelectValue placeholder={t("screen.transactions.group")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {groupOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2 lg:order-1 lg:col-span-1">
-                <Label
-                  htmlFor="transaction-search"
-                  className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground"
-                >
-                  {t("screen.transactions.searchLabel")}
-                </Label>
-                <Input
-                  id="transaction-search"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder={t("screen.transactions.searchPlaceholder")}
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end">
+              {/* Next invoice toggle */}
               <Button
-                type="button"
                 variant="ghost"
                 size="sm"
-                className="h-10 px-0 text-muted-foreground hover:text-foreground"
-                onClick={() => {
-                  setSearchQuery("");
-                  setGroupFilter("all");
-                }}
-                disabled={!searchQuery && groupFilter === "all"}
+                className="h-9 shrink-0 rounded-xl border border-border/60 px-3 text-xs font-medium text-muted-foreground hover:text-foreground"
+                onClick={() => setIsNextInvoiceVisible((current) => !current)}
               >
-                {t("screen.transactions.clearFilters")}
+                {isNextInvoiceVisible
+                  ? t("screen.transactions.hideNextInvoice")
+                  : t("screen.transactions.showNextInvoice")}
               </Button>
+
+              {(searchQuery || groupFilter !== "all") && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setGroupFilter("all");
+                  }}
+                >
+                  {t("screen.transactions.clearFilters")}
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -1426,6 +1519,75 @@ export function TransactionsScreen({
               }}
             >
               {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(confirmRequest)}
+        onOpenChange={(open) => {
+          if (!open && !isPending) {
+            setConfirmRequest(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmRequest?.kind === "delete-transaction"
+                ? t("transaction.deleteConfirm")
+                : confirmRequest?.kind === "advance-installments"
+                  ? t("transactions.installments.advanceTitle")
+                  : confirmRequest?.kind === "delete-subscription"
+                    ? t(
+                        confirmRequest.scope === "single"
+                          ? "transactions.subscriptions.deleteOnlyThisTitle"
+                          : "transactions.subscriptions.deleteThisAndFollowingUnpaidTitle",
+                      )
+                    : null}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmRequest?.kind === "delete-transaction"
+                ? t("transaction.deleteDescription")
+                : confirmRequest?.kind === "advance-installments"
+                  ? t("transactions.installments.advanceConfirmDescription")
+                      .replace("{count}", String(confirmRequest.preview.count))
+                      .replace(
+                        "{amount}",
+                        formatCurrency(confirmRequest.preview.totalAmount),
+                      )
+                      .replace(
+                        "{month}",
+                        formatDate(`${confirmRequest.preview.targetMonth}-01`, {
+                          month: "long",
+                          year: "numeric",
+                        }),
+                      )
+                  : confirmRequest?.kind === "delete-subscription"
+                    ? t(
+                        confirmRequest.scope === "single"
+                          ? "transactions.subscriptions.deleteOnlyThisConfirm"
+                          : "transactions.subscriptions.deleteThisAndFollowingUnpaidConfirm",
+                      )
+                    : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault();
+                confirmAction();
+              }}
+            >
+              {confirmRequest?.kind === "advance-installments"
+                ? t("transactions.installments.advanceRemaining")
+                : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

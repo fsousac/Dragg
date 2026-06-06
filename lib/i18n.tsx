@@ -230,6 +230,13 @@ const messages = {
     "dashboard.expensesByCategory.description":
       "Category spending grouped by 50/30/20",
     "dashboard.expensesByCategory.title": "Expenses by Category",
+    "dashboard.dailyExpenses.averagePerDay": "Average/day",
+    "dashboard.dailyExpenses.day": "Day",
+    "dashboard.dailyExpenses.daysShown": "Days shown",
+    "dashboard.dailyExpenses.description":
+      "Actual expenses by day in the selected month.",
+    "dashboard.dailyExpenses.spentSoFar": "Spent so far",
+    "dashboard.dailyExpenses.title": "Daily spending",
     "dashboard.expensesOverTime.description": "Monthly expense trend",
     "dashboard.expensesOverTime.title": "Expenses Over Time",
     "dashboard.greeting.afternoon": "Good afternoon",
@@ -249,6 +256,9 @@ const messages = {
     "dashboard.quickActions.title": "Quick Actions",
     "dashboard.quickActions.addCategory": "Add Category",
     "dashboard.quickActions.viewReports": "View Reports",
+    "dashboard.hero.healthyBalance": "Healthy balance",
+    "dashboard.hero.tightBalance": "Balance under pressure",
+    "dashboard.hero.addTransaction": "Add transaction",
     "dashboard.summary.currentBalance": "Current Balance",
     "dashboard.summary.predictedExpenses": "Predicted",
     "dashboard.summary.totalExpenses": "Total Expenses",
@@ -303,9 +313,12 @@ const messages = {
       "Review, search, and organize every income and expense entry in one place.",
     "screen.budgets.categoryBudgets": "Category Budgets",
     "screen.budgets.configureBudget": "Configure Budget",
+    "screen.budgets.exportCsv": "Export CSV",
     "screen.budgets.groups": "Budget Groups",
+    "screen.budgets.includePlanned": "Include planned transactions",
     "screen.budgets.leftToSpend": "Left to spend",
     "screen.budgets.monthlyAllocation": "Monthly allocation",
+    "screen.budgets.plannedLabel": "Planned",
     "screen.budgets.rule": "50/30/20 Rule",
     "screen.budgets.title": "Budgets",
     "screen.budgets.totalBudget": "Total Budget",
@@ -530,6 +543,7 @@ const messages = {
       "Advance {count} remaining installments totaling {amount} to {month}?",
     "transactions.installments.advanceError": "Failed to advance installments.",
     "transactions.installments.advanceRemaining": "Advance remaining",
+    "transactions.installments.advanceTitle": "Advance installments?",
     "transactions.installments.advanceNone":
       "There are no remaining future installments to advance.",
     "transactions.installments.advanceSuccess":
@@ -551,10 +565,13 @@ const messages = {
     "transactions.subscriptions.deleteOnlyThis": "Delete this occurrence",
     "transactions.subscriptions.deleteOnlyThisConfirm":
       "This will delete only the selected subscription occurrence.",
+    "transactions.subscriptions.deleteOnlyThisTitle": "Delete this occurrence?",
     "transactions.subscriptions.deleteThisAndFollowingUnpaid":
       "Delete this and following unpaid occurrences",
     "transactions.subscriptions.deleteThisAndFollowingUnpaidConfirm":
       "This will delete the selected subscription occurrence and matching future unpaid occurrences. Paid historical transactions are preserved.",
+    "transactions.subscriptions.deleteThisAndFollowingUnpaidTitle":
+      "Delete occurrences?",
     "transaction.recurrence": "Recurrence",
     "transaction.recurrenceOption.monthly": "Monthly subscription",
     "transaction.recurrenceOption.none": "No recurrence",
@@ -565,6 +582,7 @@ const messages = {
     "transaction.recordSuccess": "Transaction recorded successfully!",
     "transaction.recordError": "Failed to record transaction.",
     "transaction.deleteConfirm": "Delete this transaction?",
+    "transaction.deleteDescription": "This action cannot be undone.",
     "transaction.deleteSuccess": "Transaction deleted successfully.",
     "transaction.deleteError": "Failed to delete transaction.",
     "transaction.addTitle": "New transaction",
@@ -807,6 +825,13 @@ const messages = {
     "dashboard.expensesByCategory.description":
       "Gastos por categoria agrupados pelo 50/30/20",
     "dashboard.expensesByCategory.title": "Gastos por categoria",
+    "dashboard.dailyExpenses.averagePerDay": "Média/dia",
+    "dashboard.dailyExpenses.day": "Dia",
+    "dashboard.dailyExpenses.daysShown": "Dias exibidos",
+    "dashboard.dailyExpenses.description":
+      "Gastos reais por dia no mês selecionado.",
+    "dashboard.dailyExpenses.spentSoFar": "Gasto até agora",
+    "dashboard.dailyExpenses.title": "Gastos diários",
     "dashboard.expensesOverTime.description": "Tendência mensal de gastos",
     "dashboard.expensesOverTime.title": "Gastos ao longo do tempo",
     "dashboard.greeting.afternoon": "Boa tarde",
@@ -827,6 +852,9 @@ const messages = {
     "dashboard.quickActions.title": "Ações rápidas",
     "dashboard.quickActions.addCategory": "Adicionar Categoria",
     "dashboard.quickActions.viewReports": "Ver relatórios",
+    "dashboard.hero.healthyBalance": "Saldo saudável",
+    "dashboard.hero.tightBalance": "Saldo sob pressão",
+    "dashboard.hero.addTransaction": "Adicionar transação",
     "dashboard.summary.currentBalance": "Saldo atual",
     "dashboard.summary.predictedExpenses": "Previsto",
     "dashboard.summary.totalExpenses": "Gastos totais",
@@ -880,9 +908,12 @@ const messages = {
       "Revise, busque e organize todas as entradas de renda e gasto em um só lugar.",
     "screen.budgets.categoryBudgets": "Orçamentos por categoria",
     "screen.budgets.configureBudget": "Configurar orçamento",
+    "screen.budgets.exportCsv": "Exportar CSV",
     "screen.budgets.groups": "Grupos do orçamento",
+    "screen.budgets.includePlanned": "Incluir transações previstas",
     "screen.budgets.leftToSpend": "Restante para gastar",
     "screen.budgets.monthlyAllocation": "Alocação mensal",
+    "screen.budgets.plannedLabel": "Previsto",
     "screen.budgets.rule": "Regra 50/30/20",
     "screen.budgets.title": "Orçamentos",
     "screen.budgets.totalBudget": "Orçamento total",
@@ -1120,6 +1151,7 @@ const messages = {
     "transactions.installments.advanceError":
       "Não foi possível adiantar as parcelas.",
     "transactions.installments.advanceRemaining": "Adiantar restantes",
+    "transactions.installments.advanceTitle": "Adiantar parcelas?",
     "transactions.installments.advanceNone":
       "Não há parcelas futuras restantes para adiantar.",
     "transactions.installments.advanceSuccess":
@@ -1141,10 +1173,13 @@ const messages = {
     "transactions.subscriptions.deleteOnlyThis": "Excluir esta ocorrência",
     "transactions.subscriptions.deleteOnlyThisConfirm":
       "Isso excluirá somente a ocorrência selecionada da assinatura.",
+    "transactions.subscriptions.deleteOnlyThisTitle": "Excluir esta ocorrência?",
     "transactions.subscriptions.deleteThisAndFollowingUnpaid":
       "Excluir esta e as próximas ocorrências não pagas",
     "transactions.subscriptions.deleteThisAndFollowingUnpaidConfirm":
       "Isso excluirá a ocorrência selecionada da assinatura e as ocorrências futuras não pagas correspondentes. Transações históricas pagas serão preservadas.",
+    "transactions.subscriptions.deleteThisAndFollowingUnpaidTitle":
+      "Excluir ocorrências?",
     "transaction.recurrence": "Recorrência",
     "transaction.recurrenceOption.monthly": "Assinatura mensal",
     "transaction.recurrenceOption.none": "Sem recorrência",
@@ -1156,6 +1191,7 @@ const messages = {
     "transaction.recordSuccess": "Registro realizado com sucesso!",
     "transaction.recordError": "Não foi possível registrar a transação.",
     "transaction.deleteConfirm": "Excluir esta transação?",
+    "transaction.deleteDescription": "Esta ação não pode ser desfeita.",
     "transaction.deleteSuccess": "Transação excluída com sucesso.",
     "transaction.deleteError": "Não foi possível excluir a transação.",
     "transaction.addTitle": "Nova transação",

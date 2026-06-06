@@ -1,19 +1,22 @@
 import { Suspense } from "react";
 
 import { AppShell } from "@/components/dashboard/app-shell";
-import { BudgetProgress } from "@/components/dashboard/budget-progress";
 import { BudgetSplitChart } from "@/components/dashboard/budget-split-chart";
+import { DashboardHero } from "@/components/dashboard/dashboard-hero";
 import { TransactionForm } from "@/components/dashboard/transaction-form";
 import { ExpensesByCategoryChart } from "@/components/dashboard/expenses-by-category-chart";
-import { ExpensesOverTimeChart } from "@/components/dashboard/expenses-over-time-chart";
+import {
+  DailyExpensesSplineChart,
+  ExpensesOverTimeChart,
+} from "@/components/dashboard/expenses-over-time-chart";
 import { QuickActions } from "@/components/dashboard/quick-actions";
-import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { TransactionsList } from "@/components/dashboard/transactions-list";
 import {
   createCategoryAction,
   createTransactionAction,
 } from "@/app/transactions/actions";
 import { getDashboardData, getUserContext } from "@/lib/finance/transactions";
+import { SummaryCards } from "@/components/dashboard/summary-cards";
 
 type DashboardPageProps = {
   searchParams?: Promise<{
@@ -24,18 +27,18 @@ type DashboardPageProps = {
 function DashboardContentFallback() {
   return (
     <div aria-label="Loading dashboard" className="space-y-4 lg:space-y-6">
-      <div className="h-[336px] animate-pulse rounded-xl border border-border bg-card/70 lg:h-[326px]" />
+      <div className="h-84 animate-pulse rounded-xl border border-border bg-card/70 lg:h-81.5" />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
         {Array.from({ length: 4 }, (_, index) => (
           <div
             key={index}
-            className="h-[132px] animate-pulse rounded-xl border border-border bg-card/70"
+            className="h-33 animate-pulse rounded-xl border border-border bg-card/70"
           />
         ))}
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
-        <div className="h-[430px] animate-pulse rounded-xl border border-border bg-card/70" />
-        <div className="h-[430px] animate-pulse rounded-xl border border-border bg-card/70 lg:col-span-2" />
+        <div className="h-107.5 animate-pulse rounded-xl border border-border bg-card/70" />
+        <div className="h-107.5 animate-pulse rounded-xl border border-border bg-card/70 lg:col-span-2" />
       </div>
     </div>
   );
@@ -52,6 +55,10 @@ async function DashboardContent({
 
   return (
     <>
+      <section aria-label="Financial summary" className="mb-6 lg-mb-8">
+        <SummaryCards summaryData={dashboardData.summaryData} />
+      </section>
+
       <section aria-label="New transaction form" className="mb-6 lg:mb-8">
         <TransactionForm
           categories={dashboardData.categories}
@@ -59,10 +66,6 @@ async function DashboardContent({
           onSubmit={createTransactionAction}
           paymentMethods={dashboardData.paymentMethods}
         />
-      </section>
-
-      <section aria-label="Financial summary">
-        <SummaryCards summaryData={dashboardData.summaryData} />
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 mt-4 lg:mt-6">
@@ -89,7 +92,10 @@ async function DashboardContent({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mt-4 lg:mt-6">
         <section aria-label="Budget progress">
-          <BudgetProgress budgetData={dashboardData.budgetData} />
+          <DailyExpensesSplineChart
+            dailyExpensesOverTime={dashboardData.dailyExpensesOverTime}
+            selectedMonth={selectedMonth}
+          />
         </section>
         <section aria-label="Quick actions">
           <QuickActions />
