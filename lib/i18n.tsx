@@ -127,6 +127,8 @@ const messages = {
     "common.date": "Date",
     "common.amount": "Amount",
     "common.view": "View",
+    "common.today": "Today",
+    "common.yesterday": "Yesterday",
     "category.create": "Create category",
     "category.createDescription":
       "Add a category to organize expenses inside your 50/30/20 groups.",
@@ -170,6 +172,7 @@ const messages = {
     "data.category.housing": "Housing",
     "data.category.needs": "Basic Expenses",
     "data.category.investments": "Investments",
+    "data.category.reserve": "Reserve",
     "data.category.salary": "Salary",
     "data.category.savings": "Savings",
     "data.category.transportation": "Transportation",
@@ -722,6 +725,8 @@ const messages = {
     "common.date": "Data",
     "common.amount": "Valor",
     "common.view": "Ver",
+    "common.today": "Hoje",
+    "common.yesterday": "Ontem",
     "category.create": "Criar categoria",
     "category.createDescription":
       "Adicione uma categoria para organizar gastos dentro dos grupos 50/30/20.",
@@ -765,6 +770,7 @@ const messages = {
     "data.category.housing": "Moradia",
     "data.category.needs": "Gastos Básicos",
     "data.category.investments": "Investimentos",
+    "data.category.reserve": "Reserva",
     "data.category.salary": "Salário",
     "data.category.savings": "Economias",
     "data.category.transportation": "Transporte",

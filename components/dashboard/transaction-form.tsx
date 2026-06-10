@@ -283,7 +283,7 @@ export function TransactionForm({
                 variant="outline"
                 className={`h-8 flex-1 px-4 text-xs font-medium transition-all duration-300 ${
                   formData.type === "expense"
-                    ? "border-rose-400/60 bg-rose-300/70 text-rose-900 shadow-sm hover:bg-rose-400/70 dark:border-rose-400/50 dark:bg-rose-500/20 dark:text-rose-100 dark:hover:bg-rose-500/30"
+                    ? "shadow-sm border-negative bg-negative-bg text-negative hover:bg-negative-bg"
                     : "border-border/40 text-foreground/80 hover:bg-foreground/5"
                 }`}
                 onClick={() =>
@@ -305,7 +305,7 @@ export function TransactionForm({
                 variant="outline"
                 className={`h-8 flex-1 px-4 text-xs font-medium transition-all duration-300 ${
                   formData.type === "income"
-                    ? "border-emerald-400/60 bg-emerald-300/70 text-emerald-900 shadow-sm hover:bg-emerald-400/70 dark:border-emerald-400/50 dark:bg-emerald-500/20 dark:text-emerald-100 dark:hover:bg-emerald-500/30"
+                    ? "shadow-sm border-positive bg-positive-bg text-positive hover:bg-positive-bg"
                     : "border-border/40 text-foreground/80 hover:bg-foreground/5"
                 }`}
                 onClick={() =>

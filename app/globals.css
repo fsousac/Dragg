@@ -3,112 +3,198 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Light Mode (default) */
+/* ─── LIGHT MODE (Sunset Pine Forest) ─── */
 :root {
-  --background: #FFF9F1;
-  --foreground: #1A1C1E;
-  --card: #ffffff;
-  --card-foreground: #1A1C1E;
-  --popover: #ffffff;
-  --popover-foreground: #1A1C1E;
-  --primary: #22C55E;
+  /* Existing shadcn tokens — updated to new palette */
+  --background: #FBF3EE;
+  --foreground: #1C1410;
+  --card: #FFFFFF;
+  --card-foreground: #1C1410;
+  --popover: #FFFFFF;
+  --popover-foreground: #1C1410;
+  --primary: #C94D35;
   --primary-foreground: #ffffff;
-  --secondary: #FFF7EB;
-  --secondary-foreground: #1A1C1E;
-  --muted: #FFF7EB;
-  --muted-foreground: #6B6F76;
-  --accent: #FFF7EB;
-  --accent-foreground: #1A1C1E;
+  --secondary: #F5E8DF;
+  --secondary-foreground: #1C1410;
+  --muted: #F5E8DF;
+  --muted-foreground: #9C8070;
+  --accent: #FEF9F6;
+  --accent-foreground: #1C1410;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --border: #F1E7DA;
-  --input: #F1E7DA;
-  --ring: #22C55E;
+  --border: #E8D5C8;
+  --input: #E8D5C8;
+  --ring: #C94D35;
   --radius: 0.75rem;
 
-  /* Custom Dragg colors - adjusted for light mode */
-  --needs: #EA580C;
-  --wants: #DB2777;
-  --savings: #7C3AED;
-  --income: #15803D;
-  --expense: #f43f5e;
-  --yellow: #F6C453;
+  /* Dragg semantic colors */
+  --needs: #D4793A;
+  --wants: #C26070;
+  --savings: #7B6498;
+  --income: #4E6B5B;
+  --expense: #C94D35;
+  --yellow: #D4793A;
 
   /* Chart colors */
-  --chart-1: #22C55E;
-  --chart-2: #15803D;
-  --chart-3: #DB2777;
-  --chart-4: #7C3AED;
-  --chart-5: #A6A29A;
+  --chart-1: #C94D35;
+  --chart-2: #D4793A;
+  --chart-3: #C26070;
+  --chart-4: #7B6498;
+  --chart-5: #4E6B5B;
 
   /* Sidebar */
-  --sidebar: #ffffff;
-  --sidebar-foreground: #1A1C1E;
-  --sidebar-primary: #22C55E;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #1C1410;
+  --sidebar-primary: #C94D35;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #FFF7EB;
-  --sidebar-accent-foreground: #1A1C1E;
-  --sidebar-border: #F1E7DA;
-  --sidebar-ring: #22C55E;
+  --sidebar-accent: #F5E8DF;
+  --sidebar-accent-foreground: #1C1410;
+  --sidebar-border: #E8D5C8;
+  --sidebar-ring: #C94D35;
 
-  /* Card shadow for light mode */
-  --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --card-shadow: 0 2px 16px rgba(28, 20, 16, 0.08);
+
+  /* ── New design-system tokens ── */
+  --color-base: #FBF3EE;
+  --color-surface: #F5E8DF;
+  --color-raised: #FEF9F6;
+  --color-overlay: rgba(28, 20, 16, 0.08);
+
+  --primary-hover: #B03D27;
+  --primary-muted: rgba(201, 77, 53, 0.12);
+
+  --color-warm: #D4793A;
+  --color-rose: #C26070;
+  --color-dusk: #7B6498;
+  --color-pine: #4E6B5B;
+
+  --color-text: #1C1410;
+  --color-text-secondary: #5C4A40;
+  --color-placeholder: #C4A898;
+
+  --color-border-strong: #D0BDB0;
+
+  --color-positive: #4E6B5B;
+  --color-positive-bg: rgba(78, 107, 91, 0.12);
+  --color-negative: #C94D35;
+  --color-negative-bg: rgba(201, 77, 53, 0.12);
+  --color-warning: #D4793A;
+  --color-warning-bg: rgba(212, 121, 58, 0.12);
+  --color-info: #7B6498;
+  --color-info-bg: rgba(123, 100, 152, 0.12);
+
+  --shadow-card: 0 2px 16px rgba(28, 20, 16, 0.08);
+  --shadow-raised: 0 4px 32px rgba(28, 20, 16, 0.12);
+  --shadow-glow: 0 0 24px rgba(201, 77, 53, 0.20);
+
+  /* Hero ribbon */
+  --ribbon-a: rgba(201, 77, 53, 0.60);
+  --ribbon-b: rgba(212, 121, 58, 0.40);
+  --ribbon-c: rgba(194, 96, 112, 0.35);
+  --ribbon-d: rgba(123, 100, 152, 0.30);
+  --hero-from: #C94D35;
+  --hero-mid: #D4793A;
+  --hero-to: #7B6498;
 }
 
-/* Dark Mode */
+/* ─── DARK MODE (Forest at Night) ─── */
 .dark {
-  --background: #0B0D0E;
-  --foreground: #F5F7FA;
-  --card: #111418;
-  --card-foreground: #F5F7FA;
-  --popover: #111418;
-  --popover-foreground: #F5F7FA;
-  --primary: #22c55e;
-  --primary-foreground: #0F1112;
-  --secondary: #1F2428;
-  --secondary-foreground: #F5F7FA;
-  --muted: #1F2428;
-  --muted-foreground: #A1A7AD;
-  --accent: #1F2428;
-  --accent-foreground: #F5F7FA;
+  /* Existing shadcn tokens — updated to new palette */
+  --background: #15221C;
+  --foreground: rgba(255, 255, 255, 0.92);
+  --card: #1E2E27;
+  --card-foreground: rgba(255, 255, 255, 0.92);
+  --popover: #1E2E27;
+  --popover-foreground: rgba(255, 255, 255, 0.92);
+  --primary: #E05A40;
+  --primary-foreground: #FFFFFF;
+  --secondary: #2C3E34;
+  --secondary-foreground: rgba(255, 255, 255, 0.92);
+  --muted: #2C3E34;
+  --muted-foreground: #8FA68E;
+  --accent: #334940;
+  --accent-foreground: rgba(255, 255, 255, 0.92);
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: #1F2428;
-  --input: #1F2428;
-  --ring: #22c55e;
+  --border: rgba(143, 166, 142, 0.15);
+  --input: rgba(143, 166, 142, 0.15);
+  --ring: #E05A40;
 
-  /* Custom Dragg colors */
-  --needs: #F97316;
-  --wants: #EC4899;
-  --savings: #8B5CF6;
-  --income: #22c55e;
-  --expense: #fb7185;
-  --yellow: #F6C453;
+  /* Dragg semantic colors */
+  --needs: #E08848;
+  --wants: #D47080;
+  --savings: #9B84C0;
+  --income: #8FA68E;
+  --expense: #E05A40;
+  --yellow: #E08848;
 
   /* Chart colors */
-  --chart-1: #22c55e;
-  --chart-2: #15803D;
-  --chart-3: #EC4899;
-  --chart-4: #8B5CF6;
-  --chart-5: #A1A7AD;
+  --chart-1: #E05A40;
+  --chart-2: #E08848;
+  --chart-3: #D47080;
+  --chart-4: #9B84C0;
+  --chart-5: #8FA68E;
 
   /* Sidebar */
-  --sidebar: #111418;
-  --sidebar-foreground: #F5F7FA;
-  --sidebar-primary: #22c55e;
-  --sidebar-primary-foreground: #0F1112;
-  --sidebar-accent: #1F2428;
-  --sidebar-accent-foreground: #F5F7FA;
-  --sidebar-border: #1F2428;
-  --sidebar-ring: #22c55e;
+  --sidebar: #1E2E27;
+  --sidebar-foreground: rgba(255, 255, 255, 0.92);
+  --sidebar-primary: #E05A40;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #2C3E34;
+  --sidebar-accent-foreground: rgba(255, 255, 255, 0.92);
+  --sidebar-border: rgba(143, 166, 142, 0.15);
+  --sidebar-ring: #E05A40;
 
-  /* No shadow in dark mode, use borders */
   --card-shadow: none;
+
+  /* ── New design-system tokens ── */
+  --color-base: #15221C;
+  --color-surface: #2C3E34;
+  --color-raised: #334940;
+  --color-overlay: rgba(0, 0, 0, 0.40);
+
+  --primary-hover: #F06850;
+  --primary-muted: rgba(224, 90, 64, 0.15);
+
+  --color-warm: #E08848;
+  --color-rose: #D47080;
+  --color-dusk: #9B84C0;
+  --color-pine: #8FA68E;
+
+  --color-text: rgba(255, 255, 255, 0.92);
+  --color-text-secondary: rgba(255, 255, 255, 0.60);
+  --color-placeholder: rgba(143, 166, 142, 0.50);
+
+  --color-border-strong: rgba(143, 166, 142, 0.30);
+
+  --color-positive: #8FA68E;
+  --color-positive-bg: rgba(143, 166, 142, 0.12);
+  --color-negative: #E05A40;
+  --color-negative-bg: rgba(224, 90, 64, 0.12);
+  --color-warning: #E08848;
+  --color-warning-bg: rgba(224, 136, 72, 0.12);
+  --color-info: #9B84C0;
+  --color-info-bg: rgba(155, 132, 192, 0.12);
+
+  --shadow-card: 0 2px 16px rgba(0, 0, 0, 0.40);
+  --shadow-raised: 0 8px 32px rgba(0, 0, 0, 0.60);
+  --shadow-glow: 0 0 40px rgba(224, 90, 64, 0.25), 0 0 80px rgba(224, 90, 64, 0.10);
+
+  /* Hero ribbon */
+  --ribbon-a: rgba(44, 62, 52, 0.80);
+  --ribbon-b: rgba(78, 107, 91, 0.50);
+  --ribbon-c: rgba(143, 166, 142, 0.30);
+  --ribbon-d: rgba(43, 42, 47, 0.60);
+  --hero-from: #15221C;
+  --hero-mid: #1E3028;
+  --hero-to: #2C3E34;
 }
 
 @theme inline {
   --font-sans: var(--font-satoshi), Inter, ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Existing shadcn token mappings */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -146,13 +232,36 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Custom Dragg colors */
+  /* Dragg semantic colors */
   --color-needs: var(--needs);
   --color-wants: var(--wants);
   --color-savings: var(--savings);
   --color-income: var(--income);
   --color-expense: var(--expense);
   --color-yellow: var(--yellow);
+
+  /* ── New design-system token mappings ── */
+  --color-base: var(--color-base);
+  --color-surface: var(--color-surface);
+  --color-raised: var(--color-raised);
+  --color-warm: var(--color-warm);
+  --color-dusk: var(--color-dusk);
+  --color-pine: var(--color-pine);
+  --color-positive: var(--color-positive);
+  --color-positive-bg: var(--color-positive-bg);
+  --color-negative: var(--color-negative);
+  --color-negative-bg: var(--color-negative-bg);
+  --color-warning: var(--color-warning);
+  --color-warning-bg: var(--color-warning-bg);
+  --color-info: var(--color-info);
+  --color-info-bg: var(--color-info-bg);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-muted: var(--primary-muted);
+  --color-border-strong: var(--color-border-strong);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
+  --shadow-glow: var(--shadow-glow);
 }
 
 @layer base {
@@ -168,21 +277,32 @@
   }
 }
 
-/* Custom scrollbar - adapts to theme */
+/* Glassmorphism utility */
+.glass-card {
+  background: rgba(255, 255, 255, 0.70);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--color-border-strong);
+  box-shadow: var(--shadow-card);
+  border-radius: 16px;
+}
+.dark .glass-card {
+  background: rgba(30, 46, 39, 0.60);
+  border-color: var(--border);
+}
+
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
-
 ::-webkit-scrollbar-track {
   background: var(--background);
 }
-
 ::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 4px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
 }
@@ -193,7 +313,7 @@
 }
 
 .dragg-loading-loader {
-  box-shadow: 0 0 0 0 rgb(34 197 94 / 0.28);
+  box-shadow: 0 0 0 0 rgba(224, 90, 64, 0.28);
   position: relative;
   z-index: 0;
   animation: dragg-loading-ripple 1.5s infinite linear;
@@ -205,7 +325,7 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow: 0 0 0 0 rgb(34 197 94 / 0.28);
+  box-shadow: 0 0 0 0 rgba(224, 90, 64, 0.28);
   animation: inherit;
   z-index: -1;
 }
@@ -220,6 +340,17 @@
 
 @keyframes dragg-loading-ripple {
   100% {
-    box-shadow: 0 0 0 42px rgb(34 197 94 / 0);
+    box-shadow: 0 0 0 42px rgba(224, 90, 64, 0);
+  }
+}
+
+@keyframes tx-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

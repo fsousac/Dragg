@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -210,6 +210,7 @@ export function TransactionsScreen({
     return `/transactions?${params.toString()}`;
   }, [searchParams, selectedMonth]);
   const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const previousTransactionsHref = useMemo(() => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("month", selectedMonth);
@@ -384,6 +385,37 @@ export function TransactionsScreen({
       }),
     [groupFilter, normalizedQuery, nextInvoiceTransactions, t],
   );
+
+  const dateGroups = useMemo(() => {
+    const map = new Map<string, Transaction[]>();
+    for (const tx of filteredTransactions) {
+      const existing = map.get(tx.date);
+      if (existing) {
+        existing.push(tx);
+      } else {
+        map.set(tx.date, [tx]);
+      }
+    }
+    const entries = [...map.entries()];
+    if (sortOption === "amount-desc" || sortOption === "amount-asc") {
+      entries.sort(([, aTxs], [, bTxs]) => {
+        const aMax = Math.max(...aTxs.map((tx) => Math.abs(tx.amount)));
+        const bMax = Math.max(...bTxs.map((tx) => Math.abs(tx.amount)));
+        return sortOption === "amount-desc" ? bMax - aMax : aMax - bMax;
+      });
+    } else {
+      entries.sort(([a], [b]) =>
+        sortOption === "date-asc" ? a.localeCompare(b) : b.localeCompare(a),
+      );
+    }
+    return entries;
+  }, [filteredTransactions, sortOption]);
+
+  const getDateGroupLabel = (date: string) => {
+    if (date === today) return t("common.today");
+    if (date === yesterday) return t("common.yesterday");
+    return formatDate(date, { day: "numeric", month: "short" });
+  };
 
   const openTransactionDialog = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
@@ -597,7 +629,10 @@ export function TransactionsScreen({
       />
 
       {/* Summary chips */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 mb-3 ">
+      <div
+        className="grid grid-cols-2 gap-3 lg:grid-cols-4 mb-3"
+        style={{ animation: "tx-fade-up 0.45s both" }}
+      >
         {[
           {
             icon: TrendingUp,
@@ -673,8 +708,11 @@ export function TransactionsScreen({
         })}
       </div>
 
-      <Card className="border-border bg-card card-shadow">
-        <CardHeader className="space-y-3 pb-3">
+      <Card
+        className="border-border bg-card card-shadow py-5 my-3"
+        style={{ animation: "tx-fade-up 0.45s 0.06s both" }}
+      >
+        <CardHeader className="space-y-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <CardTitle className="font-semibold text-2xl">
@@ -803,325 +841,381 @@ export function TransactionsScreen({
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4 p-0">
-          {isNextInvoiceVisible &&
-          filteredNextInvoiceTransactions.length > 0 ? (
-            <div className="border-b border-border bg-muted/20 px-4 py-3 lg:px-6 lg:py-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    {t("screen.transactions.nextInvoice")}
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {t("screen.transactions.nextInvoiceDescription")}
-                  </p>
-                </div>
-                <Badge variant="secondary" className="shrink-0">
-                  {filteredNextInvoiceTransactions.length}
-                </Badge>
-              </div>
-              <div className="mt-3 overflow-hidden rounded-xl border border-border bg-card">
-                <div className="divide-y divide-border">
-                  {filteredNextInvoiceTransactions.map((transaction) => {
-                    const invoiceLabelKey =
-                      transaction.invoice?.paymentMethodKey ??
-                      transaction.paymentMethodKey;
-                    const transactionTitle = invoiceLabelKey
-                      ? `${t("transaction.creditCardInvoiceFor")} ${t(invoiceLabelKey)}`
-                      : t("transaction.creditCardInvoice");
+      </Card>
 
-                    return (
-                      <button
-                        key={transaction.id}
-                        type="button"
-                        className="flex w-full items-center gap-3 px-4 py-3 text-left opacity-50 transition-colors hover:bg-accent/30 hover:opacity-80 lg:gap-4 lg:px-5"
-                        onClick={() => openTransactionDialog(transaction)}
-                      >
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-xl lg:size-11 lg:text-2xl">
-                          {transaction.icon}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate text-sm font-medium text-foreground">
-                              {transactionTitle}
-                            </p>
-                            <Badge
-                              variant="secondary"
-                              className="shrink-0 border-border bg-muted px-2 py-0 text-[10px] font-medium text-muted-foreground"
-                            >
-                              {t("screen.transactions.nextInvoice")}
-                            </Badge>
-                          </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] leading-5 text-muted-foreground">
-                            <span>{t(transaction.categoryKey)}</span>
-                            <span>·</span>
-                            <span>
-                              {formatDate(transaction.date, {
-                                day: "numeric",
-                                month: "short",
-                              })}
-                            </span>
-                            <span>·</span>
-                            <span>{t(`data.group.${transaction.group}`)}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <p className="text-xs font-medium tabular-nums text-foreground/80 lg:text-sm">
-                            {transaction.amount > 0 ? "+" : ""}
-                            {formatCurrency(Math.abs(transaction.amount))}
-                          </p>
-                          <Badge
-                            variant="secondary"
-                            className="shrink-0 text-[10px]"
-                          >
-                            {t("common.view")}
-                          </Badge>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+      {/* Next invoice section */}
+      {isNextInvoiceVisible && filteredNextInvoiceTransactions.length > 0 ? (
+        <div className="overflow-hidden rounded-xl border border-border bg-muted/20 my-3 px-4 py-3 lg:px-6 lg:py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                {t("screen.transactions.nextInvoice")}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t("screen.transactions.nextInvoiceDescription")}
+              </p>
             </div>
-          ) : null}
+            <Badge variant="secondary" className="shrink-0">
+              {filteredNextInvoiceTransactions.length}
+            </Badge>
+          </div>
+          <div className="mt-3 overflow-hidden rounded-xl border border-border bg-card">
+            <div className="divide-y divide-border">
+              {filteredNextInvoiceTransactions.map((transaction) => {
+                const invoiceLabelKey =
+                  transaction.invoice?.paymentMethodKey ??
+                  transaction.paymentMethodKey;
+                const transactionTitle = invoiceLabelKey
+                  ? `${t("transaction.creditCardInvoiceFor")} ${t(invoiceLabelKey)}`
+                  : t("transaction.creditCardInvoice");
 
-          <div className="divide-y divide-border">
-            {filteredTransactions.map((transaction) => {
-              const isPlanned = Boolean(transaction.isPlanned);
-              const isCreditCardInvoice = Boolean(
-                transaction.isCreditCardInvoice,
-              );
-              const isInstallment = isInstallmentTransaction(transaction);
-              const isSubscription = isSubscriptionTransaction(transaction);
-              const shouldPresentAsPlanned =
-                isPlanned && transaction.date > today;
-              const invoiceLabelKey =
-                transaction.invoice?.paymentMethodKey ??
-                transaction.paymentMethodKey;
-              const invoiceTitle = invoiceLabelKey
-                ? `${t("transaction.creditCardInvoiceFor")} ${t(invoiceLabelKey)}`
-                : t("transaction.creditCardInvoice");
-              const transactionTitle = isCreditCardInvoice
-                ? invoiceTitle
-                : t(transaction.descriptionKey);
-
-              return (
-                <div
-                  key={transaction.id}
-                  className={cn(
-                    "flex items-center gap-2 p-4",
-                    shouldPresentAsPlanned && "bg-muted/20",
-                  )}
-                >
+                return (
                   <button
+                    key={transaction.id}
                     type="button"
-                    className="flex min-w-0 flex-1 items-center gap-4 rounded-md text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left opacity-50 transition-colors hover:bg-accent/30 hover:opacity-80 lg:gap-4 lg:px-5"
                     onClick={() => openTransactionDialog(transaction)}
                   >
-                    <div
-                      className={cn(
-                        "flex size-12 items-center justify-center rounded-lg bg-accent text-2xl",
-                        shouldPresentAsPlanned && "grayscale opacity-55",
-                      )}
-                    >
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-xl lg:size-11 lg:text-2xl">
                       {transaction.icon}
                     </div>
-                    <div
-                      className={cn(
-                        "min-w-0 flex-1",
-                        shouldPresentAsPlanned && "opacity-65",
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        <p
-                          className={cn(
-                            "truncate font-medium text-foreground",
-                            shouldPresentAsPlanned && "text-muted-foreground",
-                          )}
-                        >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-medium text-foreground">
                           {transactionTitle}
                         </p>
-                        {shouldPresentAsPlanned ? (
-                          <Badge
-                            variant="secondary"
-                            className="shrink-0 border-border bg-muted px-2 py-0 text-[10px] font-medium text-muted-foreground"
-                          >
-                            {t(
-                              isCreditCardInvoice
-                                ? "screen.transactions.plannedInvoice"
-                                : "screen.transactions.planned",
-                            )}
-                          </Badge>
-                        ) : null}
-                        {transaction.type === "income" && (
-                          <ArrowUpRight className="size-4 shrink-0 text-income" />
-                        )}
-                        {transaction.type === "expense" && (
-                          <ArrowDownRight className="size-4 shrink-0 text-expense" />
-                        )}
-                        {transaction.type === "saving" && (
-                          <Wallet className="size-4 shrink-0 text-savings" />
-                        )}
-                      </div>
-                      <div className="mt-1 flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {t(transaction.categoryKey)}
+                        <Badge
+                          variant="secondary"
+                          className="shrink-0 border-border bg-muted px-2 py-0 text-[10px] font-medium text-muted-foreground"
+                        >
+                          {t("screen.transactions.nextInvoice")}
                         </Badge>
-                        <span className="text-xs text-muted-foreground">
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] leading-5 text-muted-foreground">
+                        <span>{t(transaction.categoryKey)}</span>
+                        <span>·</span>
+                        <span>
                           {formatDate(transaction.date, {
                             day: "numeric",
                             month: "short",
                           })}
                         </span>
+                        <span>·</span>
+                        <span>{t(`data.group.${transaction.group}`)}</span>
                       </div>
                     </div>
-                    <p
-                      className={cn(
-                        "tabular-nums font-semibold",
-                        transaction.amount > 0
-                          ? "text-income"
-                          : "text-foreground",
-                      )}
-                    >
-                      {transaction.amount > 0 ? "+" : ""}
-                      {formatCurrency(Math.abs(transaction.amount))}
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <p className="text-xs font-medium tabular-nums text-foreground/80 lg:text-sm">
+                        {transaction.amount > 0 ? "+" : ""}
+                        {formatCurrency(Math.abs(transaction.amount))}
+                      </p>
+                      <Badge
+                        variant="secondary"
+                        className="shrink-0 text-[10px]"
+                      >
+                        {t("common.view")}
+                      </Badge>
+                    </div>
                   </button>
-                  {isCreditCardInvoice ? null : (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="size-9 shrink-0 text-muted-foreground"
-                        >
-                          <MoreHorizontal className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openTransactionDialog(transaction);
-                          }}
-                        >
-                          <Pencil className="size-4" />
-                          {t("common.edit")}
-                        </DropdownMenuItem>
-                        {isInstallment ? (
-                          <>
-                            <DropdownMenuItem
-                              variant="destructive"
-                              disabled={
-                                isPending &&
-                                pendingTransactionId === transaction.id
-                              }
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleDeleteInstallments(transaction, "single");
-                              }}
-                            >
-                              <Trash2 className="size-4" />
-                              {t("transactions.installments.deleteOnlyThis")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              variant="destructive"
-                              disabled={
-                                isPending &&
-                                pendingTransactionId === transaction.id
-                              }
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleDeleteInstallments(
-                                  transaction,
-                                  "this_and_following",
-                                );
-                              }}
-                            >
-                              <Trash2 className="size-4" />
-                              {t(
-                                "transactions.installments.deleteThisAndFollowing",
-                              )}
-                            </DropdownMenuItem>
-                          </>
-                        ) : isSubscription ? (
-                          <>
-                            <DropdownMenuItem
-                              variant="destructive"
-                              disabled={
-                                isPending &&
-                                pendingTransactionId === transaction.id
-                              }
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleDeleteSubscriptionOccurrences(
-                                  transaction,
-                                  "single",
-                                );
-                              }}
-                            >
-                              <Trash2 className="size-4" />
-                              {t("transactions.subscriptions.deleteOnlyThis")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              variant="destructive"
-                              disabled={
-                                isPending &&
-                                pendingTransactionId === transaction.id
-                              }
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleDeleteSubscriptionOccurrences(
-                                  transaction,
-                                  "this_and_following_unpaid",
-                                );
-                              }}
-                            >
-                              <Trash2 className="size-4" />
-                              {t(
-                                "transactions.subscriptions.deleteThisAndFollowingUnpaid",
-                              )}
-                            </DropdownMenuItem>
-                          </>
-                        ) : (
-                          <DropdownMenuItem
-                            variant="destructive"
-                            disabled={
-                              isPending &&
-                              pendingTransactionId === transaction.id
-                            }
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleDeleteTransaction(transaction);
-                            }}
-                          >
-                            <Trash2 className="size-4" />
-                            {t("common.delete")}
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              );
-            })}
-            <div className="flex justify-center p-4">
-              <Button asChild size="sm" variant="outline">
-                <Link
-                  href={
-                    showPrevious ? transactionsHref : previousTransactionsHref
-                  }
-                >
-                  {showPrevious
-                    ? t("screen.transactions.hidePrevious")
-                    : t("screen.transactions.showPrevious")}
-                </Link>
-              </Button>
+                );
+              })}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      ) : null}
+
+      {/* Timeline-grouped transaction list */}
+      <div className="flex flex-col gap-3 pb-2">
+        {dateGroups.map(([date, groupTxs], groupIdx) => {
+          const dayNet = groupTxs.reduce((sum, tx) => {
+            if (tx.isCreditCardInvoice) return sum;
+            return tx.type === "income"
+              ? sum + Math.abs(tx.amount)
+              : sum - Math.abs(tx.amount);
+          }, 0);
+
+          return (
+            <div
+              key={date}
+              style={{
+                animation: `tx-fade-up 0.35s ${groupIdx * 0.06}s both`,
+              }}
+            >
+              {/* Group header: date label + rule + day net */}
+              <div className="mb-2.5 flex items-center gap-3">
+                <span className="whitespace-nowrap text-xs font-bold uppercase tracking-[0.07em] text-muted-foreground">
+                  {getDateGroupLabel(date)}
+                </span>
+                <div className="h-px flex-1 bg-border" />
+                <span
+                  className={cn(
+                    "whitespace-nowrap tabular-nums text-xs font-bold",
+                    dayNet >= 0 ? "text-income" : "text-expense",
+                  )}
+                >
+                  {dayNet >= 0 ? "+" : "−"}
+                  {formatCurrency(Math.abs(dayNet))}
+                </span>
+              </div>
+              {/* Group card */}
+              <div className="overflow-hidden rounded-[20px] border border-border bg-card shadow-sm">
+                {groupTxs.map((transaction, rowIdx) => {
+                  const isLast = rowIdx === groupTxs.length - 1;
+                  const isPlanned = Boolean(transaction.isPlanned);
+                  const isCreditCardInvoice = Boolean(
+                    transaction.isCreditCardInvoice,
+                  );
+                  const isInstallment = isInstallmentTransaction(transaction);
+                  const isSubscription = isSubscriptionTransaction(transaction);
+                  const shouldPresentAsPlanned =
+                    isPlanned && transaction.date > today;
+                  const invoiceLabelKey =
+                    transaction.invoice?.paymentMethodKey ??
+                    transaction.paymentMethodKey;
+                  const invoiceTitle = invoiceLabelKey
+                    ? `${t("transaction.creditCardInvoiceFor")} ${t(invoiceLabelKey)}`
+                    : t("transaction.creditCardInvoice");
+                  const transactionTitle = isCreditCardInvoice
+                    ? invoiceTitle
+                    : t(transaction.descriptionKey);
+
+                  return (
+                    <div
+                      key={transaction.id}
+                      className={cn(
+                        "flex items-center gap-2 px-4 py-3.5 transition-colors",
+                        !isLast && "border-b border-border",
+                        shouldPresentAsPlanned && "bg-muted/20",
+                      )}
+                      style={{
+                        animation: `tx-fade-up 0.3s ${rowIdx * 0.025}s both`,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="flex min-w-0 flex-1 items-center gap-4 rounded-md text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={() => openTransactionDialog(transaction)}
+                      >
+                        <div
+                          className={cn(
+                            "flex size-11 items-center justify-center rounded-[13px] bg-accent text-xl",
+                            shouldPresentAsPlanned && "grayscale opacity-55",
+                          )}
+                        >
+                          {transaction.icon}
+                        </div>
+                        <div
+                          className={cn(
+                            "min-w-0 flex-1",
+                            shouldPresentAsPlanned && "opacity-65",
+                          )}
+                        >
+                          <div className="flex items-center gap-2">
+                            <p
+                              className={cn(
+                                "truncate font-medium text-foreground",
+                                shouldPresentAsPlanned &&
+                                  "text-muted-foreground",
+                              )}
+                            >
+                              {transactionTitle}
+                            </p>
+                            {shouldPresentAsPlanned ? (
+                              <Badge
+                                variant="secondary"
+                                className="shrink-0 border-border bg-muted px-2 py-0 text-[10px] font-medium text-muted-foreground not-lg:hidden"
+                              >
+                                {t(
+                                  isCreditCardInvoice
+                                    ? "screen.transactions.plannedInvoice"
+                                    : "screen.transactions.planned",
+                                )}
+                              </Badge>
+                            ) : null}
+                            {transaction.type === "income" && (
+                              <ArrowUpRight className="size-4 shrink-0 text-income" />
+                            )}
+                            {transaction.type === "expense" && (
+                              <ArrowDownRight className="size-4 shrink-0 text-expense" />
+                            )}
+                            {transaction.type === "saving" && (
+                              <Wallet className="size-4 shrink-0 text-savings" />
+                            )}
+                          </div>
+                          <div className="mt-1 flex flex-col items-start align-middle gap-2 truncate w-full">
+                            <Badge variant="secondary" className="text-xs ">
+                              {t(transaction.categoryKey)}
+                            </Badge>
+                            {shouldPresentAsPlanned ? (
+                              <Badge
+                                variant="secondary"
+                                className="lg:hidden shrink-0 border-border bg-muted px-2 py-0 text-[10px] font-medium text-muted-foreground"
+                              >
+                                {t(
+                                  isCreditCardInvoice
+                                    ? "screen.transactions.plannedInvoice"
+                                    : "screen.transactions.planned",
+                                )}
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </div>
+                        <p
+                          className={cn(
+                            "tabular-nums font-semibold w-fit",
+                            transaction.type === "income"
+                              ? "text-income"
+                              : transaction.group === "savings"
+                                ? "text-savings"
+                                : "text-expense",
+                          )}
+                        >
+                          {transaction.type === "income" ? "+" : ""}
+                          {formatCurrency(Math.abs(transaction.amount))}
+                        </p>
+                      </button>
+                      {isCreditCardInvoice ? null : (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-9 shrink-0 text-muted-foreground"
+                            >
+                              <MoreHorizontal className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openTransactionDialog(transaction);
+                              }}
+                            >
+                              <Pencil className="size-4" />
+                              {t("common.edit")}
+                            </DropdownMenuItem>
+                            {isInstallment ? (
+                              <>
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  disabled={
+                                    isPending &&
+                                    pendingTransactionId === transaction.id
+                                  }
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleDeleteInstallments(
+                                      transaction,
+                                      "single",
+                                    );
+                                  }}
+                                >
+                                  <Trash2 className="size-4" />
+                                  {t(
+                                    "transactions.installments.deleteOnlyThis",
+                                  )}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  disabled={
+                                    isPending &&
+                                    pendingTransactionId === transaction.id
+                                  }
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleDeleteInstallments(
+                                      transaction,
+                                      "this_and_following",
+                                    );
+                                  }}
+                                >
+                                  <Trash2 className="size-4" />
+                                  {t(
+                                    "transactions.installments.deleteThisAndFollowing",
+                                  )}
+                                </DropdownMenuItem>
+                              </>
+                            ) : isSubscription ? (
+                              <>
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  disabled={
+                                    isPending &&
+                                    pendingTransactionId === transaction.id
+                                  }
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleDeleteSubscriptionOccurrences(
+                                      transaction,
+                                      "single",
+                                    );
+                                  }}
+                                >
+                                  <Trash2 className="size-4" />
+                                  {t(
+                                    "transactions.subscriptions.deleteOnlyThis",
+                                  )}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  disabled={
+                                    isPending &&
+                                    pendingTransactionId === transaction.id
+                                  }
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleDeleteSubscriptionOccurrences(
+                                      transaction,
+                                      "this_and_following_unpaid",
+                                    );
+                                  }}
+                                >
+                                  <Trash2 className="size-4" />
+                                  {t(
+                                    "transactions.subscriptions.deleteThisAndFollowingUnpaid",
+                                  )}
+                                </DropdownMenuItem>
+                              </>
+                            ) : (
+                              <DropdownMenuItem
+                                variant="destructive"
+                                disabled={
+                                  isPending &&
+                                  pendingTransactionId === transaction.id
+                                }
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleDeleteTransaction(transaction);
+                                }}
+                              >
+                                <Trash2 className="size-4" />
+                                {t("common.delete")}
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+        <div className="flex justify-center">
+          <Button asChild size="sm" variant="outline">
+            <Link
+              href={showPrevious ? transactionsHref : previousTransactionsHref}
+            >
+              {showPrevious
+                ? t("screen.transactions.hidePrevious")
+                : t("screen.transactions.showPrevious")}
+            </Link>
+          </Button>
+        </div>
+      </div>
 
       <Dialog
         open={Boolean(selectedTransaction)}

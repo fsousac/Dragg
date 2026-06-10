@@ -291,6 +291,7 @@ export type BudgetSplitItem = {
   nameKey: string;
   maxAmount: number;
   spentAmount: number;
+  plannedSpentAmount: number;
   value: number;
   color: string;
 };
@@ -454,6 +455,7 @@ const categoryIconMap: Record<string, string> = {
   leisure: "🎮",
   other: "🏷️",
   others: "🏷️",
+  reserve: "🛟",
   shopping: "🛍️",
   subscriptions: "🎬",
   transportation: "🚗",
@@ -560,6 +562,7 @@ const categoryTranslationMap: Record<string, string> = {
   leisure: "data.category.leisure",
   other: "data.category.other",
   others: "data.category.other",
+  reserve: "data.category.reserve",
   shopping: "data.category.shopping",
   subscriptions: "data.category.subscriptions",
   transportation: "data.category.transportation",
@@ -3161,6 +3164,7 @@ export async function getDashboardData(
       maxAmount: budgetData.needs.budget,
       nameKey: "data.group.needs",
       spentAmount: budgetData.needs.spent,
+      plannedSpentAmount: budgetData.needs.plannedSpent,
       value: 50,
     },
     {
@@ -3169,6 +3173,7 @@ export async function getDashboardData(
       maxAmount: budgetData.wants.budget,
       nameKey: "data.group.wants",
       spentAmount: budgetData.wants.spent,
+      plannedSpentAmount: budgetData.wants.plannedSpent,
       value: 30,
     },
     {
@@ -3177,6 +3182,7 @@ export async function getDashboardData(
       maxAmount: budgetData.savings.budget,
       nameKey: "data.group.savings",
       spentAmount: budgetData.savings.spent,
+      plannedSpentAmount: budgetData.savings.plannedSpent,
       value: 20,
     },
   ];

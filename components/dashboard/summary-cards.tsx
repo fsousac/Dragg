@@ -20,15 +20,15 @@ export function SummaryCards({ summaryData }: SummaryCardsProps) {
   const { formatCurrency, t } = useI18n();
   const formatTrend = (value: number) =>
     `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
+
   const cards = [
     {
       titleKey: "dashboard.summary.totalIncome",
       value: summaryData.totalIncome,
       icon: TrendingUp,
       trend: summaryData.trends.totalIncome,
-      colorClass: "text-[#22C55E]",
-      bgClass: "bg-[#22C55E]/10",
-      iconBgClass: "bg-[#22C55E]/20",
+      colorVar: "var(--color-positive)",
+      bgVar: "var(--color-positive-bg)",
     },
     {
       titleKey: "dashboard.summary.totalExpenses",
@@ -37,26 +37,23 @@ export function SummaryCards({ summaryData }: SummaryCardsProps) {
       trend: summaryData.trends.totalExpenses,
       noteKey: "dashboard.summary.predictedExpenses",
       noteValue: summaryData.predictedExpenses,
-      colorClass: "text-[#FB7185]",
-      bgClass: "bg-[#FB7185]/10",
-      iconBgClass: "bg-[#FB7185]/20",
+      colorVar: "var(--color-negative)",
+      bgVar: "var(--color-negative-bg)",
     },
     {
       titleKey: "dashboard.summary.totalSaved",
       value: summaryData.totalSaved,
       icon: PiggyBank,
       trend: summaryData.trends.totalSaved,
-      colorClass: "text-[#8B5CF6]",
-      bgClass: "bg-[#8B5CF6]/10",
-      iconBgClass: "bg-[#8B5CF6]/20",
+      colorVar: "var(--color-info)",
+      bgVar: "var(--color-info-bg)",
     },
     {
       titleKey: "dashboard.summary.currentBalance",
       value: summaryData.currentBalance,
       icon: Wallet,
-      colorClass: "text-[#22C55E]",
-      bgClass: "bg-[#22C55E]/10",
-      iconBgClass: "bg-[#22C55E]/20",
+      colorVar: "var(--color-positive)",
+      bgVar: "var(--color-positive-bg)",
     },
   ];
 
@@ -72,14 +69,22 @@ export function SummaryCards({ summaryData }: SummaryCardsProps) {
             >
               <CardContent className="p-4 lg:p-6">
                 <div className="flex items-start justify-between">
-                  <div className={`p-2 lg:p-3 rounded-xl ${card.iconBgClass}`}>
+                  <div
+                    className="p-2 lg:p-3 rounded-xl"
+                    style={{ background: card.bgVar }}
+                  >
                     <Icon
-                      className={`w-4 h-4 lg:w-5 lg:h-5 ${card.colorClass}`}
+                      className="w-4 h-4 lg:w-5 lg:h-5"
+                      style={{ color: card.colorVar }}
                     />
                   </div>
                   {typeof card.trend === "number" ? (
                     <span
-                      className={`text-xs font-medium px-2 py-1 rounded-full ${card.bgClass} ${card.colorClass}`}
+                      className="text-xs font-medium px-2 py-1 rounded-full"
+                      style={{
+                        background: card.bgVar,
+                        color: card.colorVar,
+                      }}
                     >
                       {formatTrend(card.trend)}
                     </span>
@@ -90,7 +95,8 @@ export function SummaryCards({ summaryData }: SummaryCardsProps) {
                     {t(card.titleKey)}
                   </p>
                   <p
-                    className={`text-xl lg:text-2xl font-bold mt-1 ${card.colorClass}`}
+                    className="text-xl lg:text-2xl font-bold mt-1"
+                    style={{ color: card.colorVar }}
                   >
                     {formatCurrency(card.value)}
                   </p>
@@ -108,7 +114,6 @@ export function SummaryCards({ summaryData }: SummaryCardsProps) {
       <div className="flex flex-col items-center my-3 lg:my-4">
         <Button
           className="gap-2 w-[90%] h-10"
-          // onClick={() => setIsNewTransactionOpen(true)}
           onClick={() => {
             console.log("hello world!");
           }}

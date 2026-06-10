@@ -235,16 +235,9 @@ export function MonthWheelPicker({
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-50"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
       {/* Picker panel */}
       <div
-        className="absolute right-0 top-[calc(100%+10px)] z-50 w-[300px] rounded-2xl border border-border bg-card shadow-lg p-4"
+        className="absolute right-0 top-[calc(100%+10px)] z-50 w-75 rounded-2xl border border-border bg-card shadow-lg p-4"
         style={{ animation: "month-picker-in 0.22s cubic-bezier(.22,1,.36,1)" }}
         onClick={(e) => e.stopPropagation()}
       >

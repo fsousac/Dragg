@@ -79,7 +79,7 @@ export function CurrencyInput({
         <Input
           id={id}
           inputMode="numeric"
-          pattern="[0-9]*"
+          pattern="[0-9]*,[0-9]{2}"
           placeholder="0,00"
           value={isEditing || hasValue ? formatCurrencyInputValue(value) : ""}
           onChange={createCurrencyInputChangeHandler(onValueChange)}

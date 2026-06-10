@@ -21,8 +21,8 @@ export function DashboardHero({ summaryData, onAdd }: DashboardHeroProps) {
         className="relative flex flex-col justify-between overflow-hidden rounded-2xl p-6 text-white"
         style={{
           background:
-            "linear-gradient(135deg, #15803d 0%, #16a34a 55%, #22c55e 100%)",
-          boxShadow: "0 20px 48px -16px rgba(21,128,61,0.5)",
+            "linear-gradient(135deg, var(--hero-from) 0%, var(--hero-mid) 50%, var(--hero-to) 100%)",
+          boxShadow: "var(--shadow-raised)",
         }}
       >
         {/* decorative glows */}
@@ -31,7 +31,7 @@ export function DashboardHero({ summaryData, onAdd }: DashboardHeroProps) {
           className="pointer-events-none absolute -right-16 -top-16 size-56 rounded-full"
           style={{
             background:
-              "radial-gradient(circle, rgba(255,255,255,.2), transparent 70%)",
+              "radial-gradient(circle, var(--ribbon-a), transparent 70%)",
           }}
         />
         <div
@@ -39,7 +39,7 @@ export function DashboardHero({ summaryData, onAdd }: DashboardHeroProps) {
           className="pointer-events-none absolute -bottom-20 -left-12 size-52 rounded-full"
           style={{
             background:
-              "radial-gradient(circle, rgba(255,255,255,.1), transparent 70%)",
+              "radial-gradient(circle, var(--ribbon-b), transparent 70%)",
           }}
         />
 
@@ -53,10 +53,7 @@ export function DashboardHero({ summaryData, onAdd }: DashboardHeroProps) {
               {formatCurrency(summaryData.currentBalance)}
             </p>
             <span
-              className={cn(
-                "mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold backdrop-blur-sm",
-                isHealthy ? "bg-white/15 text-white" : "bg-white/15 text-white",
-              )}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[13px] font-semibold text-white backdrop-blur-sm"
             >
               <span
                 className={cn(
@@ -95,7 +92,8 @@ export function DashboardHero({ summaryData, onAdd }: DashboardHeroProps) {
           {onAdd && (
             <button
               onClick={onAdd}
-              className="flex w-full items-center justify-center gap-2 rounded-[13px] bg-white py-3.5 text-[15px] font-bold text-emerald-800 shadow-lg transition-transform hover:-translate-y-px active:translate-y-0"
+              className="flex w-full items-center justify-center gap-2 rounded-[13px] bg-white py-3.5 text-[15px] font-bold shadow-lg transition-transform hover:-translate-y-px active:translate-y-0"
+              style={{ color: "var(--hero-from)" }}
             >
               <Plus className="size-5" strokeWidth={2.4} />
               {t("dashboard.hero.addTransaction")}
@@ -112,9 +110,9 @@ export function DashboardHero({ summaryData, onAdd }: DashboardHeroProps) {
             value: summaryData.totalIncome,
             icon: TrendingUp,
             trend: summaryData.trends.totalIncome,
-            iconBg: "bg-emerald-500/10",
-            iconColor: "text-emerald-600 dark:text-emerald-400",
-            valueColor: "text-emerald-600 dark:text-emerald-400",
+            iconBgVar: "var(--color-positive-bg)",
+            iconColorVar: "var(--color-positive)",
+            valueColorVar: "var(--color-positive)",
           },
           {
             titleKey: "dashboard.summary.totalExpenses",
@@ -123,35 +121,35 @@ export function DashboardHero({ summaryData, onAdd }: DashboardHeroProps) {
             trend: summaryData.trends.totalExpenses,
             noteKey: "dashboard.summary.predictedExpenses" as const,
             noteValue: summaryData.predictedExpenses,
-            iconBg: "bg-rose-500/10",
-            iconColor: "text-rose-500 dark:text-rose-400",
-            valueColor: "text-foreground",
+            iconBgVar: "var(--color-negative-bg)",
+            iconColorVar: "var(--color-negative)",
+            valueColorVar: "var(--foreground)",
           },
           {
             titleKey: "dashboard.summary.totalSaved",
             value: summaryData.totalSaved,
             icon: PiggyBank,
             trend: summaryData.trends.totalSaved,
-            iconBg: "bg-violet-500/10",
-            iconColor: "text-violet-600 dark:text-violet-400",
-            valueColor: "text-foreground",
+            iconBgVar: "var(--color-info-bg)",
+            iconColorVar: "var(--color-info)",
+            valueColorVar: "var(--foreground)",
           },
           {
             titleKey: "dashboard.summary.currentBalance",
             value: summaryData.currentBalance,
             icon: TrendingUp,
-            iconBg:
+            iconBgVar:
               summaryData.currentBalance >= 0
-                ? "bg-emerald-500/10"
-                : "bg-rose-500/10",
-            iconColor:
+                ? "var(--color-positive-bg)"
+                : "var(--color-negative-bg)",
+            iconColorVar:
               summaryData.currentBalance >= 0
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-rose-500 dark:text-rose-400",
-            valueColor:
+                ? "var(--color-positive)"
+                : "var(--color-negative)",
+            valueColorVar:
               summaryData.currentBalance >= 0
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-rose-500 dark:text-rose-400",
+                ? "var(--color-positive)"
+                : "var(--color-negative)",
           },
         ].map((card) => {
           const Icon = card.icon;
@@ -160,24 +158,22 @@ export function DashboardHero({ summaryData, onAdd }: DashboardHeroProps) {
           return (
             <div
               key={card.titleKey}
-              className="flex flex-col justify-between rounded-2xl border border-border bg-card p-4 shadow-sm lg:p-5"
+              className="flex flex-col justify-between rounded-2xl border border-border bg-card p-4 shadow-card lg:p-5"
             >
               <div className="flex items-start justify-between">
                 <div
-                  className={cn(
-                    "flex size-10 items-center justify-center rounded-xl",
-                    card.iconBg,
-                  )}
+                  className="flex size-10 items-center justify-center rounded-xl"
+                  style={{ background: card.iconBgVar }}
                 >
-                  <Icon className={cn("size-5", card.iconColor)} />
+                  <Icon className="size-5" style={{ color: card.iconColorVar }} />
                 </div>
                 {"trend" in card && typeof card.trend === "number" ? (
                   <span
-                    className={cn(
-                      "rounded-full px-2 py-1 text-xs font-semibold",
-                      card.iconBg,
-                      card.iconColor,
-                    )}
+                    className="rounded-full px-2 py-1 text-xs font-semibold"
+                    style={{
+                      background: card.iconBgVar,
+                      color: card.iconColorVar,
+                    }}
                   >
                     {formatTrend(card.trend)}
                   </span>
@@ -188,10 +184,8 @@ export function DashboardHero({ summaryData, onAdd }: DashboardHeroProps) {
                   {t(card.titleKey)}
                 </p>
                 <p
-                  className={cn(
-                    "mt-1 text-xl font-bold tabular-nums lg:text-2xl",
-                    card.valueColor,
-                  )}
+                  className="mt-1 text-xl font-bold tabular-nums lg:text-2xl"
+                  style={{ color: card.valueColorVar }}
                 >
                   {formatCurrency(card.value)}
                 </p>
