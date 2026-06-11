@@ -430,9 +430,9 @@ const editablePaymentMethodTypes = [
 const transactionKinds = ["expense", "income", "saving"] as const;
 
 const groupColors = {
-  needs: "#F97316",
-  wants: "#EC4899",
-  savings: "#8B5CF6",
+  needs: "#F59E0B",
+  wants: "#8B5CF6",
+  savings: "#1FC286",
 } as const;
 
 const groupIcons = {

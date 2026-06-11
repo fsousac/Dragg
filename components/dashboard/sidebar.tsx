@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -51,6 +52,46 @@ export function Sidebar({
   const searchParams = useSearchParams();
   const { t } = useI18n();
 
+  const ulRef = useRef<HTMLUListElement>(null);
+  const pillRef = useRef<HTMLDivElement>(null);
+  const linkRefs = useRef<Map<string, HTMLAnchorElement | null>>(new Map());
+  const [pillReady, setPillReady] = useState(false);
+
+  useLayoutEffect(() => {
+    const activeLink = linkRefs.current.get(pathname);
+    const ul = ulRef.current;
+    const pill = pillRef.current;
+    if (!ul || !pill) return;
+
+    if (!activeLink) {
+      pill.style.opacity = "0";
+      return;
+    }
+
+    const ulRect = ul.getBoundingClientRect();
+    const linkRect = activeLink.getBoundingClientRect();
+    const top = linkRect.top - ulRect.top;
+    const height = linkRect.height;
+
+    if (!pillReady) {
+      pill.style.transition = "none";
+      pill.style.top = `${top}px`;
+      pill.style.height = `${height}px`;
+      pill.style.opacity = "1";
+      setPillReady(true);
+      requestAnimationFrame(() => {
+        if (pill) {
+          pill.style.transition =
+            "top 200ms ease-in-out, height 200ms ease-in-out, opacity 150ms ease-out";
+        }
+      });
+    } else {
+      pill.style.top = `${top}px`;
+      pill.style.height = `${height}px`;
+      pill.style.opacity = "1";
+    }
+  }, [pathname, pillReady]);
+
   return (
     <aside className="hidden lg:flex flex-col w-64 bg-card border-r border-border h-screen sticky top-0 card-shadow">
       {/* Logo */}
@@ -72,7 +113,14 @@ export function Sidebar({
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-4">
-        <ul className="space-y-1">
+        <ul ref={ulRef} className="relative space-y-1">
+          {/* Sliding pill background */}
+          <div
+            ref={pillRef}
+            aria-hidden="true"
+            className="pointer-events-none absolute left-0 right-0 rounded-xl bg-primary"
+            style={{ opacity: 0, top: 0, height: 0 }}
+          />
           {navigationItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -80,15 +128,18 @@ export function Sidebar({
             return (
               <li key={item.nameKey}>
                 <Link
+                  ref={(el) => {
+                    linkRefs.current.set(item.href, el);
+                  }}
                   href={href}
                   prefetch
                   onMouseEnter={() => router.prefetch(href)}
                   onFocus={() => router.prefetch(href)}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
+                    "relative z-10 flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors duration-150",
                     isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                      ? "text-card"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >
                   <Icon className="w-5 h-5" />
@@ -111,7 +162,7 @@ export function Sidebar({
           onFocus={() =>
             router.prefetch(withSelectedMonth("/settings", searchParams))
           }
-          className="flex items-center gap-3 rounded-xl transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="flex items-center gap-3 rounded-xl transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <Avatar className="size-8">
             {userAvatarUrl ? (

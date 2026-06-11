@@ -291,8 +291,8 @@ export function ReportsScreen({ reportsData }: ReportsScreenProps) {
                   <YAxis stroke="var(--muted-foreground)" fontSize={12} tickFormatter={(value) => formatCurrency(Number(value)).replace(/([,.]00|,00)$/, "")} />
                   <Tooltip formatter={(value) => [formatCurrency(Number(value ?? 0)), ""]} />
                   <Legend />
-                  <Bar dataKey="income" name={t("common.income")} fill="var(--income)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" name={t("common.expense")} fill="var(--expense)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="income" name={t("common.income")} fill="var(--income)" radius={[4, 4, 0, 0]} isAnimationActive animationBegin={0} animationDuration={500} animationEasing="ease-out" />
+                  <Bar dataKey="expenses" name={t("common.expense")} fill="var(--expense)" radius={[4, 4, 0, 0]} isAnimationActive animationBegin={100} animationDuration={500} animationEasing="ease-out" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -323,7 +323,7 @@ export function ReportsScreen({ reportsData }: ReportsScreenProps) {
                       <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <Area type="monotone" dataKey="netWorth" stroke="var(--primary)" strokeWidth={2} fill="url(#colorNetWorth)" />
+                  <Area type="monotone" dataKey="netWorth" stroke="var(--primary)" strokeWidth={2} fill="url(#colorNetWorth)" isAnimationActive animationBegin={0} animationDuration={800} animationEasing="ease-in-out" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

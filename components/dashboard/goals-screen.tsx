@@ -80,12 +80,12 @@ type GoalFormState = {
 
 const goalIcons = ["🎯", "🏦", "✈️", "🚗", "🏠", "📈", "🎓", "💻"];
 const goalColors = [
-  "#22C55E",
-  "#15803D",
-  "#F6C453",
-  "#FFC38A",
-  "#14B8A6",
-  "#EAB308",
+  "var(--chart-1)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-3)",
+  "var(--chart-2)",
+  "var(--savings)",
 ];
 
 function getTodayValue() {

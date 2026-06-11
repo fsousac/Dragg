@@ -16,7 +16,17 @@ const badgeVariants = cva(
         destructive:
           'border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60',
         outline:
-          'text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
+          'text-foreground [a&]:hover:bg-muted [a&]:hover:text-foreground',
+        income:
+          'rounded-full bg-income-bg text-income border-income/20',
+        expense:
+          'rounded-full bg-expense-bg text-expense border-expense/20',
+        savings:
+          'rounded-full bg-savings-bg text-savings border-savings/20',
+        needs:
+          'rounded-full bg-needs-bg text-needs border-needs/20',
+        wants:
+          'rounded-full bg-wants-bg text-wants border-wants/20',
       },
     },
     defaultVariants: {

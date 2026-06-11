@@ -94,6 +94,10 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
                   innerRadius={44}
                   outerRadius={72}
                   paddingAngle={4}
+                  isAnimationActive
+                  animationBegin={100}
+                  animationDuration={900}
+                  animationEasing="ease-out"
                 >
                   {chartData.map((entry) => (
                     <Cell

@@ -3,198 +3,220 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ─── LIGHT MODE (Sunset Pine Forest) ─── */
+/* ══════════════════════════════════════════════
+   DRAGG DESIGN SYSTEM — Official Brand Tokens
+   Stylesheet v2.0 | Warm-neutral palette
+   ══════════════════════════════════════════════ */
+
+/* ─── Light mode ─── */
 :root {
-  /* Existing shadcn tokens — updated to new palette */
-  --background: #FBF3EE;
-  --foreground: #1C1410;
-  --card: #FFFFFF;
-  --card-foreground: #1C1410;
-  --popover: #FFFFFF;
-  --popover-foreground: #1C1410;
-  --primary: #C94D35;
+  /* shadcn core tokens */
+  --background: #fff9f1;
+  --foreground: #1a1c1e;
+  --card: #ffffff;
+  --card-foreground: #1a1c1e;
+  --popover: #ffffff;
+  --popover-foreground: #1a1c1e;
+  --primary: #22c55e;
   --primary-foreground: #ffffff;
-  --secondary: #F5E8DF;
-  --secondary-foreground: #1C1410;
-  --muted: #F5E8DF;
-  --muted-foreground: #9C8070;
-  --accent: #FEF9F6;
-  --accent-foreground: #1C1410;
-  --destructive: #dc2626;
+  --secondary: #fff7eb;
+  --secondary-foreground: #1a1c1e;
+  --muted: #f5f0e8;
+  --muted-foreground: #6b6f76;
+  --accent: #2a3038;
+  --accent-foreground: #1a1c1e;
+  --destructive: #c53030;
   --destructive-foreground: #ffffff;
-  --border: #E8D5C8;
-  --input: #E8D5C8;
-  --ring: #C94D35;
+  --border: #f1e7da;
+  --input: #f1e7da;
+  --ring: #22c55e;
   --radius: 0.75rem;
 
-  /* Dragg semantic colors */
-  --needs: #D4793A;
-  --wants: #C26070;
-  --savings: #7B6498;
-  --income: #4E6B5B;
-  --expense: #C94D35;
-  --yellow: #D4793A;
+  /* Dragg surface tokens */
+  --surface: #ffffff;
+  --surface-elevated: #fffdf8;
+  --border-strong: #e0d4c4;
+  --border-subtle: rgba(241, 231, 218, 0.6);
 
-  /* Chart colors */
-  --chart-1: #C94D35;
-  --chart-2: #D4793A;
-  --chart-3: #C26070;
-  --chart-4: #7B6498;
-  --chart-5: #4E6B5B;
+  /* Dragg text tokens */
+  --text-primary: #1a1c1e;
+  --text-secondary: #6b6f76;
+  --text-muted: #a6a29a;
+  --text-inverse: #ffffff;
 
-  /* Sidebar */
-  --sidebar: #FFFFFF;
-  --sidebar-foreground: #1C1410;
-  --sidebar-primary: #C94D35;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #F5E8DF;
-  --sidebar-accent-foreground: #1C1410;
-  --sidebar-border: #E8D5C8;
-  --sidebar-ring: #C94D35;
+  /* Brand accent */
+  --primary-dark: #15803d;
+  --primary-light: rgba(34, 197, 94, 0.12);
+  --primary-glow: rgba(34, 197, 94, 0.2);
+  --accent-dark: #2a3038;
+  --accent-light: rgba(246, 196, 83, 0.15);
 
-  --card-shadow: 0 2px 16px rgba(28, 20, 16, 0.08);
+  /* Finance semantic */
+  --income: #15803d;
+  --income-bg: rgba(21, 128, 61, 0.1);
+  --expense: #c53030;
+  --expense-bg: rgba(197, 48, 48, 0.1);
+  --savings: #6d28d9;
+  --savings-bg: rgba(109, 40, 217, 0.1);
+  --needs: #c2410c;
+  --needs-bg: rgba(194, 65, 12, 0.1);
+  --wants: #be185d;
+  --wants-bg: rgba(190, 24, 93, 0.1);
 
-  /* ── New design-system tokens ── */
-  --color-base: #FBF3EE;
-  --color-surface: #F5E8DF;
-  --color-raised: #FEF9F6;
-  --color-overlay: rgba(28, 20, 16, 0.08);
+  /* Status */
+  --success: #22c55e;
+  --success-bg: rgba(34, 197, 94, 0.1);
+  --warning: #f6c453;
+  --warning-bg: rgba(246, 196, 83, 0.12);
+  --error: #c53030;
+  --error-bg: rgba(197, 48, 48, 0.1);
 
-  --primary-hover: #B03D27;
-  --primary-muted: rgba(201, 77, 53, 0.12);
+  /* Shadows */
+  --shadow-sm:
+    0 1px 3px rgba(15, 17, 18, 0.08), 0 1px 2px rgba(15, 17, 18, 0.04);
+  --shadow-md:
+    0 4px 12px rgba(15, 17, 18, 0.1), 0 2px 4px rgba(15, 17, 18, 0.06);
+  --shadow-lg:
+    0 8px 24px rgba(15, 17, 18, 0.12), 0 4px 8px rgba(15, 17, 18, 0.06);
+  --shadow-glow: 0 0 0 3px rgba(34, 197, 94, 0.25);
 
-  --color-warm: #D4793A;
-  --color-rose: #C26070;
-  --color-dusk: #7B6498;
-  --color-pine: #4E6B5B;
+  /* Legacy aliases — keep existing components working */
+  --card-shadow: var(--shadow-sm);
+  --shadow-card: var(--shadow-sm);
+  --shadow-raised: var(--shadow-lg);
+  --color-positive: var(--income);
+  --color-positive-bg: var(--income-bg);
+  --color-negative: var(--expense);
+  --color-negative-bg: var(--expense-bg);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-info: var(--savings);
+  --color-info-bg: var(--savings-bg);
+  --color-border-strong: var(--border-strong);
 
-  --color-text: #1C1410;
-  --color-text-secondary: #5C4A40;
-  --color-placeholder: #C4A898;
+  /* Chart palette */
+  --chart-1: #22c55e;
+  --chart-2: #15803d;
+  --chart-3: #be185d;
+  --chart-4: #6d28d9;
+  --chart-5: #c2410c;
 
-  --color-border-strong: #D0BDB0;
-
-  --color-positive: #4E6B5B;
-  --color-positive-bg: rgba(78, 107, 91, 0.12);
-  --color-negative: #C94D35;
-  --color-negative-bg: rgba(201, 77, 53, 0.12);
-  --color-warning: #D4793A;
-  --color-warning-bg: rgba(212, 121, 58, 0.12);
-  --color-info: #7B6498;
-  --color-info-bg: rgba(123, 100, 152, 0.12);
-
-  --shadow-card: 0 2px 16px rgba(28, 20, 16, 0.08);
-  --shadow-raised: 0 4px 32px rgba(28, 20, 16, 0.12);
-  --shadow-glow: 0 0 24px rgba(201, 77, 53, 0.20);
-
-  /* Hero ribbon */
-  --ribbon-a: rgba(201, 77, 53, 0.60);
-  --ribbon-b: rgba(212, 121, 58, 0.40);
-  --ribbon-c: rgba(194, 96, 112, 0.35);
-  --ribbon-d: rgba(123, 100, 152, 0.30);
-  --hero-from: #C94D35;
-  --hero-mid: #D4793A;
-  --hero-to: #7B6498;
+  /* Sidebar (shadcn) */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1a1c1e;
+  --sidebar-primary: #22c55e;
+  --sidebar-primary-foreground: #1a1c1e;
+  --sidebar-accent: #fff7eb;
+  --sidebar-accent-foreground: #1a1c1e;
+  --sidebar-border: #f1e7da;
+  --sidebar-ring: #22c55e;
 }
 
-/* ─── DARK MODE (Forest at Night) ─── */
+/* ─── Dark mode ─── */
 .dark {
-  /* Existing shadcn tokens — updated to new palette */
-  --background: #15221C;
-  --foreground: rgba(255, 255, 255, 0.92);
-  --card: #1E2E27;
-  --card-foreground: rgba(255, 255, 255, 0.92);
-  --popover: #1E2E27;
-  --popover-foreground: rgba(255, 255, 255, 0.92);
-  --primary: #E05A40;
-  --primary-foreground: #FFFFFF;
-  --secondary: #2C3E34;
-  --secondary-foreground: rgba(255, 255, 255, 0.92);
-  --muted: #2C3E34;
-  --muted-foreground: #8FA68E;
-  --accent: #334940;
-  --accent-foreground: rgba(255, 255, 255, 0.92);
-  --destructive: #ef4444;
+  /* shadcn core tokens */
+  --background: #0b0d0e;
+  --foreground: #f5f7fa;
+  --card: #111418;
+  --card-foreground: #f5f7fa;
+  --popover: #161b21;
+  --popover-foreground: #f5f7fa;
+  --primary: #22c55e;
+  --primary-foreground: #ffffff;
+  --secondary: #1f2428;
+  --secondary-foreground: #f5f7fa;
+  --muted: #252b31;
+  --muted-foreground: #a1a7ad;
+  --accent: #2a3038;
+  --accent-foreground: #0b0d0e;
+  --destructive: #fc8181;
   --destructive-foreground: #ffffff;
-  --border: rgba(143, 166, 142, 0.15);
-  --input: rgba(143, 166, 142, 0.15);
-  --ring: #E05A40;
+  --border: #1f2428;
+  --input: #1f2428;
+  --ring: #22c55e;
 
-  /* Dragg semantic colors */
-  --needs: #E08848;
-  --wants: #D47080;
-  --savings: #9B84C0;
-  --income: #8FA68E;
-  --expense: #E05A40;
-  --yellow: #E08848;
+  /* Dragg surface tokens */
+  --surface: #111418;
+  --surface-elevated: #161b21;
+  --border-strong: #2a3038;
+  --border-subtle: rgba(31, 36, 40, 0.8);
 
-  /* Chart colors */
-  --chart-1: #E05A40;
-  --chart-2: #E08848;
-  --chart-3: #D47080;
-  --chart-4: #9B84C0;
-  --chart-5: #8FA68E;
+  /* Dragg text tokens */
+  --text-primary: #f5f7fa;
+  --text-secondary: #a1a7ad;
+  --text-muted: #6b7280;
+  --text-inverse: #0b0d0e;
 
-  /* Sidebar */
-  --sidebar: #1E2E27;
-  --sidebar-foreground: rgba(255, 255, 255, 0.92);
-  --sidebar-primary: #E05A40;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #2C3E34;
-  --sidebar-accent-foreground: rgba(255, 255, 255, 0.92);
-  --sidebar-border: rgba(143, 166, 142, 0.15);
-  --sidebar-ring: #E05A40;
+  /* Brand accent */
+  --primary-dark: #16a34a;
+  --primary-light: rgba(34, 197, 94, 0.15);
+  --primary-glow: rgba(34, 197, 94, 0.25);
+  --accent-dark: #2a3038;
+  --accent-light: rgba(246, 196, 83, 0.15);
 
+  /* Finance semantic (brighter for dark surfaces) */
+  --income: #22c55e;
+  --income-bg: rgba(34, 197, 94, 0.12);
+  --expense: #fc8181;
+  --expense-bg: rgba(252, 129, 129, 0.12);
+  --savings: #a78bfa;
+  --savings-bg: rgba(167, 139, 250, 0.12);
+  --needs: #fb923c;
+  --needs-bg: rgba(251, 146, 60, 0.12);
+  --wants: #f472b6;
+  --wants-bg: rgba(244, 114, 182, 0.12);
+
+  /* Status */
+  --success: #22c55e;
+  --success-bg: rgba(34, 197, 94, 0.12);
+  --warning: #f6c453;
+  --warning-bg: rgba(246, 196, 83, 0.12);
+  --error: #fc8181;
+  --error-bg: rgba(252, 129, 129, 0.12);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5), 0 4px 8px rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 0 3px rgba(34, 197, 94, 0.3);
+
+  /* Legacy aliases */
   --card-shadow: none;
+  --shadow-card: none;
+  --shadow-raised: var(--shadow-lg);
+  --color-positive: var(--income);
+  --color-positive-bg: var(--income-bg);
+  --color-negative: var(--expense);
+  --color-negative-bg: var(--expense-bg);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-info: var(--savings);
+  --color-info-bg: var(--savings-bg);
+  --color-border-strong: var(--border-strong);
 
-  /* ── New design-system tokens ── */
-  --color-base: #15221C;
-  --color-surface: #2C3E34;
-  --color-raised: #334940;
-  --color-overlay: rgba(0, 0, 0, 0.40);
+  /* Chart palette (verified readable on dark surface) */
+  --chart-1: #22c55e;
+  --chart-2: #4ade80;
+  --chart-3: #f472b6;
+  --chart-4: #a78bfa;
+  --chart-5: #fb923c;
 
-  --primary-hover: #F06850;
-  --primary-muted: rgba(224, 90, 64, 0.15);
-
-  --color-warm: #E08848;
-  --color-rose: #D47080;
-  --color-dusk: #9B84C0;
-  --color-pine: #8FA68E;
-
-  --color-text: rgba(255, 255, 255, 0.92);
-  --color-text-secondary: rgba(255, 255, 255, 0.60);
-  --color-placeholder: rgba(143, 166, 142, 0.50);
-
-  --color-border-strong: rgba(143, 166, 142, 0.30);
-
-  --color-positive: #8FA68E;
-  --color-positive-bg: rgba(143, 166, 142, 0.12);
-  --color-negative: #E05A40;
-  --color-negative-bg: rgba(224, 90, 64, 0.12);
-  --color-warning: #E08848;
-  --color-warning-bg: rgba(224, 136, 72, 0.12);
-  --color-info: #9B84C0;
-  --color-info-bg: rgba(155, 132, 192, 0.12);
-
-  --shadow-card: 0 2px 16px rgba(0, 0, 0, 0.40);
-  --shadow-raised: 0 8px 32px rgba(0, 0, 0, 0.60);
-  --shadow-glow: 0 0 40px rgba(224, 90, 64, 0.25), 0 0 80px rgba(224, 90, 64, 0.10);
-
-  /* Hero ribbon */
-  --ribbon-a: rgba(44, 62, 52, 0.80);
-  --ribbon-b: rgba(78, 107, 91, 0.50);
-  --ribbon-c: rgba(143, 166, 142, 0.30);
-  --ribbon-d: rgba(43, 42, 47, 0.60);
-  --hero-from: #15221C;
-  --hero-mid: #1E3028;
-  --hero-to: #2C3E34;
+  /* Sidebar (shadcn) */
+  --sidebar: #111418;
+  --sidebar-foreground: #f5f7fa;
+  --sidebar-primary: #22c55e;
+  --sidebar-primary-foreground: #0b0d0e;
+  --sidebar-accent: #1f2428;
+  --sidebar-accent-foreground: #f5f7fa;
+  --sidebar-border: #1f2428;
+  --sidebar-ring: #22c55e;
 }
 
 @theme inline {
-  --font-sans: var(--font-satoshi), Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-satoshi), system-ui, ui-sans-serif, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  /* Existing shadcn token mappings */
+  /* shadcn token mappings */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -223,6 +245,8 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Sidebar token mappings */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -232,35 +256,49 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Dragg semantic colors */
-  --color-needs: var(--needs);
-  --color-wants: var(--wants);
-  --color-savings: var(--savings);
+  /* Dragg finance semantic mappings */
   --color-income: var(--income);
+  --color-income-bg: var(--income-bg);
   --color-expense: var(--expense);
-  --color-yellow: var(--yellow);
+  --color-expense-bg: var(--expense-bg);
+  --color-savings: var(--savings);
+  --color-savings-bg: var(--savings-bg);
+  --color-needs: var(--needs);
+  --color-needs-bg: var(--needs-bg);
+  --color-wants: var(--wants);
+  --color-wants-bg: var(--wants-bg);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-error: var(--error);
+  --color-error-bg: var(--error-bg);
 
-  /* ── New design-system token mappings ── */
-  --color-base: var(--color-base);
-  --color-surface: var(--color-surface);
-  --color-raised: var(--color-raised);
-  --color-warm: var(--color-warm);
-  --color-dusk: var(--color-dusk);
-  --color-pine: var(--color-pine);
-  --color-positive: var(--color-positive);
-  --color-positive-bg: var(--color-positive-bg);
-  --color-negative: var(--color-negative);
-  --color-negative-bg: var(--color-negative-bg);
-  --color-warning: var(--color-warning);
-  --color-warning-bg: var(--color-warning-bg);
-  --color-info: var(--color-info);
-  --color-info-bg: var(--color-info-bg);
-  --color-primary-hover: var(--primary-hover);
-  --color-primary-muted: var(--primary-muted);
-  --color-border-strong: var(--color-border-strong);
+  /* Dragg surface / text mappings */
+  --color-surface: var(--surface);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
 
-  --shadow-card: var(--shadow-card);
-  --shadow-raised: var(--shadow-raised);
+  /* Brand accent */
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-light: var(--primary-light);
+  --color-primary-glow: var(--primary-glow);
+  --color-accent-dark: var(--accent-dark);
+  --color-accent-light: var(--accent-light);
+
+  /* Legacy alias mappings */
+  --color-positive: var(--income);
+  --color-positive-bg: var(--income-bg);
+  --color-negative: var(--expense);
+  --color-negative-bg: var(--expense-bg);
+  --color-info: var(--savings);
+  --color-info-bg: var(--savings-bg);
+  --color-border-strong: var(--border-strong);
+
+  /* Shadow mappings */
+  --shadow-card: var(--shadow-sm);
+  --shadow-raised: var(--shadow-lg);
   --shadow-glow: var(--shadow-glow);
 }
 
@@ -274,20 +312,45 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: "Satoshi", system-ui, sans-serif;
+    font-feature-settings: "cv01", "cv02", "cv03";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+}
+
+/* Monetary value utilities */
+.font-numeric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+.amount-positive {
+  color: var(--income);
+}
+.amount-negative {
+  color: var(--expense);
 }
 
 /* Glassmorphism utility */
 .glass-card {
-  background: rgba(255, 255, 255, 0.70);
+  background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--color-border-strong);
-  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-sm);
   border-radius: 16px;
 }
 .dark .glass-card {
-  background: rgba(30, 46, 39, 0.60);
+  background: rgba(17, 20, 24, 0.65);
   border-color: var(--border);
 }
 
@@ -309,48 +372,104 @@
 
 /* Card shadow utility */
 .card-shadow {
-  box-shadow: var(--card-shadow);
+  box-shadow: var(--shadow-sm);
 }
 
+/* Dragg loading animation */
 .dragg-loading-loader {
-  box-shadow: 0 0 0 0 rgba(224, 90, 64, 0.28);
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.25);
   position: relative;
   z-index: 0;
   animation: dragg-loading-ripple 1.5s infinite linear;
 }
-
 .dragg-loading-loader::before,
 .dragg-loading-loader::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow: 0 0 0 0 rgba(224, 90, 64, 0.28);
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.25);
   animation: inherit;
   z-index: -1;
 }
-
 .dragg-loading-loader::before {
   animation-delay: -0.5s;
 }
-
 .dragg-loading-loader::after {
   animation-delay: -1s;
 }
 
 @keyframes dragg-loading-ripple {
   100% {
-    box-shadow: 0 0 0 42px rgba(224, 90, 64, 0);
+    box-shadow: 0 0 0 42px rgba(34, 197, 94, 0);
   }
 }
 
 @keyframes tx-fade-up {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(var(--fade-distance, 24px));
   }
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes tx-fade-down {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Page enter animation */
+.animate-page-enter {
+  animation: tx-fade-up 350ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Skeleton shimmer */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--secondary) 0%,
+    rgba(255, 255, 255, 0.04) 50%,
+    var(--secondary) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+/* Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

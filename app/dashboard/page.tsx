@@ -2,8 +2,7 @@ import { Suspense } from "react";
 
 import { AppShell } from "@/components/dashboard/app-shell";
 import { BudgetSplitChart } from "@/components/dashboard/budget-split-chart";
-import { DashboardHero } from "@/components/dashboard/dashboard-hero";
-import { TransactionForm } from "@/components/dashboard/transaction-form";
+import { SummarySection } from "@/components/dashboard/summary-section";
 import { ExpensesByCategoryChart } from "@/components/dashboard/expenses-by-category-chart";
 import {
   DailyExpensesSplineChart,
@@ -16,7 +15,7 @@ import {
   createTransactionAction,
 } from "@/app/transactions/actions";
 import { getDashboardData, getUserContext } from "@/lib/finance/transactions";
-import { SummaryCards } from "@/components/dashboard/summary-cards";
+import { AnimatedCard } from "@/components/ui/animated-card";
 
 type DashboardPageProps = {
   searchParams?: Promise<{
@@ -55,51 +54,50 @@ async function DashboardContent({
 
   return (
     <>
-      <section aria-label="Financial summary" className="mb-6 lg-mb-8">
-        <SummaryCards summaryData={dashboardData.summaryData} />
-      </section>
-
-      <section aria-label="New transaction form" className="mb-6 lg:mb-8">
-        <TransactionForm
-          categories={dashboardData.categories}
-          createCategoryAction={createCategoryAction}
-          onSubmit={createTransactionAction}
-          paymentMethods={dashboardData.paymentMethods}
-        />
-      </section>
+      <AnimatedCard index={0} className="mb-6 lg:mb-8">
+        <section aria-label="Financial summary">
+          <SummarySection
+            summaryData={dashboardData.summaryData}
+            categories={dashboardData.categories}
+            paymentMethods={dashboardData.paymentMethods}
+            createCategoryAction={createCategoryAction}
+            onSubmit={createTransactionAction}
+          />
+        </section>
+      </AnimatedCard>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 mt-4 lg:mt-6">
-        <section aria-label="Budget split chart">
+        <AnimatedCard index={2}>
           <BudgetSplitChart budgetSplitData={dashboardData.budgetSplitData} />
-        </section>
-        <section aria-label="Expenses over time" className="lg:col-span-2">
+        </AnimatedCard>
+        <AnimatedCard index={3} className="lg:col-span-2">
           <ExpensesOverTimeChart
             expensesOverTime={dashboardData.expensesOverTime}
           />
-        </section>
+        </AnimatedCard>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mt-4 lg:mt-6">
-        <section aria-label="Expenses by category">
+        <AnimatedCard index={4}>
           <ExpensesByCategoryChart
             expensesByCategory={dashboardData.expensesByCategory}
           />
-        </section>
-        <section aria-label="Latest transactions" className="h-full">
+        </AnimatedCard>
+        <AnimatedCard index={5} className="h-full">
           <TransactionsList transactions={dashboardData.latestTransactions} />
-        </section>
+        </AnimatedCard>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mt-4 lg:mt-6">
-        <section aria-label="Budget progress">
+        <AnimatedCard index={6} className="h-full">
           <DailyExpensesSplineChart
             dailyExpensesOverTime={dashboardData.dailyExpensesOverTime}
             selectedMonth={selectedMonth}
           />
-        </section>
-        <section aria-label="Quick actions">
+        </AnimatedCard>
+        <AnimatedCard index={7}>
           <QuickActions />
-        </section>
+        </AnimatedCard>
       </div>
     </>
   );

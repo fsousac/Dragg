@@ -11,16 +11,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 const groupColors: Record<TransactionGroup, string> = {
-  needs: "bg-[#F97316]/10 text-[#F97316]",
-  wants: "bg-[#EC4899]/10 text-[#EC4899]",
-  savings: "bg-[#8B5CF6]/10 text-[#8B5CF6]",
-  income: "bg-[#22C55E]/10 text-[#22C55E]",
+  needs: "bg-needs/10 text-needs",
+  wants: "bg-wants/10 text-wants",
+  savings: "bg-savings/10 text-savings",
+  income: "bg-income/10 text-income",
 };
 
 const amountColors = {
-  income: "text-[#22C55E]",
-  expense: "text-[#FB7185]",
-  saving: "text-[#8B5CF6]",
+  income: "text-income",
+  expense: "text-expense",
+  saving: "text-savings",
 };
 
 type TransactionsListProps = {
@@ -53,7 +53,7 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
           onFocus={() =>
             router.prefetch(withSelectedMonth("/transactions", searchParams))
           }
-          className="flex items-center gap-3 rounded-xl transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="flex items-center gap-3 rounded-xl transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <Button
             variant="ghost"
@@ -75,11 +75,11 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
               <div
                 key={transaction.id}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/50 lg:gap-4 lg:px-6 lg:py-4",
+                  "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50 lg:gap-4 lg:px-6 lg:py-4",
                   shouldPresentAsPlanned && "opacity-70",
                 )}
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-xl lg:h-12 lg:w-12 lg:text-2xl">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-xl lg:h-12 lg:w-12 lg:text-2xl">
                   {transaction.icon}
                 </div>
                 <div className="min-w-0 flex-1">

@@ -14,9 +14,9 @@ export type ExpensesByCategoryItem = {
 const categoryGroups = ["needs", "wants", "savings"] as const;
 
 const groupColors = {
-  needs: "#F97316",
-  wants: "#EC4899",
-  savings: "#8B5CF6",
+  needs:   "var(--needs)",
+  wants:   "var(--wants)",
+  savings: "var(--savings)",
 } as const;
 
 function isCategoryGroup(value: string): value is ExpenseCategoryGroup {

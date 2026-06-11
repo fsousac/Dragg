@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Header } from "@/components/dashboard/header";
 import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { NavigationPrefetcher } from "@/components/dashboard/navigation-prefetcher";
+import { PageTransition } from "@/components/dashboard/page-transition";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import type {
   AuthenticatedUserClaims,
@@ -173,7 +174,7 @@ export async function AppShell({ children, userContext }: AppShellProps) {
           userName={userName}
         />
         <div className="px-4 lg:px-8 py-4 lg:py-6 pb-24 lg:pb-8">
-          {children}
+          <PageTransition>{children}</PageTransition>
         </div>
       </main>
 

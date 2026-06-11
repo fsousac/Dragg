@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { AddTransactionDialog } from "@/components/dashboard/add-transaction-dialog";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { type TransactionFormData } from "@/components/dashboard/transaction-form";
 import { CurrencyInput } from "@/components/dashboard/form-inputs/currency-input";
@@ -81,7 +82,6 @@ import {
 } from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { TransactionForm } from "./transaction-form";
 
 type SortOption = "date-desc" | "date-asc" | "amount-desc" | "amount-asc";
 
@@ -581,7 +581,6 @@ export function TransactionsScreen({
     };
 
     await createTransactionAction(input);
-    setIsNewTransactionOpen(false);
   };
 
   const handleUpdateTransaction = () => {
@@ -648,7 +647,7 @@ export function TransactionsScreen({
             value: formatCurrency(monthlySummary.expenses),
             iconBg: "bg-rose-500/10",
             iconColor: "text-rose-500 dark:text-rose-400",
-            valueColor: "text-foreground",
+            valueColor: "text-expense",
           },
           {
             icon: PiggyBank,
@@ -656,7 +655,7 @@ export function TransactionsScreen({
             value: formatCurrency(monthlySummary.savings),
             iconBg: "bg-violet-500/10",
             iconColor: "text-violet-600 dark:text-violet-400",
-            valueColor: "text-foreground",
+            valueColor: "text-savings",
           },
           {
             icon: Wallet,
@@ -1687,31 +1686,15 @@ export function TransactionsScreen({
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog
+      <AddTransactionDialog
         open={isNewTransactionOpen}
         onOpenChange={setIsNewTransactionOpen}
-      >
-        <DialogContent
-          className="sm:max-w-[90dvw]"
-          aria-describedby="add transaction"
-        >
-          <DialogHeader className="not-sm:hidden">
-            <DialogTitle>{t("transaction.addTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("transaction.addDescription")}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="pt-[1dvh]">
-            <TransactionForm
-              categories={categories}
-              createCategoryAction={createCategoryAction}
-              createPaymentMethodAction={createPaymentMethodAction}
-              paymentMethods={paymentMethods}
-              onSubmit={handleNewTransactionSubmit}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+        categories={categories}
+        paymentMethods={paymentMethods}
+        createCategoryAction={createCategoryAction}
+        createPaymentMethodAction={createPaymentMethodAction}
+        onSubmit={handleNewTransactionSubmit}
+      />
     </>
   );
 }

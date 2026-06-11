@@ -44,7 +44,7 @@ export function ExpensesOverTimeChart({
   return (
     <Card className="bg-card border-border card-shadow">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base lg:text-lg font-semibold text-foreground">
+        <CardTitle className="text-base lg:text-lg font-semibold">
           {t("dashboard.expensesOverTime.title")}
         </CardTitle>
         <p className="text-xs lg:text-sm text-muted-foreground">
@@ -70,8 +70,16 @@ export function ExpensesOverTimeChart({
                     x2="0"
                     y2="1"
                   >
-                    <stop offset="5%" stopColor="#22C55E" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#22C55E" stopOpacity={0} />
+                    <stop
+                      offset="5%"
+                      stopColor="var(--chart-1)"
+                      stopOpacity={0.3}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor="var(--chart-1)"
+                      stopOpacity={0}
+                    />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
@@ -83,12 +91,12 @@ export function ExpensesOverTimeChart({
                   dataKey="month"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: "#A1A1AA", fontSize: 12 }}
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: "#A1A1AA", fontSize: 12 }}
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
                   tickFormatter={(value) =>
                     formatCurrency(Number(value)).replace(/([,.]00|,00)$/, "")
                   }
@@ -122,7 +130,7 @@ export function ExpensesOverTimeChart({
                               <span className="text-muted-foreground">
                                 {t("common.planned")}
                               </span>
-                              <span className="font-semibold text-rose-400">
+                              <span className="font-semibold text-expense">
                                 {formatCurrency(plannedAmount)}
                               </span>
                             </div>
@@ -136,9 +144,13 @@ export function ExpensesOverTimeChart({
                 <Area
                   type="monotone"
                   dataKey="amount"
-                  stroke="#22C55E"
+                  stroke="var(--chart-1)"
                   strokeWidth={2}
                   fill="url(#expenseGradient)"
+                  isAnimationActive
+                  animationBegin={0}
+                  animationDuration={800}
+                  animationEasing="ease-in-out"
                 />
                 {chartData.some(
                   (d) => d.plannedAmount && d.plannedAmount > 0,
@@ -146,10 +158,14 @@ export function ExpensesOverTimeChart({
                   <Area
                     type="monotone"
                     dataKey="plannedAmount"
-                    stroke="#FB7185"
+                    stroke="var(--expense)"
                     strokeWidth={2}
                     strokeDasharray="4 4"
                     fillOpacity={0}
+                    isAnimationActive
+                    animationBegin={200}
+                    animationDuration={800}
+                    animationEasing="ease-in-out"
                   />
                 ) : null}
               </AreaChart>
@@ -407,10 +423,12 @@ export function DailyExpensesSplineChart({
                   strokeWidth={2.5}
                   fill="url(#dailyExpensesGradient)"
                   dot={false}
-                  activeDot={{
-                    r: 5,
-                  }}
+                  activeDot={{ r: 5 }}
                   className="text-primary"
+                  isAnimationActive
+                  animationBegin={0}
+                  animationDuration={800}
+                  animationEasing="ease-in-out"
                 />
               </AreaChart>
             </ResponsiveContainer>
