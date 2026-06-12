@@ -40,6 +40,8 @@ export function ExpensesOverTimeChart({
     () => chartData.some((item) => item.amount > 0),
     [chartData],
   );
+  const plannedColor = "var(--muted-foreground)";
+  const usedColor = "var(--chart-1)";
 
   return (
     <Card className="bg-card border-border card-shadow">
@@ -130,7 +132,7 @@ export function ExpensesOverTimeChart({
                               <span className="text-muted-foreground">
                                 {t("common.planned")}
                               </span>
-                              <span className="font-semibold text-expense">
+                              <span className="font-semibold text-muted-foreground">
                                 {formatCurrency(plannedAmount)}
                               </span>
                             </div>
@@ -144,7 +146,7 @@ export function ExpensesOverTimeChart({
                 <Area
                   type="monotone"
                   dataKey="amount"
-                  stroke="var(--chart-1)"
+                  stroke={usedColor}
                   strokeWidth={2}
                   fill="url(#expenseGradient)"
                   isAnimationActive
@@ -158,7 +160,7 @@ export function ExpensesOverTimeChart({
                   <Area
                     type="monotone"
                     dataKey="plannedAmount"
-                    stroke="var(--expense)"
+                    stroke={plannedColor}
                     strokeWidth={2}
                     strokeDasharray="4 4"
                     fillOpacity={0}
