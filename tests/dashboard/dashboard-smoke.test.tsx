@@ -22,6 +22,7 @@ import {
 import { PageHeader } from "@/components/dashboard/page-header";
 import { PlaceholderPage } from "@/components/dashboard/placeholder-page";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
+import { AnimatedCard } from "@/components/ui/animated-card";
 
 const translations: Record<string, string> = {
   "common.expense": "Expense",
@@ -153,25 +154,28 @@ describe("dashboard component rendering", () => {
         budgetSplitData={[
           {
             amount: 1200,
-            color: "#F97316",
+            color: "#2563EB",
             maxAmount: 1000,
             nameKey: "data.group.needs",
+            plannedSpentAmount: 1200,
             spentAmount: 1200,
             value: 50,
           },
           {
             amount: 100,
-            color: "#EC4899",
+            color: "#FFC38A",
             maxAmount: 600,
             nameKey: "data.group.wants",
+            plannedSpentAmount: 100,
             spentAmount: 100,
             value: 30,
           },
           {
             amount: 300,
-            color: "#8B5CF6",
+            color: "#22C55E",
             maxAmount: 400,
             nameKey: "data.group.savings",
+            plannedSpentAmount: 300,
             spentAmount: 300,
             value: 20,
           },
@@ -188,10 +192,11 @@ describe("dashboard component rendering", () => {
       {
         payload: {
           amount: 1200,
-          color: "#F97316",
+          color: "#2563EB",
           maxAmount: 1000,
           name: "Needs",
           nameKey: "data.group.needs",
+          plannedSpentAmount: 1200,
           spentAmount: 1200,
           value: 50,
         },
@@ -231,21 +236,21 @@ describe("dashboard component rendering", () => {
       <ExpensesByCategoryChart
         expensesByCategory={[
           {
-            color: "#F97316",
+            color: "#2563EB",
             group: "needs",
             groupKey: "data.group.needs",
             nameKey: "data.category.health",
             value: 250,
           },
           {
-            color: "#EC4899",
+            color: "#FFC38A",
             group: "wants",
             groupKey: "data.group.wants",
             nameKey: "data.category.shopping",
             value: 75,
           },
           {
-            color: "#8B5CF6",
+            color: "#22C55E",
             group: "savings",
             groupKey: "data.group.savings",
             nameKey: "data.category.investments",
@@ -268,7 +273,7 @@ describe("dashboard component rendering", () => {
     const payload = [
       {
         payload: {
-          color: "#F97316",
+          color: "#2563EB",
           group: "needs" as const,
           groupKey: "data.group.needs",
           groupName: "Needs",
@@ -409,5 +414,85 @@ describe("dashboard component rendering", () => {
     expect(html).toContain("Amount");
     expect(html).toContain("Required");
     expect(html).toContain("Notes");
+  });
+
+  it("renders summary cards with negative current balance", () => {
+    const html = renderWithI18n(
+      <SummaryCards
+        summaryData={{
+          currentBalance: -200,
+          predictedExpenses: 0,
+          totalExpenses: 1200,
+          totalIncome: 1000,
+          totalSaved: 0,
+          trends: {
+            totalExpenses: 0,
+            totalIncome: 0,
+            totalSaved: 0,
+          },
+        }}
+      />,
+    );
+
+    expect(html).toContain("Current Balance");
+    expect(html).toContain("Total Income");
+  });
+
+  it("renders AnimatedCard with variant initial", () => {
+    const html = renderWithI18n(
+      <>
+        <AnimatedCard variant="initial" index={0}>
+          <span>First</span>
+        </AnimatedCard>
+        <AnimatedCard variant="initial" index={3}>
+          <span>Second</span>
+        </AnimatedCard>
+        <AnimatedCard variant="page" index={1} className="custom">
+          <span>Third</span>
+        </AnimatedCard>
+      </>,
+    );
+
+    expect(html).toContain("First");
+    expect(html).toContain("Second");
+    expect(html).toContain("Third");
+    expect(html).toContain("custom");
+  });
+
+  it("renders budget groups with normal trend (50–80% usage)", () => {
+    // needs=60% (normal), wants=58% (normal), savings=50% (under)
+    // plannedSpent === spent → null sub-note branch
+    const html = renderWithI18n(
+      <BudgetsScreen
+        budgetData={{
+          needs: { budget: 1000, percentage: 60, plannedSpent: 600, spent: 600 },
+          savings: { budget: 400, percentage: 50, plannedSpent: 200, spent: 200 },
+          wants: { budget: 600, percentage: 58, plannedSpent: 350, spent: 350 },
+        }}
+        budgetSplitData={[]}
+        categories={[]}
+      />,
+    );
+
+    expect(html).toContain("Needs");
+    expect(html).toContain("Wants");
+    expect(html).toContain("Savings");
+  });
+
+  it("renders budget screen with total spending over budget", () => {
+    // total_spent (2260) > total_budget (2000) → isOverBudget=true for total
+    const html = renderWithI18n(
+      <BudgetsScreen
+        budgetData={{
+          needs: { budget: 1000, percentage: 120, plannedSpent: 1200, spent: 1200 },
+          savings: { budget: 400, percentage: 100, plannedSpent: 400, spent: 400 },
+          wants: { budget: 600, percentage: 110, plannedSpent: 660, spent: 660 },
+        }}
+        budgetSplitData={[]}
+        categories={[{ color: "#f00", icon: "🏠", id: "c1", label: "data.category.health", monthlyLimit: 500, spent: 600 }]}
+      />,
+    );
+
+    expect(html).toContain("over budget");
   });
 });

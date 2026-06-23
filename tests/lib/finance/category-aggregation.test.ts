@@ -64,7 +64,7 @@ describe("category expense aggregation", () => {
     expect(expensesByCategory).toEqual([
       {
         categoryId: "22222222-2222-4222-8222-222222222222",
-        color: "#F97316",
+        color: "#2563EB",
         group: "needs",
         groupKey: "data.group.needs",
         nameKey: "Academy/Gym",
@@ -72,7 +72,7 @@ describe("category expense aggregation", () => {
       },
       {
         categoryId: "11111111-1111-4111-8111-111111111111",
-        color: "#F97316",
+        color: "#2563EB",
         group: "needs",
         groupKey: "data.group.needs",
         nameKey: "data.category.health",
@@ -80,7 +80,7 @@ describe("category expense aggregation", () => {
       },
       {
         categoryId: "33333333-3333-4333-8333-333333333333",
-        color: "#F97316",
+        color: "#2563EB",
         group: "needs",
         groupKey: "data.group.needs",
         nameKey: "data.category.health",
@@ -117,7 +117,7 @@ describe("category expense aggregation", () => {
     expect(expensesByCategory).toEqual([
       {
         categoryId: null,
-        color: "#F97316",
+        color: "#2563EB",
         group: "needs",
         groupKey: "data.group.needs",
         nameKey: "data.category.other",
@@ -125,7 +125,7 @@ describe("category expense aggregation", () => {
       },
       {
         categoryId: null,
-        color: "#EC4899",
+        color: "#F6C453",
         group: "wants",
         groupKey: "data.group.wants",
         nameKey: "data.category.other",

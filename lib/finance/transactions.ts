@@ -40,6 +40,7 @@ import {
   selectSubscriptionOccurrencesForDeletion,
   shouldShowSubscriptionOccurrenceInTransactionHistory,
 } from "@/lib/finance/subscriptions";
+import { GROUP_COLORS } from "@/lib/finance/group-colors";
 import { createClient } from "@/lib/supabase/server";
 
 export { buildExpensesByCategoryData };
@@ -187,7 +188,7 @@ export type UpdateCategoryInput = CreateCategoryInput & {
 };
 
 export type NewTransactionInput = {
-  type: "income" | "expense";
+  type: "income" | "expense" | "saving";
   date: string;
   amount: number;
   category: string;
@@ -429,11 +430,7 @@ const editablePaymentMethodTypes = [
 ] as const;
 const transactionKinds = ["expense", "income", "saving"] as const;
 
-const groupColors = {
-  needs: "#F59E0B",
-  wants: "#8B5CF6",
-  savings: "#1FC286",
-} as const;
+const groupColors = GROUP_COLORS;
 
 const groupIcons = {
   income: "💼",
@@ -1682,7 +1679,11 @@ export async function createTransaction(input: NewTransactionInput) {
   const amount = Math.abs(input.amount);
   assertPositiveFiniteAmount(amount, "Amount");
 
-  if (input.type !== "income" && input.type !== "expense") {
+  if (
+    input.type !== "income" &&
+    input.type !== "expense" &&
+    input.type !== "saving"
+  ) {
     throw new Error("Transaction type is invalid.");
   }
 
@@ -1695,7 +1696,11 @@ export async function createTransaction(input: NewTransactionInput) {
     "Payment method",
   );
   const kind: DbTransactionKind =
-    input.type === "income" ? "income" : categoryId ? "expense" : input.type;
+    input.type === "income"
+      ? "income"
+      : input.type === "saving"
+        ? "saving"
+        : "expense";
   const date = toIsoDate(input.date);
   const installmentCount = Number(input.installmentCount);
 
@@ -3129,7 +3134,11 @@ export async function getDashboardData(
   );
   const actualUsageByGroup = sumBudgetUsageByGroup(transactions);
   const plannedUsageByGroup = sumBudgetUsageByGroup(scheduledTransactions);
-  const budgetData = calculateBudgetData(totalIncome, actualUsageByGroup, plannedUsageByGroup);
+  const budgetData = calculateBudgetData(
+    totalIncome,
+    actualUsageByGroup,
+    plannedUsageByGroup,
+  );
 
   const expensesByCategory = buildExpensesByCategoryData(
     scheduledExpenseTransactions,

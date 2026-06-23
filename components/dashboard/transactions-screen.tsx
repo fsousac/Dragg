@@ -618,7 +618,7 @@ export function TransactionsScreen({
         description={t("screen.transactions.description")}
         actions={
           <Button
-            className="gap-2"
+            className="gap-2 text-background"
             onClick={() => setIsNewTransactionOpen(true)}
           >
             <Plus className="size-4" />

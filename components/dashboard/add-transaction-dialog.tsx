@@ -39,12 +39,14 @@ export function AddTransactionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[90dvw]">
-        <DialogHeader className="not-sm:hidden">
+      <DialogContent className="w-full max-w-lg overflow-y-auto max-h-[90dvh] lg:w-[90dvw] lg:max-w-none lg:h-[90dvh]">
+        <DialogHeader>
           <DialogTitle>{t("transaction.addTitle")}</DialogTitle>
-          <DialogDescription>{t("transaction.addDescription")}</DialogDescription>
+          <DialogDescription>
+            {t("transaction.addDescription")}
+          </DialogDescription>
         </DialogHeader>
-        <div className="pt-[1dvh]">
+        <div>
           <TransactionForm
             categories={categories}
             paymentMethods={paymentMethods}

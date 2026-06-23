@@ -250,7 +250,10 @@ export function GoalsScreen({
         title={t("screen.goals.title")}
         description={t("screen.goals.description")}
         actions={
-          <Button className="gap-2" onClick={() => openGoalDialog()}>
+          <Button
+            className="gap-2 text-background"
+            onClick={() => openGoalDialog()}
+          >
             <Plus className="size-4" />
             {t("screen.goals.newGoal")}
           </Button>

@@ -723,7 +723,7 @@ export function PaymentsScreen({
           </TabsList>
         </Tabs>
         <Button
-          className="gap-2 w-auto"
+          className="gap-2 w-auto text-background"
           onClick={() => {
             if (activeTab === "subscriptions") {
               openSubscriptionDialog();

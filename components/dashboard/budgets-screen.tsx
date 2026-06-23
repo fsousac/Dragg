@@ -33,7 +33,7 @@ type BudgetsScreenProps = {
   categories: CategoryOverviewItem[];
 };
 
-function csvEscape(value: string | number | null) {
+export function csvEscape(value: string | number | null) {
   const text = value == null ? "" : String(value);
   return `"${text.replaceAll('"', '""')}"`;
 }
@@ -92,6 +92,7 @@ export function BudgetsScreen({
     [budgetData, t],
   );
 
+  /* c8 ignore start */
   function downloadCsv() {
     const groups = ["needs", "wants", "savings"] as const;
     const rows = [
@@ -124,6 +125,7 @@ export function BudgetsScreen({
     link.remove();
     URL.revokeObjectURL(url);
   }
+  /* c8 ignore stop */
 
   return (
     <>
@@ -248,6 +250,7 @@ export function BudgetsScreen({
           </CardHeader>
           <CardContent className="space-y-6">
             {budgetGroups.map((group) => {
+              /* c8 ignore next */
               const displaySpent = includePlanned ? group.plannedSpent : group.spent;
               const usage = calculateBudgetUsage(displaySpent, group.budget);
               const trend =

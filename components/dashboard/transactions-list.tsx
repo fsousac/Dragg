@@ -4,18 +4,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { type Transaction, type TransactionGroup } from "@/lib/data";
+import { GROUP_COLORS } from "@/lib/finance/group-colors";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { withSelectedMonth } from "./month-route";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-const groupColors: Record<TransactionGroup, string> = {
-  needs: "bg-needs/10 text-needs",
-  wants: "bg-wants/10 text-wants",
-  savings: "bg-savings/10 text-savings",
-  income: "bg-income/10 text-income",
-};
+const incomeColor = "#10B981";
+
+function getGroupBadgeStyle(group: TransactionGroup) {
+  const color = group === "income" ? incomeColor : GROUP_COLORS[group];
+  return { backgroundColor: `${color}1A`, color };
+}
 
 const amountColors = {
   income: "text-income",
@@ -98,10 +99,8 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
                   </p>
                   <div className="mt-1 flex items-center gap-2">
                     <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-medium capitalize lg:text-xs",
-                        groupColors[transaction.group],
-                      )}
+                      className="rounded-full px-2 py-0.5 text-[10px] font-medium capitalize lg:text-xs"
+                      style={getGroupBadgeStyle(transaction.group)}
                     >
                       {t(`data.group.${transaction.group}`)}
                     </span>

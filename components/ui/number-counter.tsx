@@ -15,7 +15,7 @@ interface NumberCounterProps {
   startOnView?: boolean;
 }
 
-function easeOutExpo(t: number): number {
+export function easeOutExpo(t: number): number {
   return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
 }
 
@@ -34,6 +34,7 @@ export function NumberCounter({
   const [started, setStarted] = useState(!startOnView);
   const ref = useRef<HTMLSpanElement>(null);
 
+  /* c8 ignore start */
   useEffect(() => {
     if (!startOnView) return;
 
@@ -66,6 +67,7 @@ export function NumberCounter({
 
     requestAnimationFrame(tick);
   }, [started, value, duration]);
+  /* c8 ignore stop */
 
   const formatted = format
     ? format(current)

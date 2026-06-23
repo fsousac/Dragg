@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Plus, Minus, Target, PieChart, BarChart3, Folder } from "lucide-react";
 import { withSelectedMonth } from "@/components/dashboard/month-route";
 import { useI18n } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 const actions = [
   {
@@ -66,19 +66,19 @@ export function QuickActions() {
           {actions.map((action) => {
             const Icon = action.icon;
             return (
-              <Button
-                asChild
+              <Link
                 key={action.nameKey}
-                variant="ghost"
-                className={`flex flex-col items-center gap-2 h-auto py-4 lg:py-6 ${action.color} transition-all duration-200 cursor-pointer`}
+                href={withSelectedMonth(action.href, searchParams)}
+                className={cn(
+                  "flex flex-col items-center gap-2 rounded-md py-4 lg:py-6 transition-colors duration-200 cursor-pointer",
+                  action.color,
+                )}
               >
-                <Link href={withSelectedMonth(action.href, searchParams)}>
-                  <Icon className="w-5 h-5 lg:w-6 lg:h-6" />
-                  <span className="text-[10px] lg:text-xs font-medium text-center leading-tight">
-                    {t(action.nameKey)}
-                  </span>
-                </Link>
-              </Button>
+                <Icon className="w-5 h-5 lg:w-6 lg:h-6" />
+                <span className="text-[10px] lg:text-xs font-medium text-center leading-tight">
+                  {t(action.nameKey)}
+                </span>
+              </Link>
             );
           })}
         </div>

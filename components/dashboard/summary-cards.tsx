@@ -14,6 +14,14 @@ import { Button } from "../ui/button";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { NumberCounter } from "@/components/ui/number-counter";
 
+const COLOR_POSITIVE = "#22C55E";
+const COLOR_NEGATIVE = "#EF4444";
+const COLOR_SAVINGS  = "#8B5CF6";
+
+function cardColor(hex: string) {
+  return { color: hex, bg: `${hex}1A` };
+}
+
 type SummaryCardsProps = {
   summaryData: SummaryData;
   onAddTransaction?: () => void;
@@ -24,14 +32,17 @@ export function SummaryCards({ summaryData, onAddTransaction }: SummaryCardsProp
   const formatTrend = (value: number) =>
     `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 
+  const balancePalette = cardColor(
+    summaryData.currentBalance < 0 ? COLOR_NEGATIVE : COLOR_POSITIVE,
+  );
+
   const cards = [
     {
       titleKey: "dashboard.summary.totalIncome",
       value: summaryData.totalIncome,
       icon: TrendingUp,
       trend: summaryData.trends.totalIncome,
-      colorVar: "var(--color-positive)",
-      bgVar: "var(--color-positive-bg)",
+      ...cardColor(COLOR_POSITIVE),
     },
     {
       titleKey: "dashboard.summary.totalExpenses",
@@ -40,23 +51,20 @@ export function SummaryCards({ summaryData, onAddTransaction }: SummaryCardsProp
       trend: summaryData.trends.totalExpenses,
       noteKey: "dashboard.summary.predictedExpenses",
       noteValue: summaryData.predictedExpenses,
-      colorVar: "var(--color-negative)",
-      bgVar: "var(--color-negative-bg)",
+      ...cardColor(COLOR_NEGATIVE),
     },
     {
       titleKey: "dashboard.summary.totalSaved",
       value: summaryData.totalSaved,
       icon: PiggyBank,
       trend: summaryData.trends.totalSaved,
-      colorVar: "var(--color-info)",
-      bgVar: "var(--color-info-bg)",
+      ...cardColor(COLOR_SAVINGS),
     },
     {
       titleKey: "dashboard.summary.currentBalance",
       value: summaryData.currentBalance,
       icon: Wallet,
-      colorVar: "var(--color-positive)",
-      bgVar: "var(--color-positive-bg)",
+      ...balancePalette,
     },
   ];
 
@@ -72,19 +80,19 @@ export function SummaryCards({ summaryData, onAddTransaction }: SummaryCardsProp
                   <div className="flex items-start justify-between">
                     <div
                       className="p-2 lg:p-3 rounded-xl"
-                      style={{ background: card.bgVar }}
+                      style={{ background: card.bg }}
                     >
                       <Icon
                         className="w-4 h-4 lg:w-5 lg:h-5"
-                        style={{ color: card.colorVar }}
+                        style={{ color: card.color }}
                       />
                     </div>
-                    {typeof card.trend === "number" ? (
+                    {"trend" in card && typeof card.trend === "number" ? (
                       <span
                         className="text-xs font-medium px-2 py-1 rounded-full"
                         style={{
-                          background: card.bgVar,
-                          color: card.colorVar,
+                          background: card.bg,
+                          color: card.color,
                         }}
                       >
                         {formatTrend(card.trend)}
@@ -97,7 +105,7 @@ export function SummaryCards({ summaryData, onAddTransaction }: SummaryCardsProp
                     </p>
                     <p
                       className="text-xl lg:text-2xl font-bold mt-1"
-                      style={{ color: card.colorVar }}
+                      style={{ color: card.color }}
                     >
                       <NumberCounter
                         value={card.value}
