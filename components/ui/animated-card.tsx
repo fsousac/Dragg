@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
-  SPRING_EASING,
-  DURATION,
   STAGGER,
   DELAY,
 } from "@/lib/animations/tokens";

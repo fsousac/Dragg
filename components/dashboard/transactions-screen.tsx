@@ -200,7 +200,6 @@ export function TransactionsScreen({
   const [isPending, startTransition] = useTransition();
   const [isNextInvoiceVisible, setIsNextInvoiceVisible] =
     useState(showNextInvoice);
-  const [isSearchPanelOpen, setIsSearchPanelOpen] = useState(false);
   const selectedMonth =
     searchParams.get("month") ?? new Date().toISOString().slice(0, 7);
   const transactionsHref = useMemo(() => {
