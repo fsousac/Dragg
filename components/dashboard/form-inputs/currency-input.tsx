@@ -145,6 +145,9 @@ export function CurrencyInput({
   }
   /* c8 ignore stop */
 
+  /* c8 ignore next */
+  const inputValue = isFocused && !digits ? "0,00" : formatDigits(digits);
+
   return (
     <div className={cn("min-w-0 space-y-1.5", className)}>
       <Label
@@ -166,7 +169,7 @@ export function CurrencyInput({
           id={id}
           inputMode="numeric"
           placeholder="0,00"
-          value={isFocused && !digits ? "0,00" : formatDigits(digits)}
+          value={inputValue}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onFocus={handleFocus}

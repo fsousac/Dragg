@@ -34,7 +34,6 @@ export function NumberCounter({
   const [started, setStarted] = useState(!startOnView);
   const ref = useRef<HTMLSpanElement>(null);
 
-  /* c8 ignore start */
   useEffect(() => {
     if (!startOnView) return;
 
@@ -67,7 +66,6 @@ export function NumberCounter({
 
     requestAnimationFrame(tick);
   }, [started, value, duration]);
-  /* c8 ignore stop */
 
   const formatted = format
     ? format(current)

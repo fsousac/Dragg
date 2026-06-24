@@ -34,10 +34,41 @@ const satoshi = localFont({
   display: "swap",
 });
 
+const DESCRIPTION =
+  "Free and open-source personal finance app. Track income, expenses, budgets, goals, and reports. Self-hostable. Built with Next.js + Supabase.";
+
 export const metadata: Metadata = {
-  title: "Dragg",
-  description:
-    "Open-source personal finance made clear. Track, budget, and grow with confidence.",
+  metadataBase: new URL("https://dragg-finance.vercel.app"),
+  title: {
+    default: "Dragg – Personal Finance Dashboard | Open Source",
+    template: "%s | Dragg",
+  },
+  description: DESCRIPTION,
+  keywords: [
+    "personal finance",
+    "expense tracker",
+    "budget app",
+    "open source finance",
+    "self-hosted budget tracker",
+    "finance dashboard",
+    "free budget app",
+    "nextjs finance app",
+  ],
+  alternates: {
+    canonical: "https://dragg-finance.vercel.app",
+  },
+  openGraph: {
+    type: "website",
+    url: "https://dragg-finance.vercel.app",
+    siteName: "Dragg",
+    title: "Dragg – Open Source Personal Finance Dashboard",
+    description: DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Dragg – Open Source Personal Finance Dashboard",
+    description: DESCRIPTION,
+  },
   icons: {
     icon: [
       {
@@ -70,6 +101,29 @@ export default function RootLayout({
       <body
         className={`${satoshi.variable} bg-background font-sans antialiased`}
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              name: "Dragg",
+              alternateName: "Dragg Finance",
+              applicationCategory: "FinanceApplication",
+              operatingSystem: "Web",
+              description:
+                "Free and open-source personal finance app. Track income, expenses, budgets, goals, and reports. Self-hostable.",
+              inLanguage: "en",
+              offers: {
+                "@type": "Offer",
+                price: "0",
+                priceCurrency: "BRL",
+              },
+              url: "https://dragg-finance.vercel.app",
+              sameAs: ["https://github.com/fsousac/Dragg"],
+            }),
+          }}
+        />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

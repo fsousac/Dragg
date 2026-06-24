@@ -92,6 +92,12 @@ describe("month route helpers", () => {
   it("generates the current month in yyyy-mm format", () => {
     expect(getCurrentMonthValue()).toMatch(/^\d{4}-\d{2}$/);
   });
+
+  it("falls back to current month when no month param is present", () => {
+    expect(withSelectedMonth("/dashboard", new URLSearchParams())).toMatch(
+      /month=\d{4}-\d{2}$/,
+    );
+  });
 });
 
 describe("dashboard component rendering", () => {
@@ -494,5 +500,26 @@ describe("dashboard component rendering", () => {
     );
 
     expect(html).toContain("over budget");
+  });
+
+  it("renders budget pie chart cells when split data is provided", () => {
+    const html = renderWithI18n(
+      <BudgetsScreen
+        budgetData={{
+          needs: { budget: 1000, percentage: 50, plannedSpent: 500, spent: 500 },
+          savings: { budget: 400, percentage: 50, plannedSpent: 200, spent: 200 },
+          wants: { budget: 600, percentage: 50, plannedSpent: 300, spent: 300 },
+        }}
+        budgetSplitData={[
+          { amount: 500, color: "#22C55E", maxAmount: 1000, nameKey: "data.group.needs", plannedSpentAmount: 500, spentAmount: 500, value: 50 },
+          { amount: 200, color: "#FFC38A", maxAmount: 400, nameKey: "data.group.wants", plannedSpentAmount: 200, spentAmount: 200, value: 30 },
+          { amount: 150, color: "#2563EB", maxAmount: 400, nameKey: "data.group.savings", plannedSpentAmount: 150, spentAmount: 150, value: 20 },
+        ]}
+        categories={[]}
+      />,
+    );
+
+    expect(html).toContain("Needs");
+    expect(html).toContain("Savings");
   });
 });

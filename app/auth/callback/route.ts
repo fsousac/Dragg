@@ -1,24 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { getSafeRedirectPath } from "@/lib/auth/redirect";
 import { createClient } from "@/lib/supabase/server";
-
-function getSafeRedirectPath(next: string | null) {
-  if (!next) {
-    return "/dashboard";
-  }
-
-  if (
-    !next.startsWith("/") ||
-    next.startsWith("//") ||
-    next.includes("\\") ||
-    next.includes("\n") ||
-    next.includes("\r")
-  ) {
-    return "/dashboard";
-  }
-
-  return next;
-}
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);

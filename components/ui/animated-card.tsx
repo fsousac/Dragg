@@ -23,7 +23,6 @@ export function AnimatedCard({
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
 
-  /* c8 ignore start */
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -40,14 +39,12 @@ export function AnimatedCard({
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  /* c8 ignore stop */
 
   const baseDelay =
     variant === "initial"
       ? DELAY.wave3 + index * STAGGER.loose
       : index * STAGGER.base;
 
-  /* c8 ignore next */
   const visibleClass = visible ? "animated-card--visible" : undefined;
 
   return (
