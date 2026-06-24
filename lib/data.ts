@@ -19,6 +19,11 @@ export interface Transaction {
   paymentMethodType?: string | null;
   isPlanned?: boolean;
   isCreditCardInvoice?: boolean;
+  installmentGroupId?: string | null;
+  installmentNumber?: number | null;
+  installmentTotal?: number | null;
+  advancedToMonth?: string | null;
+  advancedAt?: string | null;
   invoice?: CreditCardInvoiceDetails;
 }
 
@@ -34,7 +39,9 @@ export type CreditCardInvoicePurchase = {
 export type CreditCardInvoiceDetails = {
   closingDate: string;
   dueDate: string;
+  paidAmount: number;
   paymentMethodKey: string;
   purchases: CreditCardInvoicePurchase[];
+  totalAmount: number;
   startsAt: string;
 };

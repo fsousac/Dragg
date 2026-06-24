@@ -49,6 +49,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { CurrencyInput } from "@/components/dashboard/form-inputs/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -70,40 +71,22 @@ type GoalsScreenProps = {
 
 type GoalFormState = {
   color: string;
-  currentAmount: string;
+  currentAmount: number;
   deadline: string;
   icon: string;
   name: string;
-  targetAmount: string;
+  targetAmount: number;
 };
 
 const goalIcons = ["🎯", "🏦", "✈️", "🚗", "🏠", "📈", "🎓", "💻"];
 const goalColors = [
-  "#22C55E",
-  "#15803D",
-  "#F6C453",
-  "#FFC38A",
-  "#14B8A6",
-  "#EAB308",
+  "var(--chart-1)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-3)",
+  "var(--chart-2)",
+  "var(--savings)",
 ];
-
-function sanitizeCurrencyInput(value: string) {
-  const normalizedSeparator = value.replace(/\./g, ",");
-  const sanitizedValue = normalizedSeparator.replace(/[^\d,]/g, "");
-  const [integerPart, ...decimalParts] = sanitizedValue.split(",");
-
-  return decimalParts.length
-    ? `${integerPart},${decimalParts.join("")}`
-    : integerPart;
-}
-
-function parseCurrencyInput(value: string) {
-  return Number(value.replace(",", ".")) || 0;
-}
-
-function formatCurrencyInput(value: number) {
-  return value ? value.toFixed(2).replace(".", ",") : "";
-}
 
 function getTodayValue() {
   return new Date().toISOString().slice(0, 10);
@@ -115,11 +98,11 @@ function getInitialGoalForm(): GoalFormState {
 
   return {
     color: goalColors[0],
-    currentAmount: "",
+    currentAmount: 0,
     deadline: nextYear.toISOString().slice(0, 10),
     icon: goalIcons[0],
     name: "",
-    targetAmount: "",
+    targetAmount: 0,
   };
 }
 
@@ -137,7 +120,7 @@ export function GoalsScreen({
   const [goalForm, setGoalForm] = useState<GoalFormState>(getInitialGoalForm);
   const [editingGoal, setEditingGoal] = useState<GoalOverviewItem | null>(null);
   const [fundingGoal, setFundingGoal] = useState<GoalOverviewItem | null>(null);
-  const [fundAmount, setFundAmount] = useState("");
+  const [fundAmount, setFundAmount] = useState(0);
   const [deletingGoal, setDeletingGoal] = useState<GoalOverviewItem | null>(
     null,
   );
@@ -168,11 +151,11 @@ export function GoalsScreen({
       setEditingGoal(goal);
       setGoalForm({
         color: goal.color,
-        currentAmount: formatCurrencyInput(goal.currentAmount),
+        currentAmount: goal.currentAmount,
         deadline: goal.deadline,
         icon: goal.icon,
         name: goal.name,
-        targetAmount: formatCurrencyInput(goal.targetAmount),
+        targetAmount: goal.targetAmount,
       });
     } else {
       setEditingGoal(null);
@@ -182,8 +165,8 @@ export function GoalsScreen({
   };
 
   const handleSaveGoal = () => {
-    const targetAmount = parseCurrencyInput(goalForm.targetAmount);
-    const currentAmount = parseCurrencyInput(goalForm.currentAmount);
+    const targetAmount = goalForm.targetAmount;
+    const currentAmount = goalForm.currentAmount;
 
     if (!goalForm.name.trim() || targetAmount <= 0) {
       toast.error(t("goals.validationError"));
@@ -225,7 +208,7 @@ export function GoalsScreen({
   const handleAddFunds = () => {
     if (!fundingGoal) return;
 
-    const amount = parseCurrencyInput(fundAmount);
+    const amount = fundAmount;
     if (amount <= 0) {
       toast.error(t("goals.fundValidationError"));
       return;
@@ -236,7 +219,7 @@ export function GoalsScreen({
         await addGoalFundsAction(fundingGoal.id, amount);
         toast.success(t("goals.fundSuccess"));
         setFundingGoal(null);
-        setFundAmount("");
+        setFundAmount(0);
         router.refresh();
       } catch (error) {
         console.error("Error adding goal funds:", error);
@@ -267,7 +250,10 @@ export function GoalsScreen({
         title={t("screen.goals.title")}
         description={t("screen.goals.description")}
         actions={
-          <Button className="gap-2" onClick={() => openGoalDialog()}>
+          <Button
+            className="gap-2 text-background"
+            onClick={() => openGoalDialog()}
+          >
             <Plus className="size-4" />
             {t("screen.goals.newGoal")}
           </Button>
@@ -367,12 +353,18 @@ export function GoalsScreen({
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-8">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8"
+                          >
                             <MoreVertical className="size-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openGoalDialog(goal)}>
+                          <DropdownMenuItem
+                            onClick={() => openGoalDialog(goal)}
+                          >
                             <Pencil className="mr-2 size-4" />
                             {t("common.edit")}
                           </DropdownMenuItem>
@@ -412,7 +404,9 @@ export function GoalsScreen({
                           <p
                             className={cn(
                               "text-sm font-medium",
-                              isCloseToDeadline ? "text-yellow" : "text-foreground",
+                              isCloseToDeadline
+                                ? "text-yellow"
+                                : "text-foreground",
                             )}
                           >
                             {daysRemaining > 0
@@ -496,33 +490,31 @@ export function GoalsScreen({
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="goal-target">{t("goals.targetAmount")}</Label>
-                <Input
+                <CurrencyInput
                   id="goal-target"
-                  inputMode="decimal"
+                  label={t("goals.targetAmount")}
                   value={goalForm.targetAmount}
-                  onChange={(event) =>
+                  onValueChange={(targetAmount) =>
                     setGoalForm({
                       ...goalForm,
-                      targetAmount: sanitizeCurrencyInput(event.target.value),
+                      targetAmount,
                     })
                   }
-                  placeholder="0,00"
+                  labelClassName="normal-case tracking-normal text-foreground"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="goal-current">{t("goals.currentAmount")}</Label>
-                <Input
+                <CurrencyInput
                   id="goal-current"
-                  inputMode="decimal"
+                  label={t("goals.currentAmount")}
                   value={goalForm.currentAmount}
-                  onChange={(event) =>
+                  onValueChange={(currentAmount) =>
                     setGoalForm({
                       ...goalForm,
-                      currentAmount: sanitizeCurrencyInput(event.target.value),
+                      currentAmount,
                     })
                   }
-                  placeholder="0,00"
+                  labelClassName="normal-case tracking-normal text-foreground"
                 />
               </div>
             </div>
@@ -537,6 +529,7 @@ export function GoalsScreen({
                 onChange={(event) =>
                   setGoalForm({ ...goalForm, deadline: event.target.value })
                 }
+                className="w-full max-w-full min-w-0 appearance-none overflow-hidden pr-3 text-left [&::-webkit-calendar-picker-indicator]:shrink-0 [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:overflow-hidden [&::-webkit-date-and-time-value]:text-left"
               />
             </div>
             <div className="space-y-2">
@@ -568,7 +561,8 @@ export function GoalsScreen({
                     type="button"
                     className={cn(
                       "size-8 rounded-full border border-border",
-                      goalForm.color === color && "ring-2 ring-ring ring-offset-2",
+                      goalForm.color === color &&
+                        "ring-2 ring-ring ring-offset-2",
                     )}
                     style={{ backgroundColor: color }}
                     onClick={() => setGoalForm({ ...goalForm, color })}
@@ -598,7 +592,7 @@ export function GoalsScreen({
         onOpenChange={(open) => {
           if (!open) {
             setFundingGoal(null);
-            setFundAmount("");
+            setFundAmount(0);
           }
         }}
       >
@@ -608,15 +602,12 @@ export function GoalsScreen({
             <DialogDescription>{fundingGoal?.name}</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="goal-fund-amount">{t("common.amount")}</Label>
-            <Input
+            <CurrencyInput
               id="goal-fund-amount"
-              inputMode="decimal"
+              label={t("common.amount")}
               value={fundAmount}
-              onChange={(event) =>
-                setFundAmount(sanitizeCurrencyInput(event.target.value))
-              }
-              placeholder="0,00"
+              onValueChange={setFundAmount}
+              labelClassName="normal-case tracking-normal text-foreground"
             />
           </div>
           <DialogFooter>

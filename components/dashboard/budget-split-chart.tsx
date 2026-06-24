@@ -44,7 +44,7 @@ export function BudgetSplitTooltip({
       </p>
       <p className="text-xs text-muted-foreground">
         {t("dashboard.budgetSplit.plannedSpend")}:{" "}
-        {formatCurrency(data.spentAmount)}
+        {formatCurrency(data.plannedSpentAmount)}
       </p>
     </div>
   );
@@ -60,15 +60,15 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
     () => chartData.reduce((sum, item) => sum + item.maxAmount, 0),
     [chartData],
   );
-  const totalSpent = useMemo(
-    () => chartData.reduce((sum, item) => sum + item.spentAmount, 0),
+  const totalPlannedSpent = useMemo(
+    () => chartData.reduce((sum, item) => sum + item.plannedSpentAmount, 0),
     [chartData],
   );
 
   return (
     <Card className="bg-card border-border card-shadow">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base lg:text-lg font-semibold text-foreground">
+        <CardTitle className="lg:text-lg font-semibold text-foreground">
           {t("dashboard.budgetSplit.title")}
         </CardTitle>
         <p className="text-xs lg:text-sm text-muted-foreground">
@@ -94,6 +94,10 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
                   innerRadius={44}
                   outerRadius={72}
                   paddingAngle={4}
+                  isAnimationActive
+                  animationBegin={100}
+                  animationDuration={900}
+                  animationEasing="ease-out"
                 >
                   {chartData.map((entry) => (
                     <Cell
@@ -125,7 +129,7 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
                 {t("dashboard.budgetSplit.plannedSpend")}
               </p>
               <p className="text-sm font-semibold text-foreground">
-                {formatCurrency(totalSpent)}
+                {formatCurrency(totalPlannedSpent)}
               </p>
             </div>
           </div>
@@ -134,7 +138,7 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
         <div className="space-y-5">
           {chartData.map((item) => {
             const usage = calculateBudgetUsage(
-              item.spentAmount,
+              item.plannedSpentAmount,
               item.maxAmount,
             );
 
@@ -157,7 +161,7 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-sm font-semibold text-foreground">
-                      {formatCurrency(item.spentAmount)}
+                      {formatCurrency(item.plannedSpentAmount)}
                     </p>
                     <p
                       className={

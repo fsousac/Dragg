@@ -4,23 +4,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { type Transaction, type TransactionGroup } from "@/lib/data";
+import { GROUP_COLORS } from "@/lib/finance/group-colors";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { withSelectedMonth } from "./month-route";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-const groupColors: Record<TransactionGroup, string> = {
-  needs: "bg-[#F97316]/10 text-[#F97316]",
-  wants: "bg-[#EC4899]/10 text-[#EC4899]",
-  savings: "bg-[#8B5CF6]/10 text-[#8B5CF6]",
-  income: "bg-[#22C55E]/10 text-[#22C55E]",
-};
+const incomeColor = "#10B981";
+
+function getGroupBadgeStyle(group: TransactionGroup) {
+  const color = group === "income" ? incomeColor : GROUP_COLORS[group];
+  return { backgroundColor: `${color}1A`, color };
+}
 
 const amountColors = {
-  income: "text-[#22C55E]",
-  expense: "text-[#FB7185]",
-  saving: "text-[#8B5CF6]",
+  income: "text-income",
+  expense: "text-expense",
+  saving: "text-savings",
 };
 
 type TransactionsListProps = {
@@ -34,7 +35,7 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <Card className="h-full bg-card border-border card-shadow flex flex-col">
+    <Card className="h-fit bg-card border-border card-shadow flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
           <CardTitle className="text-base lg:text-lg font-semibold text-foreground">
@@ -53,7 +54,7 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
           onFocus={() =>
             router.prefetch(withSelectedMonth("/transactions", searchParams))
           }
-          className="flex items-center gap-3 rounded-xl transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="flex items-center gap-3 rounded-xl transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <Button
             variant="ghost"
@@ -75,11 +76,11 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
               <div
                 key={transaction.id}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/50 lg:gap-4 lg:px-6 lg:py-4",
+                  "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50 lg:gap-4 lg:px-6 lg:py-4",
                   shouldPresentAsPlanned && "opacity-70",
                 )}
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-xl lg:h-12 lg:w-12 lg:text-2xl">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-xl lg:h-12 lg:w-12 lg:text-2xl">
                   {transaction.icon}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -98,10 +99,8 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
                   </p>
                   <div className="mt-1 flex items-center gap-2">
                     <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-medium capitalize lg:text-xs",
-                        groupColors[transaction.group],
-                      )}
+                      className="rounded-full px-2 py-0.5 text-[10px] font-medium capitalize lg:text-xs"
+                      style={getGroupBadgeStyle(transaction.group)}
                     >
                       {t(`data.group.${transaction.group}`)}
                     </span>

@@ -9,6 +9,7 @@ import {
   PaymentMethodsTab,
   type EditablePaymentMethod,
 } from "@/components/dashboard/payment-methods-tab";
+import { CurrencyInput } from "@/components/dashboard/form-inputs/currency-input";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { SubscriptionsTab } from "@/components/dashboard/subscriptions-tab";
 import {
@@ -43,6 +44,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  type CreateInvoiceAdvancePaymentInput,
   type CreatePaymentMethodInput,
   type CreateSubscriptionInput,
   type PaymentInvoiceItem,
@@ -58,6 +60,9 @@ import { useI18n } from "@/lib/i18n";
 
 type PaymentsScreenProps = {
   categories: TransactionFormCategory[];
+  createInvoiceAdvancePaymentAction: (
+    data: CreateInvoiceAdvancePaymentInput,
+  ) => Promise<void>;
   createPaymentMethodAction: (data: CreatePaymentMethodInput) => Promise<void>;
   createSubscriptionAction: (data: CreateSubscriptionInput) => Promise<void>;
   deletePaymentMethodAction: (paymentMethodId: string) => Promise<void>;
@@ -74,7 +79,7 @@ type PaymentsScreenProps = {
 };
 
 type EditableSubscription = {
-  amount: string;
+  amount: number;
   category: string;
   description: string;
   id: string;
@@ -90,30 +95,9 @@ const editablePaymentTypeOptions: UpdatePaymentMethodInput["type"][] = [
   "other",
 ];
 
-function sanitizeCurrencyInput(value: string) {
-  const normalizedSeparator = value.replace(/\./g, ",");
-  const sanitizedValue = normalizedSeparator.replace(/[^\d,]/g, "");
-  const [integerPart, ...decimalParts] = sanitizedValue.split(",");
-
-  if (decimalParts.length === 0) {
-    return integerPart;
-  }
-
-  return `${integerPart},${decimalParts.join("")}`;
-}
-
-function parseCurrencyInput(value: string) {
-  return Number(value.replace(",", ".")) || 0;
-}
-
-function formatCurrencyInput(value: string) {
-  if (!value) return "";
-
-  return parseCurrencyInput(value).toFixed(2).replace(".", ",");
-}
-
 export function PaymentsScreen({
   categories,
+  createInvoiceAdvancePaymentAction,
   createPaymentMethodAction,
   createSubscriptionAction,
   deletePaymentMethodAction,
@@ -142,7 +126,7 @@ export function PaymentsScreen({
     useState(false);
   const [paymentMethodForm, setPaymentMethodForm] = useState({
     closingDay: "",
-    creditLimit: "",
+    creditLimit: 0,
     dueDay: "",
     name: "",
     type: "credit" as CreatePaymentMethodInput["type"],
@@ -150,7 +134,7 @@ export function PaymentsScreen({
   const [isSubscriptionDialogOpen, setIsSubscriptionDialogOpen] =
     useState(false);
   const [subscriptionForm, setSubscriptionForm] = useState({
-    amount: "",
+    amount: 0,
     category: categories[0]?.id ?? "none",
     description: "",
     nextDate: new Date().toISOString().slice(0, 10),
@@ -168,6 +152,17 @@ export function PaymentsScreen({
     useState<SubscriptionOverviewItem | null>(null);
   const [selectedInvoice, setSelectedInvoice] =
     useState<PaymentInvoiceItem | null>(null);
+  const invoicePaymentMethodOptions = transactionPaymentMethods.filter(
+    (paymentMethod) => paymentMethod.type !== "credit",
+  );
+  const [invoicePaymentForm, setInvoicePaymentForm] = useState({
+    amount: 0,
+    date: new Date().toISOString().slice(0, 10),
+    paymentMethod:
+      invoicePaymentMethodOptions[0]?.id ??
+      transactionPaymentMethods[0]?.id ??
+      "none",
+  });
   const today = new Date().toISOString().slice(0, 10);
   const dueThreshold = (() => {
     const threshold = new Date();
@@ -195,6 +190,59 @@ export function PaymentsScreen({
   };
 
   const shouldShowDueBadge = (dateValue: string) => dateValue > today;
+
+  const openInvoiceDialog = (invoice: PaymentInvoiceItem) => {
+    setSelectedInvoice(invoice);
+    setInvoicePaymentForm({
+      amount: 0,
+      date: today,
+      paymentMethod:
+        invoicePaymentMethodOptions[0]?.id ??
+        transactionPaymentMethods[0]?.id ??
+        "none",
+    });
+  };
+
+  const handleCreateInvoiceAdvancePayment = () => {
+    if (!selectedInvoice) return;
+
+    const amount = invoicePaymentForm.amount;
+
+    if (amount <= 0) {
+      toast.error(t("payments.invoiceAdvanceAmountRequired"));
+      return;
+    }
+
+    if (amount > selectedInvoice.amount) {
+      toast.error(t("payments.invoiceAdvanceAmountTooHigh"));
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await createInvoiceAdvancePaymentAction({
+          amount,
+          date: invoicePaymentForm.date,
+          invoiceId: selectedInvoice.id,
+          paymentMethod: invoicePaymentForm.paymentMethod,
+        });
+        toast.success(t("payments.invoiceAdvanceSuccess"));
+        setSelectedInvoice(null);
+        setInvoicePaymentForm({
+          amount: 0,
+          date: today,
+          paymentMethod:
+            invoicePaymentMethodOptions[0]?.id ??
+            transactionPaymentMethods[0]?.id ??
+            "none",
+        });
+        router.refresh();
+      } catch (error) {
+        console.error("Error creating invoice advance payment:", error);
+        toast.error(t("payments.invoiceAdvanceError"));
+      }
+    });
+  };
 
   const getSubscriptionStatus = (subscription: SubscriptionOverviewItem) => {
     if (subscription.status === "paused") return "paused" as const;
@@ -226,7 +274,7 @@ export function PaymentsScreen({
             editingPaymentMethod.closingDay
               ? Number(editingPaymentMethod.closingDay)
               : null,
-          creditLimit: parseCurrencyInput(editingPaymentMethod.creditLimit),
+          creditLimit: editingPaymentMethod.creditLimit,
           dueDay:
             editingPaymentMethod.type === "credit" &&
             editingPaymentMethod.dueDay
@@ -249,7 +297,7 @@ export function PaymentsScreen({
   const resetPaymentMethodForm = () => {
     setPaymentMethodForm({
       closingDay: "",
-      creditLimit: "",
+      creditLimit: 0,
       dueDay: "",
       name: "",
       type: "credit",
@@ -269,7 +317,7 @@ export function PaymentsScreen({
             paymentMethodForm.type === "credit" && paymentMethodForm.closingDay
               ? Number(paymentMethodForm.closingDay)
               : null,
-          creditLimit: parseCurrencyInput(paymentMethodForm.creditLimit),
+          creditLimit: paymentMethodForm.creditLimit,
           dueDay:
             paymentMethodForm.type === "credit" && paymentMethodForm.dueDay
               ? Number(paymentMethodForm.dueDay)
@@ -305,7 +353,7 @@ export function PaymentsScreen({
 
   const resetSubscriptionForm = () => {
     setSubscriptionForm({
-      amount: "",
+      amount: 0,
       category: categories[0]?.id ?? "none",
       description: "",
       nextDate: new Date().toISOString().slice(0, 10),
@@ -322,7 +370,7 @@ export function PaymentsScreen({
     startTransition(async () => {
       try {
         await createSubscriptionAction({
-          amount: parseCurrencyInput(subscriptionForm.amount),
+          amount: subscriptionForm.amount,
           category: subscriptionForm.category,
           description: subscriptionForm.description,
           nextDate: subscriptionForm.nextDate,
@@ -342,7 +390,7 @@ export function PaymentsScreen({
   const openSubscriptionDialog = (subscription?: SubscriptionOverviewItem) => {
     if (subscription) {
       setEditingSubscription({
-        amount: String(subscription.amount).replace(".", ","),
+        amount: subscription.amount,
         category: subscription.categoryId ?? "none",
         description: subscription.name,
         id: subscription.id,
@@ -350,7 +398,7 @@ export function PaymentsScreen({
         paymentMethod: subscription.paymentMethodId ?? "none",
       });
       setSubscriptionForm({
-        amount: String(subscription.amount).replace(".", ","),
+        amount: subscription.amount,
         category: subscription.categoryId ?? "none",
         description: subscription.name,
         nextDate: subscription.nextDate,
@@ -376,7 +424,7 @@ export function PaymentsScreen({
     startTransition(async () => {
       try {
         await updateSubscriptionAction({
-          amount: parseCurrencyInput(subscriptionForm.amount),
+          amount: subscriptionForm.amount,
           category: subscriptionForm.category,
           description: subscriptionForm.description,
           id: editingSubscription.id,
@@ -496,7 +544,7 @@ export function PaymentsScreen({
                       key={invoice.id}
                       type="button"
                       className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left text-foreground transition-colors hover:bg-accent/50"
-                      onClick={() => setSelectedInvoice(invoice)}
+                      onClick={() => openInvoiceDialog(invoice)}
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted/40 text-foreground">
@@ -675,7 +723,7 @@ export function PaymentsScreen({
           </TabsList>
         </Tabs>
         <Button
-          className="gap-2 w-auto"
+          className="gap-2 w-auto text-background"
           onClick={() => {
             if (activeTab === "subscriptions") {
               openSubscriptionDialog();
@@ -885,6 +933,35 @@ export function PaymentsScreen({
                 </div>
               </div>
 
+              {selectedInvoice.paidAmount > 0 ? (
+                <div className="grid gap-3 rounded-lg border border-border bg-muted/20 p-4 sm:grid-cols-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      {t("payments.invoiceTotal")}
+                    </p>
+                    <p className="mt-1 text-sm font-medium">
+                      {formatCurrency(selectedInvoice.totalAmount)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      {t("payments.invoicePaid")}
+                    </p>
+                    <p className="mt-1 text-sm font-medium">
+                      {formatCurrency(selectedInvoice.paidAmount)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      {t("payments.invoiceRemaining")}
+                    </p>
+                    <p className="mt-1 text-sm font-medium">
+                      {formatCurrency(selectedInvoice.amount)}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="overflow-hidden rounded-lg border border-border">
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-border bg-muted/30 px-4 py-3 text-sm font-medium">
                   <span>{t("transaction.invoicePurchases")}</span>
@@ -924,8 +1001,100 @@ export function PaymentsScreen({
                   ))}
                 </div>
               </div>
+
+              <div className="grid gap-3 rounded-lg border border-border bg-muted/20 p-4">
+                <div>
+                  <p className="text-sm font-medium">
+                    {t("payments.invoiceAdvanceTitle")}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t("payments.invoiceAdvanceDescription")}
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                  <div className="grid gap-2">
+                    <CurrencyInput
+                      id="invoice-advance-amount"
+                      label={t("payments.details.amount")}
+                      value={invoicePaymentForm.amount}
+                      onValueChange={(amount) =>
+                        setInvoicePaymentForm((current) => ({
+                          ...current,
+                          amount,
+                        }))
+                      }
+                      labelClassName="normal-case tracking-normal text-foreground"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>{t("payments.details.paymentMethod")}</Label>
+                    <Select
+                      value={invoicePaymentForm.paymentMethod}
+                      onValueChange={(value) =>
+                        setInvoicePaymentForm((current) => ({
+                          ...current,
+                          paymentMethod: value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(invoicePaymentMethodOptions.length
+                          ? invoicePaymentMethodOptions
+                          : transactionPaymentMethods
+                        ).map((paymentMethod) => (
+                          <SelectItem
+                            key={paymentMethod.id}
+                            value={paymentMethod.id}
+                          >
+                            {t(paymentMethod.label)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="invoice-advance-date">
+                      {t("payments.details.transactionDate")}
+                    </Label>
+                    <Input
+                      id="invoice-advance-date"
+                      type="date"
+                      value={invoicePaymentForm.date}
+                      onChange={(event) =>
+                        setInvoicePaymentForm((current) => ({
+                          ...current,
+                          date: event.target.value,
+                        }))
+                      }
+                      className="w-full max-w-full min-w-0 appearance-none overflow-hidden pr-3 text-left [&::-webkit-calendar-picker-indicator]:shrink-0 [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:overflow-hidden [&::-webkit-date-and-time-value]:text-left"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           ) : null}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSelectedInvoice(null)}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="button"
+              disabled={isPending}
+              onClick={handleCreateInvoiceAdvancePayment}
+            >
+              {isPending
+                ? t("payments.invoiceAdvanceSaving")
+                : t("payments.invoiceAdvanceConfirm")}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -985,29 +1154,17 @@ export function PaymentsScreen({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-payment-method-limit">
-                  {t("payments.methodLimit")}
-                </Label>
-                <Input
+                <CurrencyInput
                   id="new-payment-method-limit"
-                  inputMode="decimal"
-                  pattern="[0-9]*[,.]?[0-9]*"
+                  label={t("payments.methodLimit")}
                   value={paymentMethodForm.creditLimit}
-                  onBlur={() =>
-                    setPaymentMethodForm((currentValue) => ({
-                      ...currentValue,
-                      creditLimit: formatCurrencyInput(
-                        currentValue.creditLimit,
-                      ),
-                    }))
-                  }
-                  onChange={(event) =>
+                  onValueChange={(creditLimit) =>
                     setPaymentMethodForm({
                       ...paymentMethodForm,
-                      creditLimit: sanitizeCurrencyInput(event.target.value),
+                      creditLimit,
                     })
                   }
-                  placeholder="0,00"
+                  labelClassName="normal-case tracking-normal text-foreground"
                 />
               </div>
               {paymentMethodForm.type === "credit" ? (
@@ -1113,27 +1270,17 @@ export function PaymentsScreen({
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="subscription-amount">
-                  {t("common.amount")}
-                </Label>
-                <Input
+                <CurrencyInput
                   id="subscription-amount"
-                  inputMode="decimal"
-                  pattern="[0-9]*[,.]?[0-9]*"
+                  label={t("common.amount")}
                   value={subscriptionForm.amount}
-                  onBlur={() =>
-                    setSubscriptionForm((currentValue) => ({
-                      ...currentValue,
-                      amount: formatCurrencyInput(currentValue.amount),
-                    }))
-                  }
-                  onChange={(event) =>
+                  onValueChange={(amount) =>
                     setSubscriptionForm({
                       ...subscriptionForm,
-                      amount: sanitizeCurrencyInput(event.target.value),
+                      amount,
                     })
                   }
-                  placeholder="0,00"
+                  labelClassName="normal-case tracking-normal text-foreground"
                 />
               </div>
               <div className="space-y-2">
@@ -1150,6 +1297,7 @@ export function PaymentsScreen({
                       nextDate: event.target.value,
                     })
                   }
+                  className="w-full max-w-full min-w-0 appearance-none overflow-hidden pr-3 text-left [&::-webkit-calendar-picker-indicator]:shrink-0 [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:overflow-hidden [&::-webkit-date-and-time-value]:text-left"
                 />
               </div>
             </div>
@@ -1296,33 +1444,17 @@ export function PaymentsScreen({
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="payment-method-limit">
-                    {t("payments.methodLimit")}
-                  </Label>
-                  <Input
+                  <CurrencyInput
                     id="payment-method-limit"
-                    inputMode="decimal"
-                    pattern="[0-9]*[,.]?[0-9]*"
+                    label={t("payments.methodLimit")}
                     value={editingPaymentMethod.creditLimit}
-                    onBlur={() =>
-                      setEditingPaymentMethod((currentValue) =>
-                        currentValue
-                          ? {
-                              ...currentValue,
-                              creditLimit: formatCurrencyInput(
-                                currentValue.creditLimit,
-                              ),
-                            }
-                          : currentValue,
-                      )
-                    }
-                    onChange={(event) =>
+                    onValueChange={(creditLimit) =>
                       setEditingPaymentMethod({
                         ...editingPaymentMethod,
-                        creditLimit: sanitizeCurrencyInput(event.target.value),
+                        creditLimit,
                       })
                     }
-                    placeholder="0,00"
+                    labelClassName="normal-case tracking-normal text-foreground"
                   />
                 </div>
                 {editingPaymentMethod.type === "credit" ? (

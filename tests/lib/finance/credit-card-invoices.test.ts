@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   createCreditCardInvoiceTransactions,
   getCreditCardInvoiceCycle,
+  getInvoiceAdvancePaymentNote,
+  withCreditCardInvoiceTransactions,
 } from "@/lib/finance/credit-card-invoices";
 import { type Transaction } from "@/lib/data";
 
@@ -94,6 +96,10 @@ describe("credit card invoices", () => {
       date: "2026-05-14",
       isCreditCardInvoice: true,
       isPlanned: true,
+      invoice: {
+        paidAmount: 0,
+        totalAmount: 150,
+      },
     });
     expect(
       invoices[0].invoice.purchases.map((purchase) => purchase.id),
@@ -194,5 +200,188 @@ describe("credit card invoices", () => {
     });
 
     expect(invoices[0].invoice.purchases[0].installmentLabel).toBe("1/2");
+  });
+
+  it("can preserve purchases when adding invoice rows for transaction history", () => {
+    const purchase = makeTransaction({
+      amount: -100,
+      date: "2026-05-03",
+      id: "forgotten-purchase",
+    });
+
+    const transactions = withCreditCardInvoiceTransactions({
+      month: "2026-05",
+      preservePurchases: true,
+      sourceTransactions: [purchase],
+      visibleTransactions: [purchase],
+    });
+
+    expect(transactions.map((transaction) => transaction.id)).toEqual([
+      "forgotten-purchase",
+      "credit-card-invoice:card-1:2026-05",
+    ]);
+  });
+
+  it("returns visible transactions unchanged when there are no invoice rows", () => {
+    const debitPurchase = makeTransaction({
+      amount: -20,
+      date: "2026-05-03",
+      id: "debit-purchase",
+      paymentMethodId: "debit-1",
+      paymentMethodKey: "Debit",
+      paymentMethodType: "debit",
+    });
+    const visibleTransactions = [debitPurchase];
+
+    expect(
+      withCreditCardInvoiceTransactions({
+        month: "2026-05",
+        sourceTransactions: [debitPurchase],
+        visibleTransactions,
+      }),
+    ).toBe(visibleTransactions);
+  });
+
+  it("handles credit purchases without configured invoice days", () => {
+    const creditPurchase = makeTransaction({
+      amount: -20,
+      date: "2026-05-03",
+      id: "unconfigured-credit-purchase",
+      paymentMethodClosingDay: undefined,
+      paymentMethodDueDay: undefined,
+    });
+    const visibleTransactions = [creditPurchase];
+
+    expect(
+      withCreditCardInvoiceTransactions({
+        month: "2026-05",
+        sourceTransactions: [creditPurchase],
+        visibleTransactions,
+      }),
+    ).toBe(visibleTransactions);
+  });
+
+  it("removes purchases by default when replacing them with invoice rows", () => {
+    const purchase = makeTransaction({
+      amount: -100,
+      date: "2026-05-03",
+      id: "invoice-purchase",
+    });
+
+    const transactions = withCreditCardInvoiceTransactions({
+      month: "2026-05",
+      sourceTransactions: [purchase],
+      visibleTransactions: [purchase],
+    });
+
+    expect(transactions.map((transaction) => transaction.id)).toEqual([
+      "credit-card-invoice:card-1:2026-05",
+    ]);
+  });
+
+  it("subtracts invoice advance payments from the remaining invoice amount", () => {
+    const purchase = makeTransaction({
+      amount: -100,
+      date: "2026-05-03",
+      id: "invoice-purchase",
+    });
+    const advancePayment = makeTransaction({
+      amount: -30,
+      date: "2026-05-04",
+      id: "advance-payment",
+      notes: getInvoiceAdvancePaymentNote("credit-card-invoice:card-1:2026-05"),
+      paymentMethodId: "bank-1",
+      paymentMethodType: "bank",
+    });
+
+    const transactions = withCreditCardInvoiceTransactions({
+      month: "2026-05",
+      sourceTransactions: [purchase, advancePayment],
+      visibleTransactions: [purchase, advancePayment],
+    });
+
+    expect(transactions).toHaveLength(2);
+    expect(transactions[0].id).toBe("advance-payment");
+    expect(transactions[1]).toMatchObject({
+      amount: -70,
+      id: "credit-card-invoice:card-1:2026-05",
+      invoice: {
+        paidAmount: 30,
+        totalAmount: 100,
+      },
+    });
+  });
+
+  it("counts advanced installments in the target invoice month only", () => {
+    const advancedInstallment = makeTransaction({
+      advancedToMonth: "2026-05",
+      amount: -120,
+      date: "2026-08-10",
+      id: "advanced-installment",
+      installmentGroupId: "group-1",
+      installmentNumber: 4,
+      installmentTotal: 6,
+    });
+
+    const mayInvoice = createCreditCardInvoiceTransactions({
+      month: "2026-05",
+      paymentMethods: [
+        {
+          closingDay: 7,
+          dueDay: 14,
+          id: "card-1",
+          labelKey: "Card",
+        },
+      ],
+      transactions: [advancedInstallment],
+    });
+    const augustInvoice = createCreditCardInvoiceTransactions({
+      month: "2026-08",
+      paymentMethods: [
+        {
+          closingDay: 7,
+          dueDay: 14,
+          id: "card-1",
+          labelKey: "Card",
+        },
+      ],
+      transactions: [advancedInstallment],
+    });
+
+    expect(mayInvoice.invoices[0]).toMatchObject({
+      amount: -120,
+      id: "credit-card-invoice:card-1:2026-05",
+    });
+    expect(mayInvoice.invoices[0].invoice.purchases).toHaveLength(1);
+    expect(mayInvoice.invoices[0].invoice.purchases[0].categoryKey).toBe(
+      "data.category.shopping",
+    );
+    expect(augustInvoice.invoices).toEqual([]);
+  });
+
+  it("removes invoice purchases when advance payments fully pay the invoice", () => {
+    const purchase = makeTransaction({
+      amount: -100,
+      date: "2026-05-03",
+      id: "invoice-purchase",
+    });
+    const advancePayment = makeTransaction({
+      amount: -100,
+      date: "2026-05-04",
+      id: "advance-payment",
+      notes: getInvoiceAdvancePaymentNote("credit-card-invoice:card-1:2026-05"),
+      paymentMethodId: "bank-1",
+      paymentMethodType: "bank",
+    });
+
+    const transactions = withCreditCardInvoiceTransactions({
+      month: "2026-05",
+      sourceTransactions: [purchase, advancePayment],
+      visibleTransactions: [purchase, advancePayment],
+    });
+
+    expect(transactions.map((transaction) => transaction.id)).toEqual([
+      "advance-payment",
+    ]);
   });
 });

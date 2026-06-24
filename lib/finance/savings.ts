@@ -53,18 +53,22 @@ export function calculateTotalSaved({
     ? getMonthRange(earliestMonth, selectedMonth)
     : []
   ).map((month) => calculateClosedMonth(month, validTransactions));
-  const totalClosedMonthLeftover = toMoneyValue(
-    closedMonths.reduce(
-      (sum, month) => sum + month.contributedLeftover,
-      0,
-    ),
+  const selectedMonthBalanceBeforeSavings = calculateMonthBalanceBeforeSavings(
+    selectedMonth,
+    validTransactions,
   );
+  const totalClosedMonthLeftover = toMoneyValue(
+    closedMonths.reduce((sum, month) => sum + month.contributedLeftover, 0),
+  );
+  const selectedMonthDeficit = Math.min(selectedMonthBalanceBeforeSavings, 0);
 
   return {
     closedMonths,
     totalClosedMonthLeftover,
     totalInvested,
-    totalSaved: toMoneyValue(totalInvested + totalClosedMonthLeftover),
+    totalSaved: toMoneyValue(
+      totalInvested + totalClosedMonthLeftover + selectedMonthDeficit,
+    ),
   };
 }
 
@@ -78,16 +82,35 @@ function calculateClosedMonth(
   const income = sumTransactionsByType(monthTransactions, "income");
   const expenses = sumExpenses(monthTransactions);
   const savings = sumSavings(monthTransactions);
-  const finalBalance = toMoneyValue(income - expenses - savings);
+  const balanceBeforeSavings = toMoneyValue(income - expenses);
+  const finalBalance = toMoneyValue(balanceBeforeSavings - savings);
+  const contributedLeftover =
+    balanceBeforeSavings < 0
+      ? balanceBeforeSavings
+      : Math.max(finalBalance, 0);
 
   return {
-    contributedLeftover: Math.max(finalBalance, 0),
+    contributedLeftover,
     expenses,
     finalBalance,
     income,
     month,
     savings,
   };
+}
+
+function calculateMonthBalanceBeforeSavings(
+  month: string,
+  transactions: TransactionLike[],
+) {
+  const monthTransactions = transactions.filter(
+    (transaction) => getTransactionMonth(transaction) === month,
+  );
+
+  return toMoneyValue(
+    sumTransactionsByType(monthTransactions, "income") -
+      sumExpenses(monthTransactions),
+  );
 }
 
 function sumTransactionsByType(

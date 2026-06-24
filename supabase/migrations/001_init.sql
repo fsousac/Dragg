@@ -155,6 +155,7 @@ begin
     (new.id, 'Shopping', 'wants', 300, true, '🛍️'),
     (new.id, 'Others', 'wants', 120, true, '🏷️'),
     (new.id, 'Investments', 'savings', 500, true, '📈'),
+    (new.id, 'Reserve', 'savings', 200, true, '🛟'),
     (new.id, 'Income', 'income', null, true, '💼');
 
   insert into public.payment_methods (

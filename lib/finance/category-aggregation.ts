@@ -1,4 +1,5 @@
 import { type Transaction, type TransactionGroup } from "@/lib/data";
+import { GROUP_COLORS } from "@/lib/finance/group-colors";
 
 type ExpenseCategoryGroup = Exclude<TransactionGroup, "income">;
 
@@ -12,12 +13,6 @@ export type ExpensesByCategoryItem = {
 };
 
 const categoryGroups = ["needs", "wants", "savings"] as const;
-
-const groupColors = {
-  needs: "#F97316",
-  wants: "#EC4899",
-  savings: "#8B5CF6",
-} as const;
 
 function isCategoryGroup(value: string): value is ExpenseCategoryGroup {
   return categoryGroups.includes(value as ExpenseCategoryGroup);
@@ -50,7 +45,7 @@ export function buildExpensesByCategoryData(
       } else {
         acc.push({
           categoryId: transaction.categoryId ?? null,
-          color: groupColors[group],
+          color: GROUP_COLORS[group],
           group,
           groupKey,
           nameKey: transaction.categoryKey,

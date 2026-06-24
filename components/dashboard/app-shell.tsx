@@ -4,7 +4,12 @@ import type { ReactNode } from "react";
 import { Header } from "@/components/dashboard/header";
 import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { NavigationPrefetcher } from "@/components/dashboard/navigation-prefetcher";
+import { PageTransition } from "@/components/dashboard/page-transition";
 import { Sidebar } from "@/components/dashboard/sidebar";
+import type {
+  AuthenticatedUserClaims,
+  AuthenticatedUserContext,
+} from "@/lib/finance/transactions";
 import { createClient } from "@/lib/supabase/server";
 
 function getDisplayName(email: string) {
@@ -40,7 +45,9 @@ function getMetadataValue(
   return null;
 }
 
-function getAvatarUrl(metadata: Array<Record<string, unknown> | undefined | null>) {
+function getAvatarUrl(
+  metadata: Array<Record<string, unknown> | undefined | null>,
+) {
   const directValue = getMetadataValue(metadata, [
     "avatar_url",
     "avatarUrl",
@@ -94,17 +101,31 @@ function getAvatarUrl(metadata: Array<Record<string, unknown> | undefined | null
 
 interface AppShellProps {
   children: ReactNode;
+  userContext?: AuthenticatedUserContext;
 }
 
-export async function AppShell({ children }: AppShellProps) {
+async function getShellUser(userContext?: AuthenticatedUserContext) {
+  if (userContext) {
+    return {
+      claims: userContext.claims,
+      user: userContext.user,
+    };
+  }
+
   const supabase = await createClient();
   const [{ data: claimsData }, { data: userData }] = await Promise.all([
     supabase.auth.getClaims(),
     supabase.auth.getUser(),
   ]);
 
-  const claims = claimsData?.claims;
-  const user = userData?.user;
+  return {
+    claims: claimsData?.claims as AuthenticatedUserClaims | undefined,
+    user: userData?.user,
+  };
+}
+
+export async function AppShell({ children, userContext }: AppShellProps) {
+  const { claims, user } = await getShellUser(userContext);
 
   if (!claims || !user) {
     redirect("/");
@@ -153,7 +174,7 @@ export async function AppShell({ children }: AppShellProps) {
           userName={userName}
         />
         <div className="px-4 lg:px-8 py-4 lg:py-6 pb-24 lg:pb-8">
-          {children}
+          <PageTransition>{children}</PageTransition>
         </div>
       </main>
 

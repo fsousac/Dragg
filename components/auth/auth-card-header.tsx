@@ -18,6 +18,8 @@ export function AuthCardHeader() {
             alt=""
             width={30}
             height={30}
+            priority
+            loading="eager"
             className="size-8"
             aria-hidden="true"
           />

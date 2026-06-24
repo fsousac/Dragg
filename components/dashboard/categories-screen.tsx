@@ -81,7 +81,7 @@ export function CategoriesScreen({
         description={t("screen.categories.description")}
         actions={
           <NewCategoryDialog createCategoryAction={createCategoryAction}>
-            <Button className="gap-2">
+            <Button className="gap-2 text-background">
               <Plus className="size-4" />
               {t("screen.categories.newCategory")}
             </Button>

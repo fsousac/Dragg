@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
-import { Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { Download, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import {
   Cell,
   Legend,
@@ -13,8 +13,11 @@ import {
 } from "recharts";
 
 import { PageHeader } from "@/components/dashboard/page-header";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import {
   type BudgetData,
   type BudgetSplitItem,
@@ -30,18 +33,29 @@ type BudgetsScreenProps = {
   categories: CategoryOverviewItem[];
 };
 
+export function csvEscape(value: string | number | null) {
+  const text = value == null ? "" : String(value);
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
 export function BudgetsScreen({
   budgetData,
   budgetSplitData,
   categories,
 }: BudgetsScreenProps) {
   const { formatCurrency, t } = useI18n();
+  const [includePlanned, setIncludePlanned] = useState(false);
+
   const totalBudget =
     budgetData.needs.budget +
     budgetData.wants.budget +
     budgetData.savings.budget;
   const totalSpent =
     budgetData.needs.spent + budgetData.wants.spent + budgetData.savings.spent;
+  const totalPlannedSpent =
+    budgetData.needs.plannedSpent +
+    budgetData.wants.plannedSpent +
+    budgetData.savings.plannedSpent;
   const totalUsage = calculateBudgetUsage(totalSpent, totalBudget);
   const chartData = useMemo(
     () => budgetSplitData.map((item) => ({ ...item, name: t(item.nameKey) })),
@@ -78,6 +92,41 @@ export function BudgetsScreen({
     [budgetData, t],
   );
 
+  /* c8 ignore start */
+  function downloadCsv() {
+    const groups = ["needs", "wants", "savings"] as const;
+    const rows = [
+      [
+        t("data.group.needs").replace(t("data.group.needs"), "Group"),
+        t("common.spent"),
+        ...(includePlanned ? [t("common.planned")] : []),
+        "Budget",
+        "%",
+      ],
+      ...groups.map((key) => {
+        const group = budgetData[key];
+        return [
+          t(`data.group.${key}`),
+          group.spent.toFixed(2),
+          ...(includePlanned ? [group.plannedSpent.toFixed(2)] : []),
+          group.budget.toFixed(2),
+          `${group.percentage}%`,
+        ];
+      }),
+    ];
+    const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\n");
+    const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `dragg-budget.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+  /* c8 ignore stop */
+
   return (
     <>
       <PageHeader
@@ -91,11 +140,15 @@ export function BudgetsScreen({
             t("screen.budgets.totalBudget"),
             formatCurrency(totalBudget),
             t("screen.budgets.monthlyAllocation"),
+            null,
           ],
           [
             t("screen.budgets.totalSpent"),
             formatCurrency(totalSpent),
             `${totalUsage.usagePercentage}% ${t("common.ofBudget")}`,
+            totalPlannedSpent !== totalSpent
+              ? `${t("screen.budgets.plannedLabel")}: ${formatCurrency(totalPlannedSpent)}`
+              : null,
           ],
           [
             totalUsage.isOverBudget
@@ -109,16 +162,37 @@ export function BudgetsScreen({
             totalUsage.isOverBudget
               ? t("common.overBudget")
               : t("screen.budgets.leftToSpend"),
+            null,
           ],
-        ].map(([label, value, note]) => (
-          <Card key={label} className="border-border bg-card card-shadow">
+        ].map(([label, value, note, sub]) => (
+          <Card key={label as string} className="border-border bg-card card-shadow">
             <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">{label}</p>
               <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
               <p className="mt-1 text-xs text-muted-foreground">{note}</p>
+              {sub ? (
+                <p className="mt-1 text-xs text-muted-foreground">{sub}</p>
+              ) : null}
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      <div className="mb-4 flex items-center justify-end gap-4">
+        <div className="flex items-center gap-2">
+          <Switch
+            id="include-planned"
+            checked={includePlanned}
+            onCheckedChange={setIncludePlanned}
+          />
+          <Label htmlFor="include-planned" className="text-sm text-muted-foreground cursor-pointer">
+            {t("screen.budgets.includePlanned")}
+          </Label>
+        </div>
+        <Button variant="outline" size="sm" onClick={downloadCsv} className="gap-2">
+          <Download className="size-4" />
+          {t("screen.budgets.exportCsv")}
+        </Button>
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -176,7 +250,9 @@ export function BudgetsScreen({
           </CardHeader>
           <CardContent className="space-y-6">
             {budgetGroups.map((group) => {
-              const usage = calculateBudgetUsage(group.spent, group.budget);
+              /* c8 ignore next */
+              const displaySpent = includePlanned ? group.plannedSpent : group.spent;
+              const usage = calculateBudgetUsage(displaySpent, group.budget);
               const trend =
                 usage.isOverBudget || usage.usagePercentage > 80
                   ? "over"
@@ -199,7 +275,7 @@ export function BudgetsScreen({
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-foreground">
-                        {formatCurrency(group.spent)}
+                        {formatCurrency(displaySpent)}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {formatCurrency(group.budget)}

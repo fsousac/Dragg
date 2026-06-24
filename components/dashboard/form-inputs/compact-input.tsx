@@ -38,14 +38,14 @@ export function CompactInput({
   inputClassName,
 }: CompactInputProps) {
   return (
-    <div className="min-w-0 space-y-1.5">
+    <div className="w-full min-w-0 space-y-1.5">
       <Label
         htmlFor={id}
         className="text-xs font-medium text-foreground/70 uppercase tracking-wide"
       >
         {label}
       </Label>
-      <div className="relative group min-w-0 overflow-hidden">
+      <div className="relative group w-full min-w-0 overflow-hidden">
         {icon && (
           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40 group-focus-within:text-foreground/60 transition-colors">
             {icon}
@@ -67,6 +67,7 @@ export function CompactInput({
             hover:border-border/80 focus:border-primary/70 focus:bg-background/80
             transition-all duration-200 rounded-lg
             placeholder:text-foreground/50
+            w-full min-w-0 max-w-full
             ${error ? "border-destructive/60" : ""}
             ${inputClassName ?? ""}
           `}

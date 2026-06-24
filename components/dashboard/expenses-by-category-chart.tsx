@@ -95,7 +95,7 @@ export function ExpensesByCategoryChart({
   return (
     <Card className="bg-card border-border card-shadow">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base lg:text-lg font-semibold text-foreground">
+        <CardTitle className="text-base lg:text-lg font-semibold">
           {t("dashboard.expensesByCategory.title")}
         </CardTitle>
         <p className="text-xs lg:text-sm text-muted-foreground">
@@ -106,7 +106,7 @@ export function ExpensesByCategoryChart({
         {total > 0 ? (
           <div className="space-y-5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-[180px_1fr] md:items-center">
-              <div className="h-[170px] min-h-0 min-w-0">
+              <div className="h-42.5 min-h-0 min-w-0">
                 <ResponsiveContainer
                   width="100%"
                   height="100%"
@@ -123,6 +123,10 @@ export function ExpensesByCategoryChart({
                       innerRadius={44}
                       outerRadius={72}
                       paddingAngle={2}
+                      isAnimationActive
+                      animationBegin={100}
+                      animationDuration={900}
+                      animationEasing="ease-out"
                     >
                       {chartData.map((entry, index) => (
                         <Cell
@@ -213,7 +217,7 @@ export function ExpensesByCategoryChart({
             ))}
           </div>
         ) : (
-          <div className="flex h-[200px] items-center justify-center rounded-md border border-dashed border-border/70 bg-muted/20 text-sm text-muted-foreground">
+          <div className="flex h-50 items-center justify-center rounded-md border border-dashed border-border/70 bg-muted/20 text-sm text-muted-foreground">
             {t("common.noDataForPeriod")}
           </div>
         )}

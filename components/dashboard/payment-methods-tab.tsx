@@ -33,7 +33,7 @@ type PaymentMethodsTabProps = {
 
 export type EditablePaymentMethod = {
   closingDay: string;
-  creditLimit: string;
+  creditLimit: number;
   dueDay: string;
   id: string;
   name: string;
@@ -186,12 +186,7 @@ export function PaymentMethodsTab({
                             closingDay: paymentMethod.closingDay
                               ? String(paymentMethod.closingDay)
                               : "",
-                            creditLimit: paymentMethod.creditLimit
-                              ? String(paymentMethod.creditLimit).replace(
-                                  ".",
-                                  ",",
-                                )
-                              : "",
+                            creditLimit: paymentMethod.creditLimit,
                             dueDay: paymentMethod.dueDay
                               ? String(paymentMethod.dueDay)
                               : "",

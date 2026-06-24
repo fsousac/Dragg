@@ -3,7 +3,7 @@ import Image from "next/image";
 export default function Loading() {
   return (
     <div
-      className="fixed inset-0 z-[100] grid place-items-center bg-background/45 text-foreground backdrop-blur-[2px]"
+      className="fixed inset-0 z-100 grid place-items-center bg-background/45 text-foreground backdrop-blur-[2px]"
       aria-label="Carregando Dragg"
       aria-live="polite"
     >
@@ -14,6 +14,8 @@ export default function Loading() {
             alt=""
             width={32}
             height={32}
+            priority
+            loading="eager"
             className="size-8 brightness-0"
             aria-hidden="true"
           />

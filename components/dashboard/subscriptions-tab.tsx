@@ -75,9 +75,7 @@ export function SubscriptionsTab({
           <Card key={label} className="border-border bg-card card-shadow">
             <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">{label}</p>
-              <p className="mt-1 text-2xl font-bold text-foreground">
-                {value}
-              </p>
+              <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
               <p className="mt-1 text-xs text-muted-foreground">{note}</p>
             </CardContent>
           </Card>
@@ -132,7 +130,7 @@ export function SubscriptionsTab({
                   <p className="mt-0.5 flex min-w-0 flex-wrap items-center justify-end gap-x-1 gap-y-0.5 text-xs text-muted-foreground">
                     <Calendar className="size-3 shrink-0" />
                     <span>{t("common.next")}:</span>
-                    <span className="min-w-0 break-words text-right">
+                    <span className="min-w-0 wrap-break-word text-right">
                       {formatDate(payment.nextDate, {
                         day: "numeric",
                         month: "short",

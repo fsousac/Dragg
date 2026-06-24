@@ -35,7 +35,7 @@ const satoshi = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Dragg - Your Personal Finance Dashboard",
+  title: "Dragg",
   description:
     "Open-source personal finance made clear. Track, budget, and grow with confidence.",
   icons: {

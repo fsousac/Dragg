@@ -55,6 +55,7 @@ export function calculateBudgetUsage(
 export function calculateBudgetData(
   monthlyIncome: number,
   spentByGroup: Record<BudgetGroup, number>,
+  plannedSpentByGroup?: Record<BudgetGroup, number>,
 ) {
   const safeMonthlyIncome = Number.isFinite(monthlyIncome)
     ? Math.max(monthlyIncome, 0)
@@ -65,16 +66,19 @@ export function calculateBudgetData(
       safeMonthlyIncome,
       spentByGroup.needs,
       BUDGET_GROUP_RATIOS.needs,
+      plannedSpentByGroup?.needs,
     ),
     savings: createBudgetGroupData(
       safeMonthlyIncome,
       spentByGroup.savings,
       BUDGET_GROUP_RATIOS.savings,
+      plannedSpentByGroup?.savings,
     ),
     wants: createBudgetGroupData(
       safeMonthlyIncome,
       spentByGroup.wants,
       BUDGET_GROUP_RATIOS.wants,
+      plannedSpentByGroup?.wants,
     ),
   };
 }
@@ -110,6 +114,7 @@ function createBudgetGroupData(
   monthlyIncome: number,
   spentAmount: number,
   budgetRatio: number,
+  plannedSpentAmount?: number,
 ) {
   const budget = toMoneyValue(monthlyIncome * budgetRatio);
   const usage = calculateBudgetUsage(spentAmount, budget);
@@ -117,6 +122,7 @@ function createBudgetGroupData(
   return {
     budget,
     percentage: usage.usagePercentage,
+    plannedSpent: plannedSpentAmount ?? usage.spentAmount,
     spent: usage.spentAmount,
   };
 }

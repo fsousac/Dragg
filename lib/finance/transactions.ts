@@ -1,7 +1,7 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
-import { type SupabaseClient } from "@supabase/supabase-js";
+import { type SupabaseClient, type User } from "@supabase/supabase-js";
 
 import {
   type CreditCardInvoiceDetails,
@@ -18,15 +18,46 @@ import {
   buildExpensesByCategoryData,
   type ExpensesByCategoryItem,
 } from "@/lib/finance/category-aggregation";
-import { createCreditCardInvoiceTransactions } from "@/lib/finance/credit-card-invoices";
+import {
+  getInvoiceAdvancePaymentInvoiceId,
+  getInvoiceAdvancePaymentNote,
+  withCreditCardInvoiceTransactions,
+} from "@/lib/finance/credit-card-invoices";
 import {
   getPaymentMethodDetail,
   type PaymentMethodDetail,
 } from "@/lib/finance/payment-method-overview";
+import {
+  createInstallmentMetadata,
+  getInstallmentPrepaymentSummary,
+  isInstallmentTransaction,
+  selectInstallmentsForDeletion,
+  selectInstallmentsForPrepayment,
+  type InstallmentDeleteScope,
+  type InstallmentPrepaymentScope,
+} from "@/lib/finance/installments";
+import {
+  selectSubscriptionOccurrencesForDeletion,
+  shouldShowSubscriptionOccurrenceInTransactionHistory,
+} from "@/lib/finance/subscriptions";
+import { GROUP_COLORS } from "@/lib/finance/group-colors";
 import { createClient } from "@/lib/supabase/server";
 
 export { buildExpensesByCategoryData };
 export type { ExpensesByCategoryItem };
+
+export type AuthenticatedUserClaims = {
+  email?: string;
+  sub: string;
+} & Record<string, unknown>;
+
+export type AuthenticatedUserContext = {
+  claims: AuthenticatedUserClaims;
+  createdAt: string | null;
+  supabase: SupabaseClient;
+  user: User;
+  userId: string;
+};
 
 type DbCategoryGroup = Exclude<TransactionGroup, "income">;
 type DbTransactionKind = TransactionType;
@@ -53,9 +84,14 @@ type PaymentMethodRow = {
 type TransactionRow = {
   id: string;
   amount: number | string;
+  advanced_at?: string | null;
+  advanced_to_month?: string | null;
   date: string;
   description: string;
   kind: DbTransactionKind;
+  installment_group_id?: string | null;
+  installment_number?: number | string | null;
+  installment_total?: number | string | null;
   notes: string | null;
   categories: CategoryRow | null;
   category_id: string | null;
@@ -152,7 +188,7 @@ export type UpdateCategoryInput = CreateCategoryInput & {
 };
 
 export type NewTransactionInput = {
-  type: "income" | "expense";
+  type: "income" | "expense" | "saving";
   date: string;
   amount: number;
   category: string;
@@ -182,6 +218,13 @@ export type CreatePaymentMethodInput = {
   type: UpdatePaymentMethodInput["type"];
 };
 
+export type CreateInvoiceAdvancePaymentInput = {
+  amount: number;
+  date: string;
+  invoiceId: string;
+  paymentMethod: string;
+};
+
 export type UpdateTransactionInput = {
   id: string;
   type: TransactionType;
@@ -191,6 +234,30 @@ export type UpdateTransactionInput = {
   paymentMethod: string;
   description: string;
   notes?: string;
+};
+
+export type DeleteInstallmentsInput = {
+  scope: InstallmentDeleteScope;
+  transactionId: string;
+};
+
+export type AdvanceInstallmentsInput = {
+  scope?: InstallmentPrepaymentScope;
+  targetMonth: string;
+  transactionId: string;
+};
+
+export type InstallmentPrepaymentPreview = {
+  count: number;
+  targetMonth: string;
+  totalAmount: number;
+};
+
+export type SubscriptionDeleteScope = "single" | "this_and_following_unpaid";
+
+export type DeleteSubscriptionOccurrencesInput = {
+  scope: SubscriptionDeleteScope;
+  transactionId: string;
 };
 
 export type UpdatePaymentMethodInput = {
@@ -217,7 +284,7 @@ export type SummaryData = {
 
 export type BudgetData = Record<
   DbCategoryGroup,
-  { spent: number; budget: number; percentage: number }
+  { spent: number; plannedSpent: number; budget: number; percentage: number }
 >;
 
 export type BudgetSplitItem = {
@@ -225,6 +292,7 @@ export type BudgetSplitItem = {
   nameKey: string;
   maxAmount: number;
   spentAmount: number;
+  plannedSpentAmount: number;
   value: number;
   color: string;
 };
@@ -246,6 +314,11 @@ export type ExpensesOverTimeItem = {
   monthKey: string;
   amount: number;
   plannedAmount?: number;
+};
+
+export type DailyExpensesOverTimeItem = {
+  amount: number;
+  date: string;
 };
 
 export type ReportMonthlyItem = {
@@ -284,9 +357,11 @@ export type PaymentInvoiceItem = {
   dueDate: string;
   id: string;
   invoice: CreditCardInvoiceDetails;
+  paidAmount: number;
   paymentMethodKey: string;
   purchaseCount: number;
   status: PaymentsDueStatus;
+  totalAmount: number;
 };
 
 export type PaymentBillItem = {
@@ -319,6 +394,7 @@ export type DashboardData = TransactionFormOptions & {
   budgetSplitData: BudgetSplitItem[];
   expensesByCategory: ExpensesByCategoryItem[];
   expensesOverTime: ExpensesOverTimeItem[];
+  dailyExpensesOverTime: DailyExpensesOverTimeItem[];
   latestTransactions: Transaction[];
   summaryData: SummaryData;
 };
@@ -354,11 +430,7 @@ const editablePaymentMethodTypes = [
 ] as const;
 const transactionKinds = ["expense", "income", "saving"] as const;
 
-const groupColors = {
-  needs: "#F97316",
-  wants: "#EC4899",
-  savings: "#8B5CF6",
-} as const;
+const groupColors = GROUP_COLORS;
 
 const groupIcons = {
   income: "💼",
@@ -380,6 +452,7 @@ const categoryIconMap: Record<string, string> = {
   leisure: "🎮",
   other: "🏷️",
   others: "🏷️",
+  reserve: "🛟",
   shopping: "🛍️",
   subscriptions: "🎬",
   transportation: "🚗",
@@ -390,7 +463,12 @@ const transactionSelect = `
   date,
   description,
   amount,
+  advanced_at,
+  advanced_to_month,
   kind,
+  installment_group_id,
+  installment_number,
+  installment_total,
   notes,
   category_id,
   payment_method_id,
@@ -417,12 +495,44 @@ const transactionSelectWithoutCategoryIcon = `
   description,
   amount,
   kind,
+  installment_group_id,
+  installment_number,
+  installment_total,
   notes,
   category_id,
   payment_method_id,
   categories (
     id,
     name,
+    group_type,
+    is_default,
+    monthly_limit
+  ),
+  payment_methods (
+    id,
+    name,
+    closing_day,
+    due_day,
+    type
+  )
+`;
+
+const transactionSelectWithoutAdvancedMetadata = `
+  id,
+  date,
+  description,
+  amount,
+  kind,
+  installment_group_id,
+  installment_number,
+  installment_total,
+  notes,
+  category_id,
+  payment_method_id,
+  categories (
+    id,
+    name,
+    icon,
     group_type,
     is_default,
     monthly_limit
@@ -449,6 +559,7 @@ const categoryTranslationMap: Record<string, string> = {
   leisure: "data.category.leisure",
   other: "data.category.other",
   others: "data.category.other",
+  reserve: "data.category.reserve",
   shopping: "data.category.shopping",
   subscriptions: "data.category.subscriptions",
   transportation: "data.category.transportation",
@@ -610,7 +721,7 @@ function toPaymentMethodLabelKey(
 
 export async function getUserContext(
   supabaseClient?: SupabaseClient | Promise<SupabaseClient>,
-) {
+): Promise<AuthenticatedUserContext> {
   const supabase = supabaseClient
     ? await (supabaseClient as Promise<SupabaseClient>)
     : await createClient();
@@ -619,14 +730,19 @@ export async function getUserContext(
     supabase.auth.getUser(),
   ]);
 
-  if (!claimsData?.claims?.sub) {
+  const claims = claimsData?.claims as AuthenticatedUserClaims | undefined;
+  const user = userData.user;
+
+  if (!claims?.sub || !user) {
     redirect("/");
   }
 
   return {
-    createdAt: userData.user?.created_at ?? null,
+    claims,
+    createdAt: user.created_at ?? null,
     supabase,
-    userId: claimsData.claims.sub,
+    user,
+    userId: claims.sub,
   };
 }
 
@@ -800,6 +916,12 @@ function filterByTransactionMonth(
   includePrevious = false,
 ) {
   return transactions.filter((transaction) => {
+    if (transaction.advancedToMonth) {
+      return includePrevious
+        ? transaction.advancedToMonth <= month
+        : transaction.advancedToMonth === month;
+    }
+
     const transactionMonth = transaction.date.slice(0, 7);
     return includePrevious
       ? transactionMonth <= month
@@ -815,54 +937,6 @@ function markPlannedTransactions(transactions: Transaction[]) {
       ? { ...transaction, isPlanned: true }
       : transaction,
   );
-}
-
-function withCreditCardInvoiceTransactions(
-  sourceTransactions: Transaction[],
-  visibleTransactions: Transaction[],
-  month: string,
-) {
-  const creditPaymentMethods = new Map<
-    string,
-    {
-      closingDay: number | null;
-      dueDay: number | null;
-      id: string;
-      labelKey: string;
-    }
-  >();
-
-  for (const transaction of sourceTransactions) {
-    if (
-      transaction.paymentMethodId &&
-      transaction.paymentMethodKey &&
-      transaction.paymentMethodType === "credit"
-    ) {
-      creditPaymentMethods.set(transaction.paymentMethodId, {
-        closingDay: transaction.paymentMethodClosingDay ?? null,
-        dueDay: transaction.paymentMethodDueDay ?? null,
-        id: transaction.paymentMethodId,
-        labelKey: transaction.paymentMethodKey,
-      });
-    }
-  }
-
-  const { invoices, purchaseIds } = createCreditCardInvoiceTransactions({
-    month,
-    paymentMethods: [...creditPaymentMethods.values()],
-    transactions: sourceTransactions,
-  });
-
-  if (!invoices.length) {
-    return visibleTransactions;
-  }
-
-  return [
-    ...visibleTransactions.filter(
-      (transaction) => !purchaseIds.has(transaction.id),
-    ),
-    ...invoices,
-  ];
 }
 
 function toTransaction(row: TransactionRow): Transaction {
@@ -885,6 +959,8 @@ function toTransaction(row: TransactionRow): Transaction {
 
   return {
     id: row.id,
+    advancedAt: row.advanced_at ?? null,
+    advancedToMonth: row.advanced_to_month ?? null,
     amount: signedAmount,
     categoryId: row.category_id,
     categoryKey: categoryName,
@@ -895,6 +971,11 @@ function toTransaction(row: TransactionRow): Transaction {
       row.kind === "income"
         ? groupIcons.income
         : toCategoryIcon(rawCategoryName, row.categories?.icon),
+    installmentGroupId: row.installment_group_id ?? null,
+    installmentNumber:
+      row.installment_number == null ? null : Number(row.installment_number),
+    installmentTotal:
+      row.installment_total == null ? null : Number(row.installment_total),
     notes: row.notes,
     paymentMethodId: row.payment_method_id,
     paymentMethodClosingDay:
@@ -1250,7 +1331,10 @@ export async function listPaymentMethodOverview(
 export async function listSubscriptionOverview(): Promise<
   SubscriptionOverviewItem[]
 > {
-  const transactions = await listTransactions({ includeFuture: true });
+  const transactions = await listTransactions({
+    includeFuture: true,
+    includePausedSubscriptions: true,
+  });
   const today = getTodayValue();
   const subscriptionTransactions = transactions
     .filter((transaction) => transaction.notes?.startsWith("subscription"))
@@ -1332,9 +1416,11 @@ export async function getPaymentsDueData(
         dueDate: invoice.dueDate,
         id: transaction.id,
         invoice,
+        paidAmount: invoice.paidAmount,
         paymentMethodKey: invoice.paymentMethodKey,
         purchaseCount: invoice.purchases.length,
         status: getPaymentsDueStatus(invoice.dueDate, today),
+        totalAmount: invoice.totalAmount,
       };
     })
     .sort((left, right) => left.dueDate.localeCompare(right.dueDate));
@@ -1393,6 +1479,7 @@ export async function getPaymentsDueData(
       (transaction) =>
         transaction.type === "expense" &&
         !transaction.isCreditCardInvoice &&
+        !getInvoiceAdvancePaymentInvoiceId(transaction) &&
         !transaction.notes?.startsWith("subscription") &&
         (transaction.paymentMethodType === "boleto" ||
           transaction.paymentMethodType === "bank"),
@@ -1592,7 +1679,11 @@ export async function createTransaction(input: NewTransactionInput) {
   const amount = Math.abs(input.amount);
   assertPositiveFiniteAmount(amount, "Amount");
 
-  if (input.type !== "income" && input.type !== "expense") {
+  if (
+    input.type !== "income" &&
+    input.type !== "expense" &&
+    input.type !== "saving"
+  ) {
     throw new Error("Transaction type is invalid.");
   }
 
@@ -1605,7 +1696,11 @@ export async function createTransaction(input: NewTransactionInput) {
     "Payment method",
   );
   const kind: DbTransactionKind =
-    input.type === "income" ? "income" : categoryId ? "expense" : input.type;
+    input.type === "income"
+      ? "income"
+      : input.type === "saving"
+        ? "saving"
+        : "expense";
   const date = toIsoDate(input.date);
   const installmentCount = Number(input.installmentCount);
 
@@ -1623,13 +1718,15 @@ export async function createTransaction(input: NewTransactionInput) {
     throw new Error("Installment count is invalid.");
   }
 
-  const occurrenceCount = input.type === "expense" ? installmentCount : 1;
-  const installmentAmount =
-    installmentCount > 1
-      ? Number((amount / installmentCount).toFixed(2))
-      : amount;
+  const isInstallmentPurchase =
+    input.type === "expense" && installmentCount > 1;
+  const occurrenceCount = isInstallmentPurchase ? installmentCount : 1;
+  const installmentGroupId = isInstallmentPurchase ? crypto.randomUUID() : null;
+  const installmentAmount = isInstallmentPurchase
+    ? Number((amount / installmentCount).toFixed(2))
+    : amount;
   const totalRoundedInstallments = Number(
-    (installmentAmount * installmentCount).toFixed(2),
+    (installmentAmount * occurrenceCount).toFixed(2),
   );
   const installmentRemainder = Number(
     (amount - totalRoundedInstallments).toFixed(2),
@@ -1645,12 +1742,21 @@ export async function createTransaction(input: NewTransactionInput) {
       String(occurrenceDate.getMonth() + 1).padStart(2, "0"),
       String(occurrenceDate.getDate()).padStart(2, "0"),
     ].join("-");
-    const scheduleNote =
-      installmentCount > 1 ? `${index + 1}/${installmentCount}` : null;
+    const installmentMetadata =
+      isInstallmentPurchase && installmentGroupId
+        ? createInstallmentMetadata({
+            groupId: installmentGroupId,
+            installmentNumber: index + 1,
+            installmentTotal: installmentCount,
+          })
+        : null;
+    const scheduleNote = installmentMetadata
+      ? `${installmentMetadata.installmentNumber}/${installmentMetadata.installmentTotal}`
+      : null;
     const finalNotes =
       [scheduleNote, notes].filter(Boolean).join(" - ") || null;
     const rowAmount =
-      index === installmentCount - 1
+      index === occurrenceCount - 1
         ? Number((installmentAmount + installmentRemainder).toFixed(2))
         : installmentAmount;
 
@@ -1658,10 +1764,12 @@ export async function createTransaction(input: NewTransactionInput) {
       amount: rowAmount,
       category_id: categoryId,
       date: dateValue,
-      description:
-        installmentCount > 1
-          ? `${description} (${index + 1}/${installmentCount})`
-          : description,
+      description: installmentMetadata
+        ? `${description} (${index + 1}/${installmentCount})`
+        : description,
+      installment_group_id: installmentMetadata?.installmentGroupId ?? null,
+      installment_number: installmentMetadata?.installmentNumber ?? null,
+      installment_total: installmentMetadata?.installmentTotal ?? null,
       kind,
       notes: finalNotes,
       payment_method_id: paymentMethodId,
@@ -1684,6 +1792,97 @@ export async function createTransaction(input: NewTransactionInput) {
 
   if (error) {
     throw new Error(`Unable to save transaction: ${error.message}`);
+  }
+}
+
+function parseCreditCardInvoiceId(invoiceId: string) {
+  const match = invoiceId.match(
+    /^credit-card-invoice:([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}):(\d{4}-\d{2})$/i,
+  );
+
+  if (!match) {
+    throw new Error("Invoice is invalid.");
+  }
+
+  return {
+    month: match[2],
+    paymentMethodId: match[1],
+  };
+}
+
+export async function createInvoiceAdvancePayment(
+  input: CreateInvoiceAdvancePaymentInput,
+) {
+  const ctx = await getUserContext();
+  const { createdAt, supabase, userId } = ctx;
+  const amount = Math.abs(input.amount);
+  assertPositiveFiniteAmount(amount, "Amount");
+
+  const date = toIsoDate(input.date);
+  assertValidIsoDate(date);
+  assertDateNotBeforeUserCreated(date, createdAt);
+
+  const { month, paymentMethodId: invoicePaymentMethodId } =
+    parseCreditCardInvoiceId(input.invoiceId);
+  const paymentMethodId = normalizeNullableId(
+    input.paymentMethod,
+    "Payment method",
+  );
+
+  const [{ data: invoicePaymentMethod, error: invoicePaymentMethodError }] =
+    await Promise.all([
+      supabase
+        .from("payment_methods")
+        .select("id, type")
+        .eq("id", invoicePaymentMethodId)
+        .eq("user_id", userId)
+        .maybeSingle(),
+      assertUserPaymentMethod(supabase, userId, paymentMethodId),
+    ]);
+
+  if (invoicePaymentMethodError) {
+    throw new Error(
+      `Unable to validate invoice: ${invoicePaymentMethodError.message}`,
+    );
+  }
+
+  if (!invoicePaymentMethod || invoicePaymentMethod.type !== "credit") {
+    throw new Error("Invoice is invalid.");
+  }
+
+  const invoices = await listTransactions({
+    includeCreditCardInvoices: true,
+    includeFuture: true,
+    month,
+    useFinancialMonth: false,
+    userContext: ctx,
+  });
+  const invoice = invoices.find(
+    (transaction) =>
+      transaction.isCreditCardInvoice && transaction.id === input.invoiceId,
+  );
+
+  if (!invoice) {
+    throw new Error("Invoice is already paid or unavailable.");
+  }
+
+  if (amount > Math.abs(invoice.amount)) {
+    throw new Error("Advance payment cannot exceed the remaining invoice.");
+  }
+
+  const { error } = await supabase.from("transactions").insert({
+    amount,
+    category_id: null,
+    date,
+    description: "transaction.invoiceAdvancePayment",
+    kind: "expense" satisfies DbTransactionKind,
+    notes: getInvoiceAdvancePaymentNote(input.invoiceId),
+    payment_method_id: paymentMethodId,
+    user_id: userId,
+  });
+
+  if (error) {
+    throw new Error(`Unable to save invoice advance payment: ${error.message}`);
   }
 }
 
@@ -2330,8 +2529,284 @@ export async function deleteTransaction(transactionId: string) {
   }
 }
 
+async function getUserTransactionById(
+  supabase: SupabaseClient,
+  userId: string,
+  transactionId: string,
+) {
+  const { data, error } = await supabase
+    .from("transactions")
+    .select(transactionSelect)
+    .eq("id", transactionId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Unable to load transaction: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error("Transaction not found.");
+  }
+
+  return toTransaction(data as unknown as TransactionRow);
+}
+
+async function getInstallmentGroupTransactions(
+  supabase: SupabaseClient,
+  userId: string,
+  installmentGroupId: string,
+) {
+  const { data, error } = await supabase
+    .from("transactions")
+    .select(transactionSelect)
+    .eq("user_id", userId)
+    .eq("installment_group_id", installmentGroupId);
+
+  if (error) {
+    throw new Error(`Unable to load installments: ${error.message}`);
+  }
+
+  return ((data ?? []) as unknown as TransactionRow[]).map(toTransaction);
+}
+
+export async function deleteInstallments(input: DeleteInstallmentsInput) {
+  assertUuid(input.transactionId, "Transaction");
+  const { supabase, userId } = await getUserContext();
+
+  if (input.scope === "single") {
+    await deleteTransaction(input.transactionId);
+    return;
+  }
+
+  const selectedTransaction = await getUserTransactionById(
+    supabase,
+    userId,
+    input.transactionId,
+  );
+
+  if (!isInstallmentTransaction(selectedTransaction)) {
+    await deleteTransaction(input.transactionId);
+    return;
+  }
+
+  const installments = await getInstallmentGroupTransactions(
+    supabase,
+    userId,
+    selectedTransaction.installmentGroupId as string,
+  );
+  const selectedInstallments = selectInstallmentsForDeletion({
+    scope: input.scope,
+    selectedTransaction,
+    transactions: installments,
+  });
+  const selectedIds = selectedInstallments.map((transaction) => transaction.id);
+
+  if (!selectedIds.length) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("user_id", userId)
+    .eq(
+      "installment_group_id",
+      selectedTransaction.installmentGroupId as string,
+    )
+    .in("id", selectedIds);
+
+  if (error) {
+    throw new Error(`Unable to delete installments: ${error.message}`);
+  }
+}
+
+export async function advanceInstallments(input: AdvanceInstallmentsInput) {
+  assertUuid(input.transactionId, "Transaction");
+
+  if (!input.targetMonth.match(/^\d{4}-\d{2}$/)) {
+    throw new Error("Target month is invalid.");
+  }
+
+  const { supabase, userId } = await getUserContext();
+  const selectedTransaction = await getUserTransactionById(
+    supabase,
+    userId,
+    input.transactionId,
+  );
+
+  if (!isInstallmentTransaction(selectedTransaction)) {
+    throw new Error("Transaction is not an installment.");
+  }
+
+  const installments = await getInstallmentGroupTransactions(
+    supabase,
+    userId,
+    selectedTransaction.installmentGroupId as string,
+  );
+  const selectedInstallments = selectInstallmentsForPrepayment({
+    currentMonth: input.targetMonth,
+    scope: input.scope ?? "remaining",
+    selectedTransaction,
+    transactions: installments,
+  });
+  const selectedIds = selectedInstallments.map((transaction) => transaction.id);
+
+  if (!selectedIds.length) {
+    throw new Error("No remaining future installments to advance.");
+  }
+
+  const { error } = await supabase
+    .from("transactions")
+    .update({
+      advanced_at: new Date().toISOString(),
+      advanced_to_month: input.targetMonth,
+    })
+    .eq("user_id", userId)
+    .eq(
+      "installment_group_id",
+      selectedTransaction.installmentGroupId as string,
+    )
+    .in("id", selectedIds);
+
+  if (error) {
+    throw new Error(`Unable to advance installments: ${error.message}`);
+  }
+}
+
+export async function previewInstallmentPrepayment(
+  input: AdvanceInstallmentsInput,
+): Promise<InstallmentPrepaymentPreview> {
+  assertUuid(input.transactionId, "Transaction");
+
+  if (!input.targetMonth.match(/^\d{4}-\d{2}$/)) {
+    throw new Error("Target month is invalid.");
+  }
+
+  const { supabase, userId } = await getUserContext();
+  const selectedTransaction = await getUserTransactionById(
+    supabase,
+    userId,
+    input.transactionId,
+  );
+
+  if (!isInstallmentTransaction(selectedTransaction)) {
+    throw new Error("Transaction is not an installment.");
+  }
+
+  const installments = await getInstallmentGroupTransactions(
+    supabase,
+    userId,
+    selectedTransaction.installmentGroupId as string,
+  );
+  const selectedInstallments = selectInstallmentsForPrepayment({
+    currentMonth: input.targetMonth,
+    scope: input.scope ?? "remaining",
+    selectedTransaction,
+    transactions: installments,
+  });
+  const summary = getInstallmentPrepaymentSummary(selectedInstallments);
+
+  return {
+    count: summary.count,
+    targetMonth: input.targetMonth,
+    totalAmount: summary.totalAmount,
+  };
+}
+
+function getSubscriptionGroupQuery(
+  supabase: SupabaseClient,
+  userId: string,
+  subscription: SubscriptionReferenceRow,
+) {
+  let query = supabase
+    .from("transactions")
+    .select("id, date")
+    .eq("user_id", userId)
+    .eq("description", subscription.description)
+    .like("notes", "subscription%");
+
+  query = subscription.category_id
+    ? query.eq("category_id", subscription.category_id)
+    : query.is("category_id", null);
+
+  query = subscription.payment_method_id
+    ? query.eq("payment_method_id", subscription.payment_method_id)
+    : query.is("payment_method_id", null);
+
+  return query;
+}
+
+export async function deleteSubscriptionOccurrences(
+  input: DeleteSubscriptionOccurrencesInput,
+) {
+  assertUuid(input.transactionId, "Transaction");
+  const { supabase, userId } = await getUserContext();
+  const { data: reference, error: referenceError } = await supabase
+    .from("transactions")
+    .select("id, description, category_id, payment_method_id, notes")
+    .eq("id", input.transactionId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (referenceError) {
+    throw new Error(`Unable to load subscription: ${referenceError.message}`);
+  }
+
+  const subscription = reference as SubscriptionReferenceRow | null;
+
+  if (!subscription?.notes?.startsWith("subscription")) {
+    throw new Error("Subscription is invalid.");
+  }
+
+  if (input.scope === "single") {
+    await deleteTransaction(input.transactionId);
+    return;
+  }
+
+  const { data, error } = await getSubscriptionGroupQuery(
+    supabase,
+    userId,
+    subscription,
+  ).order("date", { ascending: true });
+
+  if (error) {
+    throw new Error(`Unable to load subscription charges: ${error.message}`);
+  }
+
+  const occurrences = (data ?? []) as SubscriptionOccurrenceRow[];
+  const selectedOccurrence = occurrences.find(
+    (occurrence) => occurrence.id === input.transactionId,
+  );
+
+  if (!selectedOccurrence) {
+    throw new Error("Subscription occurrence not found.");
+  }
+
+  const selectedIds = selectSubscriptionOccurrencesForDeletion({
+    occurrences,
+    scope: input.scope,
+    selectedOccurrence,
+    today: getTodayValue(),
+  }).map((occurrence) => occurrence.id);
+
+  const { error: deleteError } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("user_id", userId)
+    .in("id", selectedIds);
+
+  if (deleteError) {
+    throw new Error(
+      `Unable to delete subscription charges: ${deleteError.message}`,
+    );
+  }
+}
+
 export async function listTransactions(options?: {
   includeCreditCardInvoices?: boolean;
+  includePausedSubscriptions?: boolean;
+  preserveCreditCardInvoicePurchases?: boolean;
   includePrevious?: boolean;
   includeFuture?: boolean;
   month?: string;
@@ -2385,19 +2860,50 @@ export async function listTransactions(options?: {
   const { data, error } = await query;
 
   if (!error) {
-    const transactions = ((data ?? []) as unknown as TransactionRow[]).map(
-      toTransaction,
+    const rows = [...((data ?? []) as unknown as TransactionRow[])];
+
+    if (monthRange && includeFuture) {
+      const { data: advancedData, error: advancedError } = await supabase
+        .from("transactions")
+        .select(transactionSelect)
+        .eq("user_id", userId)
+        .eq("advanced_to_month", monthRange.month)
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false });
+
+      if (advancedError && advancedError.code !== "42703") {
+        throw new Error(
+          `Unable to load advanced installments: ${advancedError.message}`,
+        );
+      }
+
+      for (const row of (advancedData ?? []) as unknown as TransactionRow[]) {
+        if (!rows.some((existingRow) => existingRow.id === row.id)) {
+          rows.push(row);
+        }
+      }
+    }
+
+    const transactions = rows.map(toTransaction).filter(
+      (transaction) =>
+        !transaction.notes?.startsWith("subscription") ||
+        shouldShowSubscriptionOccurrenceInTransactionHistory({
+          includePausedSubscriptions: options?.includePausedSubscriptions,
+          occurrence: transaction,
+        }),
     );
     const filteredTransactions = monthRange
       ? filterByMonth(transactions, monthRange.month, includePrevious)
       : transactions;
     const resultTransactions =
       includeCreditCardInvoices && monthRange
-        ? withCreditCardInvoiceTransactions(
-            transactions,
-            filteredTransactions,
-            monthRange.month,
-          )
+        ? withCreditCardInvoiceTransactions({
+            month: monthRange.month,
+            preservePurchases:
+              options?.preserveCreditCardInvoicePurchases ?? false,
+            sourceTransactions: transactions,
+            visibleTransactions: filteredTransactions,
+          })
         : filteredTransactions;
 
     return includeFuture
@@ -2406,6 +2912,66 @@ export async function listTransactions(options?: {
   }
 
   if (error.code === "42703") {
+    let metadataFallbackQuery = supabase
+      .from("transactions")
+      .select(transactionSelectWithoutAdvancedMetadata)
+      .eq("user_id", userId)
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (monthRange) {
+      metadataFallbackQuery = metadataFallbackQuery.lte("date", monthRange.end);
+      if (!includePrevious && queryStart) {
+        metadataFallbackQuery = metadataFallbackQuery.gte("date", queryStart);
+      }
+    } else if (!includeFuture) {
+      metadataFallbackQuery = metadataFallbackQuery.lte(
+        "date",
+        getTodayValue(),
+      );
+    }
+
+    const { data: metadataFallbackData, error: metadataFallbackError } =
+      await metadataFallbackQuery;
+
+    if (!metadataFallbackError) {
+      const transactions = (
+        (metadataFallbackData ?? []) as unknown as TransactionRow[]
+      )
+        .map(toTransaction)
+        .filter(
+          (transaction) =>
+            !transaction.notes?.startsWith("subscription") ||
+            shouldShowSubscriptionOccurrenceInTransactionHistory({
+              includePausedSubscriptions: options?.includePausedSubscriptions,
+              occurrence: transaction,
+            }),
+        );
+      const filteredTransactions = monthRange
+        ? filterByMonth(transactions, monthRange.month, includePrevious)
+        : transactions;
+      const resultTransactions =
+        includeCreditCardInvoices && monthRange
+          ? withCreditCardInvoiceTransactions({
+              month: monthRange.month,
+              preservePurchases:
+                options?.preserveCreditCardInvoicePurchases ?? false,
+              sourceTransactions: transactions,
+              visibleTransactions: filteredTransactions,
+            })
+          : filteredTransactions;
+
+      return includeFuture
+        ? markPlannedTransactions(resultTransactions)
+        : resultTransactions;
+    }
+
+    if (metadataFallbackError.code !== "42703") {
+      throw new Error(
+        `Unable to load transactions: ${metadataFallbackError.message}`,
+      );
+    }
+
     let fallbackQuery = supabase
       .from("transactions")
       .select(transactionSelectWithoutCategoryIcon)
@@ -2428,19 +2994,28 @@ export async function listTransactions(options?: {
       throw new Error(`Unable to load transactions: ${fallbackError.message}`);
     }
 
-    const transactions = (
-      (fallbackData ?? []) as unknown as TransactionRow[]
-    ).map(toTransaction);
+    const transactions = ((fallbackData ?? []) as unknown as TransactionRow[])
+      .map(toTransaction)
+      .filter(
+        (transaction) =>
+          !transaction.notes?.startsWith("subscription") ||
+          shouldShowSubscriptionOccurrenceInTransactionHistory({
+            includePausedSubscriptions: options?.includePausedSubscriptions,
+            occurrence: transaction,
+          }),
+      );
     const filteredTransactions = monthRange
       ? filterByMonth(transactions, monthRange.month, includePrevious)
       : transactions;
     const resultTransactions =
       includeCreditCardInvoices && monthRange
-        ? withCreditCardInvoiceTransactions(
-            transactions,
-            filteredTransactions,
-            monthRange.month,
-          )
+        ? withCreditCardInvoiceTransactions({
+            month: monthRange.month,
+            preservePurchases:
+              options?.preserveCreditCardInvoicePurchases ?? false,
+            sourceTransactions: transactions,
+            visibleTransactions: filteredTransactions,
+          })
         : filteredTransactions;
 
     return includeFuture
@@ -2557,8 +3132,13 @@ export async function getDashboardData(
     (sum, transaction) => sum + Math.abs(transaction.amount),
     0,
   );
+  const actualUsageByGroup = sumBudgetUsageByGroup(transactions);
   const plannedUsageByGroup = sumBudgetUsageByGroup(scheduledTransactions);
-  const budgetData = calculateBudgetData(totalIncome, plannedUsageByGroup);
+  const budgetData = calculateBudgetData(
+    totalIncome,
+    actualUsageByGroup,
+    plannedUsageByGroup,
+  );
 
   const expensesByCategory = buildExpensesByCategoryData(
     scheduledExpenseTransactions,
@@ -2578,6 +3158,14 @@ export async function getDashboardData(
     monthKey: monthBucket.monthKey,
   }));
 
+  const dailyExpensesOverTime = transactions
+    .filter((transaction) => transaction.type === "expense")
+    .map((transaction) => ({
+      amount: Math.abs(transaction.amount),
+      date: transaction.date,
+    }))
+    .sort((left, right) => left.date.localeCompare(right.date));
+
   const budgetSplitData = [
     {
       amount: budgetData.needs.spent,
@@ -2585,6 +3173,7 @@ export async function getDashboardData(
       maxAmount: budgetData.needs.budget,
       nameKey: "data.group.needs",
       spentAmount: budgetData.needs.spent,
+      plannedSpentAmount: budgetData.needs.plannedSpent,
       value: 50,
     },
     {
@@ -2593,6 +3182,7 @@ export async function getDashboardData(
       maxAmount: budgetData.wants.budget,
       nameKey: "data.group.wants",
       spentAmount: budgetData.wants.spent,
+      plannedSpentAmount: budgetData.wants.plannedSpent,
       value: 30,
     },
     {
@@ -2601,6 +3191,7 @@ export async function getDashboardData(
       maxAmount: budgetData.savings.budget,
       nameKey: "data.group.savings",
       spentAmount: budgetData.savings.spent,
+      plannedSpentAmount: budgetData.savings.plannedSpent,
       value: 20,
     },
   ];
@@ -2609,6 +3200,7 @@ export async function getDashboardData(
     budgetData,
     budgetSplitData,
     categories,
+    dailyExpensesOverTime,
     expensesByCategory,
     expensesOverTime,
     // Merge recent actual transactions with scheduled (future) transactions,
