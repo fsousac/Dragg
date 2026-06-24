@@ -101,6 +101,10 @@
       "postcss": "^8.5.15",
       "lodash": ">=4.18.0",
       "vite": ">=8.0.16"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "sharp",
+      "unrs-resolver"
+    ]
   }
 }
