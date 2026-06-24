@@ -317,13 +317,13 @@ export function TransactionForm({
   const sectionLabel =
     "mb-2.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground";
   const chipBase =
-    "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all duration-200 cursor-pointer";
+    "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all duration-200 cursor-pointer max-w-full";
   const chipAddAction =
     "border-dashed border-border/40 text-foreground/50 hover:border-border/60 hover:text-foreground/70";
 
   return (
-    <div className="w-full">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+    <div className="w-full min-w-0">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5 min-w-0">
         {/* Type selector */}
         <div className="flex w-full gap-1 rounded-lg border border-border/40 bg-muted/20 p-1">
           <button
@@ -390,9 +390,9 @@ export function TransactionForm({
           <p className="mb-3 text-center text-sm text-muted-foreground">
             {t("transaction.amount")}
           </p>
-          <div className="flex items-center justify-center gap-1.5">
+          <div className="flex items-center justify-center align-middle gap-1.5 mx-2">
             <span
-              className={`text-md font-semibold ${
+              className={`text-md font-semibold pt-1.5 ${
                 formData.type === "expense"
                   ? "text-red-400"
                   : formData.type === "income"
@@ -405,9 +405,10 @@ export function TransactionForm({
             <CurrencyInput
               id="amount"
               label=""
+              className="max-w-[80%] min-w-fit"
               value={formData.amount}
               onValueChange={(amount) => setFormData({ ...formData, amount })}
-              inputClassName="w-fit border-0 bg-transparent p-0 text-center !text-3xl font-bold tabular-nums shadow-none placeholder:text-foreground/25 focus-visible:ring-0"
+              inputClassName="w-fill border-0 bg-transparent p-0 text-center !text-3xl font-bold tabular-nums shadow-none placeholder:text-foreground/25 focus-visible:ring-0"
             />
           </div>
           {errors.amount && (
@@ -418,13 +419,13 @@ export function TransactionForm({
         </div>
 
         {/* Two-column grid on desktop */}
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-x-6 lg:gap-y-5">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-x-6 lg:gap-y-5 min-w-0">
           {/* ── Left: Amount + Category ── */}
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-5 min-w-0">
             {/* Category chips */}
             <div>
               <span className={sectionLabel}>{t("transaction.category")}</span>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 min-w-0 max-w-full">
                 {displayedCategoryOptions.map((option) => {
                   const isSelected = formData.category === option.value;
                   return (
@@ -468,7 +469,7 @@ export function TransactionForm({
           {/* ── end left ── */}
 
           {/* ── Right: Description + Payment + Date + Installments + Notes ── */}
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-5 min-w-0">
             {/* Description */}
             <CompactInput
               label={t("transaction.description")}
@@ -488,7 +489,7 @@ export function TransactionForm({
               <span className={sectionLabel}>
                 {t("transaction.paymentMethod")}
               </span>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 min-w-0 max-w-full">
                 {paymentMethods.map((pm) => (
                   <button
                     key={pm.id}
@@ -526,7 +527,7 @@ export function TransactionForm({
             </div>
 
             {/* Date */}
-            <div className="grid gap-5 lg:grid-cols-2 lg:gap-6 ">
+            <div className="grid gap-5 lg:grid-cols-2 lg:gap-6 min-w-0">
               <CompactInput
                 label={t("transaction.date")}
                 id="date"
