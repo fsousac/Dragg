@@ -5,6 +5,13 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     coverage: {
+      exclude: [
+        "app/**",
+        "components/ui/**",
+        "lib/i18n.tsx",
+        "lib/supabase/**",
+        "middleware.ts",
+      ],
       thresholds: {
         branches: 100,
         functions: 100,

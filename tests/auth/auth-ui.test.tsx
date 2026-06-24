@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { getSafeRedirectPath } from "@/lib/auth/redirect";
 import { LoginCard } from "@/components/auth/login-card";
 import { PasswordRequirementsChecklist } from "@/components/auth/password-requirements-checklist";
 import { UpdatePasswordCard } from "@/components/auth/update-password-card";
@@ -63,6 +64,27 @@ vi.mock("@/lib/i18n", () => ({
     t: (key: string) => translations[key] ?? key,
   }),
 }));
+
+describe("auth callback redirect safety", () => {
+  it("falls back to /dashboard for null, non-absolute, and protocol-relative paths", () => {
+    expect(getSafeRedirectPath(null)).toBe("/dashboard");
+    expect(getSafeRedirectPath("http://evil.com")).toBe("/dashboard");
+    expect(getSafeRedirectPath("//evil.com")).toBe("/dashboard");
+  });
+
+  it("falls back to /dashboard for paths with escape sequences", () => {
+    expect(getSafeRedirectPath("/path\\to")).toBe("/dashboard");
+    expect(getSafeRedirectPath("/path\ninjection")).toBe("/dashboard");
+    expect(getSafeRedirectPath("/path\rinjection")).toBe("/dashboard");
+  });
+
+  it("returns valid absolute paths unchanged", () => {
+    expect(getSafeRedirectPath("/dashboard")).toBe("/dashboard");
+    expect(getSafeRedirectPath("/transactions?type=expense")).toBe(
+      "/transactions?type=expense",
+    );
+  });
+});
 
 describe("auth UI", () => {
   it("renders Google and email/password sign-in options", () => {

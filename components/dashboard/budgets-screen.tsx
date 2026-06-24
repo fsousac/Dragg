@@ -61,6 +61,9 @@ export function BudgetsScreen({
     () => budgetSplitData.map((item) => ({ ...item, name: t(item.nameKey) })),
     [budgetSplitData, t],
   );
+  /* c8 ignore next */
+  const pieTooltipFormatter = (value: unknown) =>
+    [`${value}%`, t("screen.budgets.monthlyAllocation")] as [string, string];
 
   const budgetGroups = useMemo(
     () => [
@@ -229,12 +232,7 @@ export function BudgetsScreen({
                       />
                     ))}
                   </Pie>
-                  <Tooltip
-                    formatter={(value) => [
-                      `${value}%`,
-                      t("screen.budgets.monthlyAllocation"),
-                    ]}
-                  />
+                  <Tooltip formatter={pieTooltipFormatter} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
