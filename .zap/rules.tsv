@@ -9,3 +9,4 @@
 10109	IGNORE	Modern SPA behavior is expected for this Next.js application.
 90004	IGNORE	Cross-Origin-Embedder-Policy is not required for the unauthenticated app surface and can break third-party auth/media integrations.
 90005	IGNORE	ZAP requests omit browser Sec-Fetch-Dest headers; this is scanner behavior, not an application response defect.
+10019	IGNORE	308 Permanent Redirect responses have no body; Content-Type is not required by RFC 7538 and its absence on redirects is a ZAP false positive.
