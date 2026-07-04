@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CreditCard, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getSubscriptionMatchKey } from "@/lib/finance/subscriptions";
 import {
   type CreateInvoiceAdvancePaymentInput,
   type CreatePaymentMethodInput,
@@ -121,6 +122,30 @@ export function PaymentsScreen({
     summary,
   } = paymentsDueData;
   const [activeTab, setActiveTab] = useState("payments");
+  const [pendingSubscriptionHighlight, setPendingSubscriptionHighlight] =
+    useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeTab !== "subscriptions" || !pendingSubscriptionHighlight) return;
+    const row = document.getElementById(pendingSubscriptionHighlight);
+    if (!row) return;
+
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    row.classList.add("ring-2", "ring-primary/40");
+    const timeout = setTimeout(() => {
+      row.classList.remove("ring-2", "ring-primary/40");
+      setPendingSubscriptionHighlight(null);
+    }, 1500);
+
+    return () => clearTimeout(timeout);
+  }, [activeTab, pendingSubscriptionHighlight]);
+
+  const goToSubscription = (subscription: SubscriptionOverviewItem) => {
+    setActiveTab("subscriptions");
+    setPendingSubscriptionHighlight(
+      `subscription-row-${getSubscriptionMatchKey(subscription)}`,
+    );
+  };
   const [isPending, startTransition] = useTransition();
   const [isPaymentMethodDialogOpen, setIsPaymentMethodDialogOpen] =
     useState(false);
@@ -604,9 +629,11 @@ export function PaymentsScreen({
                   {dueSubscriptions.map((subscription) => {
                     const status = getSubscriptionStatus(subscription);
                     return (
-                      <div
+                      <button
                         key={subscription.id}
-                        className="flex items-center justify-between gap-4 px-4 py-3"
+                        type="button"
+                        className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-accent/50"
+                        onClick={() => goToSubscription(subscription)}
                       >
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium text-foreground">
@@ -643,7 +670,7 @@ export function PaymentsScreen({
                             {formatCurrency(subscription.amount)}
                           </span>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -980,11 +1007,6 @@ export function PaymentsScreen({
                           <p className="truncate text-sm font-medium">
                             {t(purchase.descriptionKey)}
                           </p>
-                          {purchase.installmentLabel ? (
-                            <Badge variant="secondary" className="shrink-0">
-                              {purchase.installmentLabel}
-                            </Badge>
-                          ) : null}
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {formatDate(purchase.date, {

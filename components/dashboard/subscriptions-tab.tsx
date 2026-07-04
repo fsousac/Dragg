@@ -13,6 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getSubscriptionMatchKey } from "@/lib/finance/subscriptions";
 import { type SubscriptionOverviewItem } from "@/lib/finance/transactions";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -93,7 +94,8 @@ export function SubscriptionsTab({
             {subscriptions.map((payment) => (
               <div
                 key={payment.id}
-                className="grid grid-cols-[3rem_minmax(0,1fr)_minmax(5.75rem,7.5rem)_2.25rem] items-start gap-1 p-4 transition-colors hover:bg-accent/50 sm:grid-cols-[3rem_minmax(0,1fr)_minmax(7rem,max-content)_2.25rem] sm:items-center sm:gap-4"
+                id={`subscription-row-${getSubscriptionMatchKey(payment)}`}
+                className="grid grid-cols-[3rem_minmax(0,1fr)_minmax(5.75rem,7.5rem)_2.25rem] items-start gap-1 rounded-lg p-4 transition-[background-color,box-shadow] duration-300 hover:bg-accent/50 sm:grid-cols-[3rem_minmax(0,1fr)_minmax(7rem,max-content)_2.25rem] sm:items-center sm:gap-4"
               >
                 <div className="flex size-12 items-center justify-center rounded-lg bg-accent text-2xl">
                   {payment.icon}

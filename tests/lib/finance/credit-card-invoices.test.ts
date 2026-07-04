@@ -208,18 +208,28 @@ describe("credit card invoices", () => {
       date: "2026-05-03",
       id: "forgotten-purchase",
     });
+    const unrelatedTransaction = makeTransaction({
+      amount: -20,
+      date: "2026-05-03",
+      id: "debit-purchase",
+      paymentMethodId: "debit-1",
+      paymentMethodType: "debit",
+    });
 
     const transactions = withCreditCardInvoiceTransactions({
       month: "2026-05",
       preservePurchases: true,
-      sourceTransactions: [purchase],
-      visibleTransactions: [purchase],
+      sourceTransactions: [purchase, unrelatedTransaction],
+      visibleTransactions: [purchase, unrelatedTransaction],
     });
 
     expect(transactions.map((transaction) => transaction.id)).toEqual([
       "forgotten-purchase",
+      "debit-purchase",
       "credit-card-invoice:card-1:2026-05",
     ]);
+    expect(transactions[0].isCreditCardInvoicePurchase).toBe(true);
+    expect(transactions[1].isCreditCardInvoicePurchase).toBeUndefined();
   });
 
   it("returns visible transactions unchanged when there are no invoice rows", () => {

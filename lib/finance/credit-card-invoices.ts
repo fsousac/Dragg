@@ -270,7 +270,11 @@ export function withCreditCardInvoiceTransactions(options: {
 
   return [
     ...(options.preservePurchases
-      ? options.visibleTransactions
+      ? options.visibleTransactions.map((transaction) =>
+          purchaseIds.has(transaction.id)
+            ? { ...transaction, isCreditCardInvoicePurchase: true }
+            : transaction,
+        )
       : options.visibleTransactions.filter(
           (transaction) => !purchaseIds.has(transaction.id),
         )),

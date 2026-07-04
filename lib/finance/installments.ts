@@ -133,6 +133,7 @@ export function selectInstallmentsForDeletion<
 export function selectInstallmentsForPrepayment<
   TTransaction extends TransactionLike,
 >(input: {
+  count?: number;
   currentMonth: string;
   scope?: InstallmentPrepaymentScope;
   selectedTransaction: TTransaction;
@@ -145,7 +146,7 @@ export function selectInstallmentsForPrepayment<
   const scope = input.scope ?? "remaining";
   const selectedNumber = Number(input.selectedTransaction.installmentNumber);
 
-  return input.transactions
+  const eligible = input.transactions
     .filter((transaction) =>
       isSameInstallmentGroup(transaction, input.selectedTransaction),
     )
@@ -161,6 +162,14 @@ export function selectInstallmentsForPrepayment<
       return isSelectedOrAfter && transactionMonth > input.currentMonth;
     })
     .sort(compareInstallmentOrder);
+
+  if (input.count == null) {
+    return eligible;
+  }
+
+  // Advancing N months means folding in the earliest N remaining
+  // installments, not an arbitrary subset.
+  return eligible.slice(0, Math.max(0, input.count));
 }
 
 export function getInstallmentPrepaymentSummary<

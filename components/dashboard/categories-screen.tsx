@@ -29,12 +29,6 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-const groupColors: Record<CategoryOverviewItem["group"], string> = {
-  needs: "bg-needs text-white",
-  savings: "bg-savings text-white",
-  wants: "bg-wants text-white",
-};
-
 type CategoriesScreenProps = {
   categories: CategoryOverviewItem[];
   createCategoryAction: (data: CreateCategoryInput) => Promise<void>;
@@ -126,10 +120,11 @@ export function CategoriesScreen({
                       </h3>
                       <Badge
                         variant="secondary"
-                        className={cn(
-                          "mt-1 text-xs",
-                          groupColors[category.group],
-                        )}
+                        className="mt-1 text-xs"
+                        style={{
+                          backgroundColor: `${category.color}1A`,
+                          color: category.color,
+                        }}
                       >
                         {t(`data.group.${category.group}`)}
                       </Badge>

@@ -67,6 +67,25 @@ export function Header({
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerAnchorRef = useRef<HTMLDivElement>(null);
+  const mobilePickerAnchorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+
+    function handleOutsideClick(event: MouseEvent) {
+      const target = event.target as Node;
+      if (
+        pickerAnchorRef.current?.contains(target) ||
+        mobilePickerAnchorRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setPickerOpen(false);
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [pickerOpen]);
 
   const [selYear, selMonthIdx] = selectedMonth.split("-").map(Number);
   const selectedMonthZeroBased = selMonthIdx - 1;
@@ -167,7 +186,7 @@ export function Header({
         <div className="flex items-center gap-2">
           <ThemeToggle />
           {/* Mobile month picker trigger */}
-          <div className="relative">
+          <div ref={mobilePickerAnchorRef} className="relative">
             <button
               onClick={() => setPickerOpen((v) => !v)}
               className="flex h-9 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-xs font-semibold"

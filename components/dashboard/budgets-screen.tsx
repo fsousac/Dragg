@@ -340,6 +340,7 @@ export function BudgetsScreen({
                 const percentage = Math.round(
                   (category.spent / category.monthlyLimit) * 100,
                 );
+                const isOverBudget = percentage > 100;
                 return (
                   <div
                     key={category.id}
@@ -352,7 +353,14 @@ export function BudgetsScreen({
                           {t(category.label)}
                         </span>
                       </div>
-                      <span className="text-sm text-muted-foreground">
+                      <span
+                        className={cn(
+                          "text-sm",
+                          isOverBudget
+                            ? "font-medium text-destructive"
+                            : "text-muted-foreground",
+                        )}
+                      >
                         {formatCurrency(category.spent)} /{" "}
                         {formatCurrency(category.monthlyLimit)}
                       </span>
@@ -361,7 +369,9 @@ export function BudgetsScreen({
                       className="overflow-hidden rounded-full bg-secondary"
                       style={{
                         // @ts-expect-error CSS variable
-                        "--progress-foreground": category.color,
+                        "--progress-foreground": isOverBudget
+                          ? "var(--destructive)"
+                          : category.color,
                       }}
                     >
                       <Progress

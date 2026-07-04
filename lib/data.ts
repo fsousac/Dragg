@@ -19,6 +19,10 @@ export interface Transaction {
   paymentMethodType?: string | null;
   isPlanned?: boolean;
   isCreditCardInvoice?: boolean;
+  // Set when this individual purchase's amount is already folded into a
+  // sibling isCreditCardInvoice transaction's total (preserveCreditCardInvoicePurchases),
+  // so callers summing totals can avoid double-counting it.
+  isCreditCardInvoicePurchase?: boolean;
   installmentGroupId?: string | null;
   installmentNumber?: number | null;
   installmentTotal?: number | null;

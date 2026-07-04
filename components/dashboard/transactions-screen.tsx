@@ -124,6 +124,11 @@ type TransactionsScreenProps = {
     data: DeleteSubscriptionOccurrencesInput,
   ) => Promise<void>;
   deleteTransactionAction: (transactionId: string) => Promise<void>;
+  monthlySummary: {
+    totalIncome: number;
+    totalExpenses: number;
+    totalSavings: number;
+  };
   nextInvoiceTransactions: Transaction[];
   paymentMethods: TransactionFormPaymentMethod[];
   previewInstallmentPrepaymentAction: (
@@ -169,6 +174,7 @@ export function TransactionsScreen({
   deleteInstallmentsAction,
   deleteSubscriptionOccurrencesAction,
   deleteTransactionAction,
+  monthlySummary: monthlySummaryTotals,
   nextInvoiceTransactions,
   paymentMethods,
   previewInstallmentPrepaymentAction,
@@ -197,6 +203,18 @@ export function TransactionsScreen({
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(
     null,
   );
+  const [advanceCount, setAdvanceCount] = useState(1);
+  const advanceInstallmentsPreview =
+    confirmRequest?.kind === "advance-installments"
+      ? confirmRequest.preview
+      : null;
+  const advanceSelectedInstallments = advanceInstallmentsPreview
+    ? advanceInstallmentsPreview.installments.slice(0, advanceCount)
+    : [];
+  const advanceSelectedTotal = advanceSelectedInstallments.reduce(
+    (sum, installment) => sum + installment.amount,
+    0,
+  );
   const [isPending, startTransition] = useTransition();
   const [isNextInvoiceVisible, setIsNextInvoiceVisible] =
     useState(showNextInvoice);
@@ -222,17 +240,11 @@ export function TransactionsScreen({
     transaction.notes?.startsWith("subscription") ?? false;
 
   const monthlySummary = useMemo(() => {
-    let income = 0;
-    let expenses = 0;
-    let savings = 0;
-    for (const tx of transactions) {
-      if (tx.isCreditCardInvoice) continue;
-      if (tx.type === "income") income += Math.abs(tx.amount);
-      else if (tx.type === "saving") savings += Math.abs(tx.amount);
-      else expenses += Math.abs(tx.amount);
-    }
+    const income = monthlySummaryTotals.totalIncome;
+    const expenses = monthlySummaryTotals.totalExpenses;
+    const savings = monthlySummaryTotals.totalSavings;
     return { income, expenses, savings, balance: income - expenses - savings };
-  }, [transactions]);
+  }, [monthlySummaryTotals]);
 
   const getInstallmentDeleteDescriptionKey = (
     scope: InstallmentDeleteScope,
@@ -454,6 +466,7 @@ export function TransactionsScreen({
           return;
         }
 
+        setAdvanceCount(preview.count);
         setConfirmRequest({
           kind: "advance-installments",
           preview,
@@ -525,6 +538,7 @@ export function TransactionsScreen({
       startTransition(async () => {
         try {
           await advanceInstallmentsAction({
+            count: advanceCount,
             scope: "remaining",
             targetMonth: selectedMonth,
             transactionId: confirmRequest.transactionId,
@@ -1134,6 +1148,23 @@ export function TransactionsScreen({
                                     "transactions.installments.deleteThisAndFollowing",
                                   )}
                                 </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  disabled={
+                                    isPending &&
+                                    pendingTransactionId === transaction.id
+                                  }
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleDeleteInstallments(
+                                      transaction,
+                                      "all",
+                                    );
+                                  }}
+                                >
+                                  <Trash2 className="size-4" />
+                                  {t("transactions.installments.deleteAll")}
+                                </DropdownMenuItem>
                               </>
                             ) : isSubscription ? (
                               <>
@@ -1298,35 +1329,40 @@ export function TransactionsScreen({
                       );
                       const canAdvanceInstallment = Boolean(
                         installmentTransaction &&
-                        isInstallmentTransaction(installmentTransaction),
+                        isInstallmentTransaction(installmentTransaction) &&
+                        // `transactions` here is only the currently loaded
+                        // page window, not the full installment group, so we
+                        // can't reuse selectInstallmentsForPrepayment (it
+                        // needs the future sibling rows). The installment's
+                        // own number/total is always available, so use that:
+                        // nothing to advance once it's the last one.
+                        Number(installmentTransaction.installmentNumber) <
+                          Number(installmentTransaction.installmentTotal),
                       );
 
                       return (
                         <div
                           key={purchase.id}
-                          className="grid gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+                          className="flex items-center gap-3 px-4 py-3"
                         >
-                          <div className="min-w-0">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <p className="truncate text-sm font-medium">
-                                {t(purchase.descriptionKey)}
-                              </p>
-                              {purchase.installmentLabel ? (
-                                <Badge variant="secondary" className="shrink-0">
-                                  {purchase.installmentLabel}
-                                </Badge>
-                              ) : null}
-                            </div>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {formatDate(purchase.date, {
-                                day: "numeric",
-                                month: "short",
-                              })}{" "}
-                              · {t(purchase.categoryKey)}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">
+                              {t(purchase.descriptionKey)}
                             </p>
+                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                              <span className="text-xs text-muted-foreground">
+                                {formatDate(purchase.date, {
+                                  day: "numeric",
+                                  month: "short",
+                                })}
+                              </span>
+                              <Badge variant="secondary" className="text-xs">
+                                {t(purchase.categoryKey)}
+                              </Badge>
+                            </div>
                           </div>
-                          <div className="flex items-center justify-end gap-2 sm:flex-row-reverse sm:gap-3">
-                            <p className="text-sm font-semibold tabular-nums sm:text-right">
+                          <div className="flex shrink-0 items-center gap-2">
+                            <p className="text-sm font-semibold tabular-nums">
                               {formatCurrency(purchase.amount)}
                             </p>
                             {canAdvanceInstallment && installmentTransaction ? (
@@ -1516,18 +1552,69 @@ export function TransactionsScreen({
           )}
 
           <DialogFooter className="gap-2 sm:justify-between">
-            {selectedTransaction &&
-              !selectedTransaction.isCreditCardInvoice && (
-                <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="flex gap-2">
+              {selectedTransaction &&
+                !selectedTransaction.isCreditCardInvoice &&
+                (isInstallmentTransaction(selectedTransaction) ? (
+                  <div className="flex flex-1">
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      className="flex-1 rounded-r-none"
+                      disabled={isPending}
+                      onClick={() =>
+                        handleDeleteInstallments(selectedTransaction, "single")
+                      }
+                    >
+                      <Trash2 className="size-4" />
+                      {t("common.delete")}
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          className="rounded-l-none border-l border-l-destructive-foreground/30 px-2"
+                          disabled={isPending}
+                        >
+                          <ChevronDown className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={() =>
+                            handleDeleteInstallments(
+                              selectedTransaction,
+                              "this_and_following",
+                            )
+                          }
+                        >
+                          {t(
+                            "transactions.installments.deleteThisAndFollowing",
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={() =>
+                            handleDeleteInstallments(
+                              selectedTransaction,
+                              "all",
+                            )
+                          }
+                        >
+                          {t("transactions.installments.deleteAll")}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                ) : (
                   <Button
+                    type="button"
                     variant="destructive"
+                    className="flex-1"
                     disabled={isPending}
                     onClick={() => {
-                      if (isInstallmentTransaction(selectedTransaction)) {
-                        handleDeleteInstallments(selectedTransaction, "single");
-                        return;
-                      }
-
                       if (isSubscriptionTransaction(selectedTransaction)) {
                         handleDeleteSubscriptionOccurrences(
                           selectedTransaction,
@@ -1542,29 +1629,28 @@ export function TransactionsScreen({
                     <Trash2 className="size-4" />
                     {t("common.delete")}
                   </Button>
-                </div>
-              )}
-            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                ))}
               <Button
                 type="button"
                 variant="outline"
+                className="flex-1"
                 disabled={isPending}
                 onClick={closeTransactionDialog}
               >
                 {t("common.cancel")}
               </Button>
-              {selectedTransaction?.isCreditCardInvoice ? null : (
-                <Button
-                  type="button"
-                  disabled={isPending || !formData?.description.trim()}
-                  onClick={handleUpdateTransaction}
-                >
-                  {isPending
-                    ? t("transaction.saving")
-                    : t("transaction.saveChanges")}
-                </Button>
-              )}
             </div>
+            {selectedTransaction?.isCreditCardInvoice ? null : (
+              <Button
+                type="button"
+                disabled={isPending || !formData?.description.trim()}
+                onClick={handleUpdateTransaction}
+              >
+                {isPending
+                  ? t("transaction.saving")
+                  : t("transaction.saveChanges")}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1644,10 +1730,10 @@ export function TransactionsScreen({
                 ? t("transaction.deleteDescription")
                 : confirmRequest?.kind === "advance-installments"
                   ? t("transactions.installments.advanceConfirmDescription")
-                      .replace("{count}", String(confirmRequest.preview.count))
+                      .replace("{count}", String(advanceCount))
                       .replace(
                         "{amount}",
-                        formatCurrency(confirmRequest.preview.totalAmount),
+                        formatCurrency(advanceSelectedTotal),
                       )
                       .replace(
                         "{month}",
@@ -1665,6 +1751,36 @@ export function TransactionsScreen({
                     : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {advanceInstallmentsPreview ? (
+            <div className="grid gap-1.5">
+              <Label htmlFor="advance-count">
+                {t("transactions.installments.advanceCountLabel")}
+              </Label>
+              <Input
+                id="advance-count"
+                type="number"
+                min={1}
+                max={advanceInstallmentsPreview.count}
+                value={advanceCount}
+                onChange={(event) => {
+                  const value = Math.round(Number(event.target.value));
+                  if (!Number.isFinite(value)) return;
+                  setAdvanceCount(
+                    Math.min(
+                      Math.max(value, 1),
+                      advanceInstallmentsPreview.count,
+                    ),
+                  );
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("transactions.installments.advanceCountHelp").replace(
+                  "{max}",
+                  String(advanceInstallmentsPreview.count),
+                )}
+              </p>
+            </div>
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isPending}>
               {t("common.cancel")}

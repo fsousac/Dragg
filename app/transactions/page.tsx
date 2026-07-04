@@ -2,6 +2,7 @@ import { AppShell } from "@/components/dashboard/app-shell";
 import { TransactionsScreen } from "@/components/dashboard/transactions-screen";
 import {
   getUserContext,
+  getMonthlySummary,
   getTransactionFormOptions,
   listTransactions,
 } from "@/lib/finance/transactions";
@@ -47,27 +48,30 @@ export default async function TransactionsPage({
     : resolvedSearchParams?.nextInvoice === "1";
   const userContext = await getUserContext();
   const nextMonth = getNextMonthValue(selectedMonth);
-  const [transactions, transactionFormOptions, nextMonthTransactions] =
-    await Promise.all([
-      listTransactions({
-        includeCreditCardInvoices: true,
-        includePrevious: showPrevious,
-        includeFuture: true,
-        month: selectedMonth,
-        preserveCreditCardInvoicePurchases: true,
-        useFinancialMonth: false,
-        userContext,
-      }),
-      getTransactionFormOptions({ userContext }),
-      listTransactions({
-        includeCreditCardInvoices: true,
-        includeFuture: true,
-        month: nextMonth,
-        preserveCreditCardInvoicePurchases: true,
-        useFinancialMonth: false,
-        userContext,
-      }),
-    ]);
+  const [
+    transactions,
+    transactionFormOptions,
+    nextMonthTransactions,
+    monthlySummary,
+  ] = await Promise.all([
+    listTransactions({
+      includeCreditCardInvoices: true,
+      includePrevious: showPrevious,
+      includeFuture: true,
+      month: selectedMonth,
+      preserveCreditCardInvoicePurchases: true,
+      userContext,
+    }),
+    getTransactionFormOptions({ userContext }),
+    listTransactions({
+      includeCreditCardInvoices: true,
+      includeFuture: true,
+      month: nextMonth,
+      preserveCreditCardInvoicePurchases: true,
+      userContext,
+    }),
+    getMonthlySummary(selectedMonth, userContext),
+  ]);
 
   const nextInvoiceTransactions = nextMonthTransactions.filter(
     (transaction) => transaction.isCreditCardInvoice,
@@ -86,6 +90,7 @@ export default async function TransactionsPage({
           deleteSubscriptionOccurrencesAction
         }
         deleteTransactionAction={deleteTransactionAction}
+        monthlySummary={monthlySummary}
         nextInvoiceTransactions={nextInvoiceTransactions}
         previewInstallmentPrepaymentAction={previewInstallmentPrepaymentAction}
         paymentMethods={transactionFormOptions.paymentMethods}
