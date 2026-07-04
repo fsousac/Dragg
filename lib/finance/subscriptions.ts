@@ -92,9 +92,7 @@ export function buildSubscriptionOverview(
         existingSubscription.nextDate = transaction.date;
         existingSubscription.amount = Math.abs(transaction.amount);
       }
-    } else if (existingSubscription.nextDate < today) {
-      // No future occurrence seen yet: keep amount in sync with the most
-      // recent past occurrence instead of the oldest one in the group.
+    } else {
       existingSubscription.amount = Math.abs(transaction.amount);
     }
   }

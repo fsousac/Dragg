@@ -495,7 +495,10 @@ describe("dashboard component rendering", () => {
           wants: { budget: 600, percentage: 110, plannedSpent: 660, spent: 660 },
         }}
         budgetSplitData={[]}
-        categories={[{ color: "#f00", icon: "🏠", id: "c1", label: "data.category.health", monthlyLimit: 500, spent: 600 }]}
+        categories={[
+          { color: "#f00", icon: "🏠", id: "c1", label: "data.category.health", monthlyLimit: 500, spent: 600 },
+          { color: "#0f0", icon: "🛍️", id: "c2", label: "data.category.shopping", monthlyLimit: 500, spent: 200 },
+        ]}
       />,
     );
 

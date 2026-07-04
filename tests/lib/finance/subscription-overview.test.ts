@@ -55,9 +55,78 @@ describe("buildSubscriptionOverview", () => {
     // guards that grouping itself doesn't throw and stays empty as expected.
     expect(overview).toHaveLength(0);
   });
+
+  it("marks a subscription paused from its very first occurrence", () => {
+    const today = "2026-06-01";
+    const overview = buildSubscriptionOverview(
+      [
+        subscriptionTransaction({
+          id: "first",
+          date: "2026-06-10",
+          notes: "subscription paused 1/12",
+        }),
+      ],
+      today,
+    );
+
+    expect(overview[0].status).toBe("paused");
+  });
+
+  it("transitions an active subscription to paused when a later occurrence is paused", () => {
+    const today = "2026-06-01";
+    const overview = buildSubscriptionOverview(
+      [
+        subscriptionTransaction({ id: "active", date: "2026-06-05" }),
+        subscriptionTransaction({
+          id: "paused",
+          date: "2026-07-05",
+          notes: "subscription paused 2/12",
+        }),
+      ],
+      today,
+    );
+
+    expect(overview[0].status).toBe("paused");
+  });
+
+  it("keeps the earliest future occurrence when a later one isn't sooner", () => {
+    const today = "2026-06-01";
+    const overview = buildSubscriptionOverview(
+      [
+        subscriptionTransaction({ id: "soonest", date: "2026-06-05", amount: 50 }),
+        subscriptionTransaction({ id: "later", date: "2026-07-05", amount: 99 }),
+      ],
+      today,
+    );
+
+    expect(overview[0].nextDate).toBe("2026-06-05");
+    expect(overview[0].amount).toBe(50);
+  });
 });
 
 describe("getSubscriptionMatchKey", () => {
+  it("falls back to categoryKey and paymentMethodKey, then empty string", () => {
+    expect(
+      getSubscriptionMatchKey({
+        categoryId: null,
+        categoryKey: "data.category.streaming",
+        name: "Netflix",
+        paymentMethodId: null,
+        paymentMethodKey: "data.paymentMethod.pix",
+      }),
+    ).toBe("Netflix|data.category.streaming|data.paymentMethod.pix");
+
+    expect(
+      getSubscriptionMatchKey({
+        categoryId: null,
+        categoryKey: "data.category.streaming",
+        name: "Netflix",
+        paymentMethodId: null,
+        paymentMethodKey: null,
+      }),
+    ).toBe("Netflix|data.category.streaming|");
+  });
+
   it("is stable across items built from different occurrence ids", () => {
     const a = subscriptionTransaction({ id: "occurrence-a", date: "2026-05-10" });
     const b = subscriptionTransaction({ id: "occurrence-b", date: "2026-06-10" });
