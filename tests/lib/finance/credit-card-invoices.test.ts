@@ -220,6 +220,7 @@ describe("credit card invoices", () => {
       "forgotten-purchase",
       "credit-card-invoice:card-1:2026-05",
     ]);
+    expect(transactions[0].isCreditCardInvoicePurchase).toBe(true);
   });
 
   it("returns visible transactions unchanged when there are no invoice rows", () => {

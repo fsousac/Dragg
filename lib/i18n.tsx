@@ -545,9 +545,11 @@ const messages = {
     "transaction.installmentsLabel": "Split in installments",
     "transaction.installmentCount": "Number of installments",
     "transactions.installments.advanceConfirmDescription":
-      "Advance {count} remaining installments totaling {amount} to {month}?",
+      "Advance {count} installment(s), totaling {amount}, to {month}?",
+    "transactions.installments.advanceCountLabel": "Installments to advance",
+    "transactions.installments.advanceCountHelp": "of {max} remaining",
     "transactions.installments.advanceError": "Failed to advance installments.",
-    "transactions.installments.advanceRemaining": "Advance remaining",
+    "transactions.installments.advanceRemaining": "Advance",
     "transactions.installments.advanceTitle": "Advance installments?",
     "transactions.installments.advanceNone":
       "There are no remaining future installments to advance.",
@@ -1157,15 +1159,17 @@ const messages = {
     "transaction.installmentsLabel": "Parcelar em parcelas",
     "transaction.installmentCount": "Número de parcelas",
     "transactions.installments.advanceConfirmDescription":
-      "Adiantar {count} parcelas restantes, totalizando {amount}, para {month}?",
+      "Antecipar {count} parcela(s), totalizando {amount}, para {month}?",
+    "transactions.installments.advanceCountLabel": "Parcelas a antecipar",
+    "transactions.installments.advanceCountHelp": "de {max} restantes",
     "transactions.installments.advanceError":
-      "Não foi possível adiantar as parcelas.",
-    "transactions.installments.advanceRemaining": "Adiantar restantes",
-    "transactions.installments.advanceTitle": "Adiantar parcelas?",
+      "Não foi possível antecipar as parcelas.",
+    "transactions.installments.advanceRemaining": "Antecipar",
+    "transactions.installments.advanceTitle": "Antecipar parcelas?",
     "transactions.installments.advanceNone":
-      "Não há parcelas futuras restantes para adiantar.",
+      "Não há parcelas futuras restantes para antecipar.",
     "transactions.installments.advanceSuccess":
-      "Parcelas adiantadas com sucesso.",
+      "Parcelas antecipadas com sucesso.",
     "transactions.installments.deleteAll": "Excluir todas as parcelas",
     "transactions.installments.deleteAllConfirm":
       "Isso excluirá todas as parcelas desta compra.",

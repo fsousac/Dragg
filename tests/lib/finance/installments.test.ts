@@ -323,6 +323,38 @@ describe("installment helpers", () => {
     });
   });
 
+  it("limits prepayment to the earliest N remaining installments when count is given", () => {
+    const selected = installment({
+      date: "2026-05-10",
+      id: "installment-1",
+      installmentNumber: 1,
+      installmentTotal: 4,
+    });
+
+    expect(
+      selectInstallmentsForPrepayment({
+        count: 1,
+        currentMonth: "2026-05",
+        selectedTransaction: selected,
+        transactions: [
+          selected,
+          installment({
+            date: "2026-06-10",
+            id: "installment-2",
+            installmentNumber: 2,
+            installmentTotal: 4,
+          }),
+          installment({
+            date: "2026-07-10",
+            id: "installment-3",
+            installmentNumber: 3,
+            installmentTotal: 4,
+          }),
+        ],
+      }).map((transaction) => transaction.id),
+    ).toEqual(["installment-2"]);
+  });
+
   it("treats missing installment amounts as zero in prepayment summaries", () => {
     expect(
       getInstallmentPrepaymentSummary([

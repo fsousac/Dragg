@@ -10,7 +10,6 @@ import {
   type TransactionType,
 } from "@/lib/data";
 import {
-  BUDGET_GROUP_RATIOS,
   calculateBudgetData,
   sumBudgetUsageByGroup,
 } from "@/lib/finance/budget";
@@ -37,8 +36,15 @@ import {
   type InstallmentPrepaymentScope,
 } from "@/lib/finance/installments";
 import {
+  buildSubscriptionOverview,
   selectSubscriptionOccurrencesForDeletion,
   shouldShowSubscriptionOccurrenceInTransactionHistory,
+  type SubscriptionOverviewItem,
+} from "@/lib/finance/subscriptions";
+
+export {
+  getSubscriptionMatchKey,
+  type SubscriptionOverviewItem,
 } from "@/lib/finance/subscriptions";
 import { GROUP_COLORS } from "@/lib/finance/group-colors";
 import { createClient } from "@/lib/supabase/server";
@@ -157,20 +163,6 @@ export type PaymentMethodOverviewItem = TransactionFormPaymentMethod & {
   spent: number;
 };
 
-export type SubscriptionOverviewItem = {
-  amount: number;
-  categoryId?: string | null;
-  categoryKey: string;
-  frequency: "monthly";
-  icon: string;
-  id: string;
-  name: string;
-  nextDate: string;
-  paymentMethodId?: string | null;
-  paymentMethodKey?: string | null;
-  status: "active" | "paused";
-};
-
 export type TransactionFormOptions = {
   categories: TransactionFormCategory[];
   paymentMethods: TransactionFormPaymentMethod[];
@@ -242,6 +234,7 @@ export type DeleteInstallmentsInput = {
 };
 
 export type AdvanceInstallmentsInput = {
+  count?: number;
   scope?: InstallmentPrepaymentScope;
   targetMonth: string;
   transactionId: string;
@@ -249,6 +242,7 @@ export type AdvanceInstallmentsInput = {
 
 export type InstallmentPrepaymentPreview = {
   count: number;
+  installments: { amount: number; date: string; id: string }[];
   targetMonth: string;
   totalAmount: number;
 };
@@ -1072,21 +1066,7 @@ function getMonthlyFinanceSummary(transactions: Transaction[]) {
   const grossSavings = transactions
     .filter((transaction) => transaction.type === "saving")
     .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
-  const needsSpent = transactions
-    .filter(
-      (transaction) =>
-        transaction.type === "expense" && transaction.group === "needs",
-    )
-    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
-  const wantsSpent = transactions
-    .filter(
-      (transaction) =>
-        transaction.type === "expense" && transaction.group === "wants",
-    )
-    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
-  const excessExpenses =
-    Math.max(needsSpent - income * BUDGET_GROUP_RATIOS.needs, 0) +
-    Math.max(wantsSpent - income * BUDGET_GROUP_RATIOS.wants, 0);
+  const excessExpenses = Math.max(expenses - income, 0);
 
   return {
     excessExpenses,
@@ -1335,57 +1315,8 @@ export async function listSubscriptionOverview(): Promise<
     includeFuture: true,
     includePausedSubscriptions: true,
   });
-  const today = getTodayValue();
-  const subscriptionTransactions = transactions
-    .filter((transaction) => transaction.notes?.startsWith("subscription"))
-    .sort((left, right) => left.date.localeCompare(right.date));
-  const groupedSubscriptions = new Map<string, SubscriptionOverviewItem>();
 
-  for (const transaction of subscriptionTransactions) {
-    const groupKey = [
-      transaction.descriptionKey,
-      transaction.categoryId ?? transaction.categoryKey,
-      transaction.paymentMethodId ?? transaction.paymentMethodKey ?? "",
-    ].join("|");
-    const existingSubscription = groupedSubscriptions.get(groupKey);
-    const isFutureOrToday = transaction.date >= today;
-
-    if (!existingSubscription) {
-      groupedSubscriptions.set(groupKey, {
-        amount: Math.abs(transaction.amount),
-        categoryId: transaction.categoryId,
-        categoryKey: transaction.categoryKey,
-        frequency: "monthly",
-        icon: transaction.icon,
-        id: transaction.id,
-        name: transaction.descriptionKey,
-        nextDate: transaction.date,
-        paymentMethodId: transaction.paymentMethodId,
-        paymentMethodKey: transaction.paymentMethodKey,
-        status: transaction.notes?.includes("paused") ? "paused" : "active",
-      });
-      continue;
-    }
-
-    if (
-      isFutureOrToday &&
-      transaction.notes?.includes("paused") &&
-      existingSubscription.status === "active"
-    ) {
-      existingSubscription.status = "paused";
-    }
-
-    if (
-      (existingSubscription.nextDate < today && isFutureOrToday) ||
-      (isFutureOrToday && transaction.date < existingSubscription.nextDate)
-    ) {
-      existingSubscription.nextDate = transaction.date;
-    }
-  }
-
-  return [...groupedSubscriptions.values()].filter(
-    (subscription) => subscription.nextDate >= today,
-  );
+  return buildSubscriptionOverview(transactions, getTodayValue());
 }
 
 export async function getPaymentsDueData(
@@ -1400,6 +1331,7 @@ export async function getPaymentsDueData(
       includeCreditCardInvoices: true,
       includeFuture: true,
       month: selectedMonth,
+      preserveCreditCardInvoicePurchases: true,
       useFinancialMonth: false,
       userContext: ctx,
     }),
@@ -1432,15 +1364,11 @@ export async function getPaymentsDueData(
         transaction.date >= monthRange.start &&
         transaction.date <= monthRange.end,
     )
-    .filter(
-      (transaction) =>
-        !(
-          transaction.paymentMethodType === "credit" &&
-          transaction.paymentMethodDueDay != null
-        ),
-    )
     .sort((left, right) => left.date.localeCompare(right.date));
-  const groupedSubscriptions = new Map<string, SubscriptionOverviewItem>();
+  const groupedSubscriptions = new Map<
+    string,
+    SubscriptionOverviewItem & { isCreditCardInvoicePurchase: boolean }
+  >();
 
   for (const transaction of subscriptionTransactions) {
     const groupKey = [
@@ -1458,6 +1386,9 @@ export async function getPaymentsDueData(
         frequency: "monthly",
         icon: transaction.icon,
         id: transaction.id,
+        isCreditCardInvoicePurchase: Boolean(
+          transaction.isCreditCardInvoicePurchase,
+        ),
         name: transaction.descriptionKey,
         nextDate: transaction.date,
         paymentMethodId: transaction.paymentMethodId,
@@ -1469,10 +1400,15 @@ export async function getPaymentsDueData(
 
     if (transaction.date < existingSubscription.nextDate) {
       existingSubscription.nextDate = transaction.date;
+      existingSubscription.isCreditCardInvoicePurchase = Boolean(
+        transaction.isCreditCardInvoicePurchase,
+      );
     }
   }
 
-  const filteredSubscriptions = [...groupedSubscriptions.values()];
+  const filteredSubscriptions: SubscriptionOverviewItem[] = [
+    ...groupedSubscriptions.values(),
+  ];
 
   const bills: PaymentBillItem[] = plannedTransactions
     .filter(
@@ -1499,10 +1435,12 @@ export async function getPaymentsDueData(
     (sum, invoice) => sum + invoice.amount,
     0,
   );
-  const totalSubscriptions = filteredSubscriptions.reduce(
-    (sum, subscription) => sum + subscription.amount,
-    0,
-  );
+  const totalSubscriptions = [...groupedSubscriptions.values()]
+    // Subscriptions inside the current credit card invoice cycle are
+    // already counted in totalInvoices; skip them here to avoid double
+    // counting, even though they still show up in the subscriptions list.
+    .filter((subscription) => !subscription.isCreditCardInvoicePurchase)
+    .reduce((sum, subscription) => sum + subscription.amount, 0);
   const totalBills = bills.reduce((sum, bill) => sum + bill.amount, 0);
   const totalDue = totalInvoices + totalSubscriptions + totalBills;
   const nextDueDate =
@@ -2645,6 +2583,7 @@ export async function advanceInstallments(input: AdvanceInstallmentsInput) {
     selectedTransaction.installmentGroupId as string,
   );
   const selectedInstallments = selectInstallmentsForPrepayment({
+    count: input.count,
     currentMonth: input.targetMonth,
     scope: input.scope ?? "remaining",
     selectedTransaction,
@@ -2699,6 +2638,9 @@ export async function previewInstallmentPrepayment(
     userId,
     selectedTransaction.installmentGroupId as string,
   );
+  // Always preview the full remaining set (ignore input.count here) so the
+  // UI can let the user pick how many months to advance and compute the
+  // total for that subset locally, without another round trip.
   const selectedInstallments = selectInstallmentsForPrepayment({
     currentMonth: input.targetMonth,
     scope: input.scope ?? "remaining",
@@ -2709,6 +2651,11 @@ export async function previewInstallmentPrepayment(
 
   return {
     count: summary.count,
+    installments: selectedInstallments.map((transaction) => ({
+      amount: Math.abs(transaction.amount),
+      date: transaction.date,
+      id: transaction.id,
+    })),
     targetMonth: input.targetMonth,
     totalAmount: summary.totalAmount,
   };
@@ -3053,6 +3000,24 @@ function sumTransactionsByType(
     .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
 }
 
+export async function getMonthlySummary(
+  month?: string,
+  userContext?: Awaited<ReturnType<typeof getUserContext>>,
+): Promise<{ totalIncome: number; totalExpenses: number; totalSavings: number }> {
+  const selectedMonth = normalizeMonthValue(month);
+  const ctx = userContext ?? (await getUserContext());
+  const transactions = await listTransactions({
+    month: selectedMonth,
+    userContext: ctx,
+  });
+
+  return {
+    totalIncome: sumTransactionsByType(transactions, "income"),
+    totalExpenses: sumTransactionsByType(transactions, "expense"),
+    totalSavings: sumTransactionsByType(transactions, "saving"),
+  };
+}
+
 function getPercentageChange(currentValue: number, previousValue: number) {
   if (previousValue === 0) {
     return currentValue === 0 ? 0 : 100;
@@ -3253,51 +3218,37 @@ export async function getReportsData(
   const safePeriodMonths = getSafeReportPeriod(periodMonths);
   const periodBuckets = getLastMonthKeys(selectedMonth, safePeriodMonths);
   const periodMonthSet = new Set(periodBuckets.map((bucket) => bucket.key));
+  const ctx = await getUserContext();
   const transactions = await listTransactions({
     includePrevious: true,
     month: selectedMonth,
+    userContext: ctx,
   });
   const transactionMonthPairs = transactions.map((transaction) => ({
     financialMonth: getFinancialMonth(transaction),
     transaction,
   }));
-  const allMonthKeys = [
-    ...new Set(transactionMonthPairs.map((pair) => pair.financialMonth)),
-  ].sort();
-  const netWorthByMonth = new Map<string, number>();
-  let netWorth = 0;
 
-  for (const financialMonth of allMonthKeys) {
-    const monthTransactions = transactionMonthPairs
-      .filter((pair) => pair.financialMonth === financialMonth)
-      .map((pair) => pair.transaction);
-    netWorth += getMonthlyFinanceSummary(monthTransactions).savings;
-    netWorthByMonth.set(financialMonth, netWorth);
-  }
+  const baselineMonth = getPreviousMonthValue(periodBuckets[0].key);
+  const [baselineNetWorth, ...bucketNetWorths] = await Promise.all([
+    getTotalSavedForMonth(baselineMonth, ctx),
+    ...periodBuckets.map((bucket) => getTotalSavedForMonth(bucket.key, ctx)),
+  ]);
+  const previousNetWorths = [baselineNetWorth, ...bucketNetWorths.slice(0, -1)];
 
-  let lastKnownNetWorth = 0;
-  const monthlyReports = periodBuckets.map((bucket) => {
+  const monthlyReports = periodBuckets.map((bucket, index) => {
     const monthTransactions = transactionMonthPairs
       .filter((pair) => pair.financialMonth === bucket.key)
       .map((pair) => pair.transaction);
     const summary = getMonthlyFinanceSummary(monthTransactions);
-
-    if (netWorthByMonth.has(bucket.key)) {
-      lastKnownNetWorth = netWorthByMonth.get(bucket.key) ?? lastKnownNetWorth;
-    } else {
-      const previousMonthWithBalance = allMonthKeys
-        .filter((financialMonth) => financialMonth < bucket.key)
-        .at(-1);
-      lastKnownNetWorth = previousMonthWithBalance
-        ? (netWorthByMonth.get(previousMonthWithBalance) ?? lastKnownNetWorth)
-        : 0;
-    }
+    const netWorth = bucketNetWorths[index];
 
     return {
       ...summary,
       month: bucket.key,
       monthKey: bucket.monthKey,
-      netWorth: lastKnownNetWorth,
+      netWorth,
+      savings: netWorth - previousNetWorths[index],
       year: bucket.year,
     };
   });

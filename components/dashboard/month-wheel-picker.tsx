@@ -118,12 +118,26 @@ function Wheel({ items, index, align, onCommit }: WheelProps) {
     d.lastT = now;
   }
 
-  function onPointerUp() {
+  function onPointerUp(e: ReactPointerEvent<HTMLDivElement>) {
     const d = dragRef.current;
     if (!d || !ref.current) return;
+    const el = ref.current;
+
+    // A tap: no drag happened, so resolve it to whichever item is under the
+    // pointer instead of relying on a native "click" event, which some
+    // browsers don't dispatch to the original target once the container has
+    // pointer capture.
+    if (!d.moved) {
+      const contentY = e.clientY - el.getBoundingClientRect().top + el.scrollTop;
+      const idx = clamp(Math.floor((contentY - PAD) / ITEM_H));
+      dragRef.current = null;
+      el.style.scrollSnapType = "y mandatory";
+      handleClick(idx);
+      return;
+    }
+
     let velocity = -d.v * 14;
     const max = (items.length - 1) * ITEM_H;
-    const el = ref.current;
 
     function frame() {
       if (!el) return;
@@ -151,7 +165,6 @@ function Wheel({ items, index, align, onCommit }: WheelProps) {
   }
 
   function handleClick(i: number) {
-    if (dragRef.current?.moved) return;
     ref.current?.scrollTo({ top: i * ITEM_H, behavior: "smooth" });
     setCenter(i);
     onCommit(i);
