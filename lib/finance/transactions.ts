@@ -3106,7 +3106,7 @@ export async function getDashboardData(
   );
 
   const expensesByCategory = buildExpensesByCategoryData(
-    scheduledExpenseTransactions,
+    scheduledTransactions,
   );
 
   const expensesOverTime = monthBuckets.map((monthBucket) => ({

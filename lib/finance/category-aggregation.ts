@@ -24,7 +24,7 @@ export function buildExpensesByCategoryData(
   return transactions
     .filter(
       (transaction) =>
-        transaction.type === "expense" && isCategoryGroup(transaction.group),
+        transaction.type !== "income" && isCategoryGroup(transaction.group),
     )
     .reduce((acc, transaction) => {
       const group = transaction.group as ExpenseCategoryGroup;
