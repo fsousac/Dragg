@@ -196,4 +196,26 @@ describe("category expense aggregation", () => {
       ["savings", "data.category.savings", 500],
     ]);
   });
+
+  it("includes investment transactions (type saving) in the savings group", () => {
+    const saving = transaction({
+      amount: -200,
+      categoryId: "55555555-5555-4555-8555-555555555555",
+      categoryKey: "data.category.investments",
+      group: "savings",
+      id: "tx-investment",
+    });
+    saving.type = "saving";
+
+    expect(buildExpensesByCategoryData([saving])).toEqual([
+      {
+        categoryId: "55555555-5555-4555-8555-555555555555",
+        color: "#22C55E",
+        group: "savings",
+        groupKey: "data.group.savings",
+        nameKey: "data.category.investments",
+        value: 200,
+      },
+    ]);
+  });
 });
