@@ -204,6 +204,7 @@ export function TransactionsScreen({
   const [isNewTransactionOpen, setIsNewTransactionOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] =
     useState<Transaction | null>(null);
+  const [invoiceOrigin, setInvoiceOrigin] = useState<Transaction | null>(null);
   const [formData, setFormData] = useState<EditableTransaction | null>(null);
   const [pendingTransactionId, setPendingTransactionId] = useState<
     string | null
@@ -453,26 +454,28 @@ export function TransactionsScreen({
 
   const closeTransactionDialog = () => {
     if (isPending) return;
+    if (invoiceOrigin) {
+      setSelectedTransaction(invoiceOrigin);
+      setFormData(null);
+      setInvoiceOrigin(null);
+      return;
+    }
     setSelectedTransaction(null);
     setFormData(null);
   };
 
   const handleAdvanceInstallmentsById = (transactionId: string) => {
-    const transaction = transactions.find(
-      (candidate) => candidate.id === transactionId,
-    );
-
-    if (!transaction || !isInstallmentTransaction(transaction)) {
-      return;
-    }
-
-    setPendingTransactionId(transaction.id);
+    // The server action looks the transaction up by id and validates it's
+    // an installment itself, so this doesn't need to find it in the
+    // currently loaded `transactions` page window first — that window only
+    // covers the selected month and excludes next month's invoice purchases.
+    setPendingTransactionId(transactionId);
     startTransition(async () => {
       try {
         const preview = await previewInstallmentPrepaymentAction({
           scope: "remaining",
           targetMonth: selectedMonth,
-          transactionId: transaction.id,
+          transactionId,
         });
 
         if (preview.count === 0) {
@@ -484,7 +487,7 @@ export function TransactionsScreen({
         setConfirmRequest({
           kind: "advance-installments",
           preview,
-          transactionId: transaction.id,
+          transactionId,
         });
       } catch (error) {
         console.error("Error advancing installments:", error);
@@ -1341,17 +1344,19 @@ export function TransactionsScreen({
                       const installmentTransaction = transactions.find(
                         (transaction) => transaction.id === purchase.id,
                       );
+                      // `purchase.installmentLabel` ("N/M") is computed
+                      // server-side from the same installment fields and is
+                      // always present on invoice purchases — including next
+                      // month's, which never show up in the locally loaded
+                      // `transactions` page window — so gate on it instead
+                      // of requiring a local match.
+                      const installmentMatch = purchase.installmentLabel?.match(
+                        /^(\d+)\/(\d+)$/,
+                      );
                       const canAdvanceInstallment = Boolean(
-                        installmentTransaction &&
-                        isInstallmentTransaction(installmentTransaction) &&
-                        // `transactions` here is only the currently loaded
-                        // page window, not the full installment group, so we
-                        // can't reuse selectInstallmentsForPrepayment (it
-                        // needs the future sibling rows). The installment's
-                        // own number/total is always available, so use that:
-                        // nothing to advance once it's the last one.
-                        Number(installmentTransaction.installmentNumber) <
-                          Number(installmentTransaction.installmentTotal),
+                        installmentMatch &&
+                          Number(installmentMatch[1]) <
+                            Number(installmentMatch[2]),
                       );
 
                       return (
@@ -1386,14 +1391,15 @@ export function TransactionsScreen({
                                 size="icon"
                                 className="size-9 shrink-0 text-muted-foreground"
                                 aria-label={t("common.edit")}
-                                onClick={() =>
-                                  openTransactionDialog(installmentTransaction)
-                                }
+                                onClick={() => {
+                                  setInvoiceOrigin(selectedTransaction);
+                                  openTransactionDialog(installmentTransaction);
+                                }}
                               >
                                 <Pencil className="size-4" />
                               </Button>
                             ) : null}
-                            {canAdvanceInstallment && installmentTransaction ? (
+                            {canAdvanceInstallment ? (
                               <Button
                                 type="button"
                                 variant="ghost"
