@@ -147,6 +147,16 @@ function normalizeSearchValue(value: string) {
     .toLowerCase();
 }
 
+export function isVisibleInSelectedMonth(
+  transaction: Transaction,
+  selectedMonth: string,
+) {
+  return (
+    !transaction.isCreditCardInvoicePurchase ||
+    transaction.date.startsWith(selectedMonth)
+  );
+}
+
 function getInitialFormState(
   transaction: Transaction,
   incomeCategoryId: string,
@@ -320,6 +330,10 @@ export function TransactionsScreen({
 
   const filteredTransactions = useMemo(() => {
     const filtered = transactions.filter((transaction) => {
+      if (!isVisibleInSelectedMonth(transaction, selectedMonth)) {
+        return false;
+      }
+
       if (groupFilter !== "all" && transaction.group !== groupFilter) {
         return false;
       }
@@ -363,7 +377,7 @@ export function TransactionsScreen({
         ? leftDate - rightDate
         : rightDate - leftDate;
     });
-  }, [groupFilter, normalizedQuery, sortOption, t, transactions]);
+  }, [groupFilter, normalizedQuery, selectedMonth, sortOption, t, transactions]);
 
   const filteredNextInvoiceTransactions = useMemo(
     () =>
@@ -1365,6 +1379,20 @@ export function TransactionsScreen({
                             <p className="text-sm font-semibold tabular-nums">
                               {formatCurrency(purchase.amount)}
                             </p>
+                            {installmentTransaction ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="size-9 shrink-0 text-muted-foreground"
+                                aria-label={t("common.edit")}
+                                onClick={() =>
+                                  openTransactionDialog(installmentTransaction)
+                                }
+                              >
+                                <Pencil className="size-4" />
+                              </Button>
+                            ) : null}
                             {canAdvanceInstallment && installmentTransaction ? (
                               <Button
                                 type="button"
