@@ -82,7 +82,6 @@ type PaymentMethodRow = {
   credit_limit: number | string | null;
   due_day?: number | string | null;
   id: string;
-  is_default: boolean | null;
   name: string;
   type: "pix" | "debit" | "credit" | "cash" | "bank" | "boleto" | "other";
 };
@@ -483,34 +482,6 @@ const transactionSelect = `
   )
 `;
 
-const transactionSelectWithoutCategoryIcon = `
-  id,
-  date,
-  description,
-  amount,
-  kind,
-  installment_group_id,
-  installment_number,
-  installment_total,
-  notes,
-  category_id,
-  payment_method_id,
-  categories (
-    id,
-    name,
-    group_type,
-    is_default,
-    monthly_limit
-  ),
-  payment_methods (
-    id,
-    name,
-    closing_day,
-    due_day,
-    type
-  )
-`;
-
 const transactionSelectWithoutAdvancedMetadata = `
   id,
   date,
@@ -605,7 +576,9 @@ function isCategoryGroup(value: string): value is DbCategoryGroup {
 function isEditablePaymentMethodType(
   value: string,
 ): value is UpdatePaymentMethodInput["type"] {
-  return editablePaymentMethodTypes.some((type) => type === value);
+  return editablePaymentMethodTypes.includes(
+    value as UpdatePaymentMethodInput["type"],
+  );
 }
 
 function isTransactionKind(value: string): value is DbTransactionKind {
@@ -628,7 +601,7 @@ function assertValidIsoDate(value: string) {
   const date = new Date(`${value}T00:00:00.000Z`);
 
   if (
-    !value.match(/^\d{4}-\d{2}-\d{2}$/) ||
+    !/^\d{4}-\d{2}-\d{2}$/.exec(value) ||
     Number.isNaN(date.getTime()) ||
     date.toISOString().slice(0, 10) !== value
   ) {
@@ -637,7 +610,7 @@ function assertValidIsoDate(value: string) {
 }
 
 function assertValidColor(value: string) {
-  if (!value.match(/^#[0-9a-f]{6}$/i)) {
+  if (!/^#[0-9a-f]{6}$/i.exec(value)) {
     throw new Error("Color is invalid.");
   }
 }
@@ -864,8 +837,7 @@ function toMonthValue(date: Date) {
 }
 
 function getPreviousMonthValue(month: string) {
-  const [year, monthNumber] = month.split("-").map(Number);
-  return toMonthValue(new Date(year, monthNumber - 2, 1));
+  return getMonthOffsetValue(month, -1);
 }
 
 function getMonthOffsetValue(month: string, offset: number) {
@@ -1094,26 +1066,11 @@ async function listCategories(options?: {
     .order("is_default", { ascending: false })
     .order("name", { ascending: true });
 
-  if (!error) {
-    return (data ?? []) as CategoryRow[];
+  if (error) {
+    throw new Error(`Unable to load categories: ${error.message}`);
   }
 
-  if (error.code === "42703") {
-    const { data: fallbackData, error: fallbackError } = await supabase
-      .from("categories")
-      .select("id, name, group_type, is_default, monthly_limit")
-      .eq("user_id", userId)
-      .order("is_default", { ascending: false })
-      .order("name", { ascending: true });
-
-    if (fallbackError) {
-      throw new Error(`Unable to load categories: ${fallbackError.message}`);
-    }
-
-    return (fallbackData ?? []) as CategoryRow[];
-  }
-
-  throw new Error(`Unable to load categories: ${error.message}`);
+  return (data ?? []) as CategoryRow[];
 }
 
 export async function listCategoryOverview(
@@ -1155,69 +1112,19 @@ async function listPaymentMethods(options?: {
 }) {
   const ctx = options?.userContext ?? (await getUserContext());
   const { supabase, userId } = ctx;
+  // payment_methods has no is_default column (see docs/database.md) — do not
+  // select/order by it, that column has never existed in any migration.
   const { data, error } = await supabase
     .from("payment_methods")
-    .select("id, name, type, is_default, credit_limit, due_day, closing_day")
+    .select("id, name, type, credit_limit, due_day, closing_day")
     .eq("user_id", userId)
-    .order("is_default", { ascending: false })
     .order("name", { ascending: true });
 
-  if (!error) {
-    return (data ?? []) as PaymentMethodRow[];
+  if (error) {
+    throw new Error(`Unable to load payment methods: ${error.message}`);
   }
 
-  // Backward-compatible fallback for schemas without is_default in payment_methods.
-  if (error.code === "42703") {
-    const { data: limitFallbackData, error: limitFallbackError } =
-      await supabase
-        .from("payment_methods")
-        .select("id, name, type, credit_limit, due_day")
-        .eq("user_id", userId)
-        .order("name", { ascending: true });
-
-    if (!limitFallbackError) {
-      return (
-        (limitFallbackData ?? []) as Omit<PaymentMethodRow, "is_default">[]
-      ).map((paymentMethod) => ({
-        ...paymentMethod,
-        closing_day: null,
-        is_default: null,
-      }));
-    }
-
-    if (limitFallbackError.code !== "42703") {
-      throw new Error(
-        `Unable to load payment methods: ${limitFallbackError.message}`,
-      );
-    }
-
-    const { data: fallbackData, error: fallbackError } = await supabase
-      .from("payment_methods")
-      .select("id, name, type")
-      .eq("user_id", userId)
-      .order("name", { ascending: true });
-
-    if (fallbackError) {
-      throw new Error(
-        `Unable to load payment methods: ${fallbackError.message}`,
-      );
-    }
-
-    return (
-      (fallbackData ?? []) as Omit<
-        PaymentMethodRow,
-        "credit_limit" | "is_default"
-      >[]
-    ).map((paymentMethod) => ({
-      ...paymentMethod,
-      closing_day: null,
-      credit_limit: null,
-      due_day: null,
-      is_default: null,
-    }));
-  }
-
-  throw new Error(`Unable to load payment methods: ${error.message}`);
+  return (data ?? []) as PaymentMethodRow[];
 }
 
 function isProtectedPaymentMethod(paymentMethod: PaymentMethodRow) {
@@ -1272,10 +1179,12 @@ export async function listPaymentMethodOverview(
     const dueDay =
       paymentMethod.due_day == null ? null : Number(paymentMethod.due_day);
 
+    // payment_methods has no is_default column; toPaymentMethodLabelKey
+    // falls back to matching well-known default names when passed null.
     const label = toPaymentMethodLabelKey(
       paymentMethod.name,
       paymentMethod.type,
-      paymentMethod.is_default,
+      null,
     );
     const detail = getPaymentMethodDetail({
       paymentMethod: {
@@ -1299,7 +1208,7 @@ export async function listPaymentMethodOverview(
       detail,
       dueDay,
       id: paymentMethod.id,
-      isDefault: Boolean(paymentMethod.is_default),
+      isDefault: false,
       label,
       name: paymentMethod.name,
       spent: detail.totalAmount,
@@ -1326,16 +1235,14 @@ export async function getPaymentsDueData(
   const selectedMonth = normalizeMonthValue(month);
   const monthRange = getMonthRange(selectedMonth);
   const ctx = userContext ?? (await getUserContext());
-  const [plannedTransactions] = await Promise.all([
-    listTransactions({
-      includeCreditCardInvoices: true,
-      includeFuture: true,
-      month: selectedMonth,
-      preserveCreditCardInvoicePurchases: true,
-      useFinancialMonth: false,
-      userContext: ctx,
-    }),
-  ]);
+  const plannedTransactions = await listTransactions({
+    includeCreditCardInvoices: true,
+    includeFuture: true,
+    month: selectedMonth,
+    preserveCreditCardInvoicePurchases: true,
+    useFinancialMonth: false,
+    userContext: ctx,
+  });
   const today = getTodayValue();
 
   const invoices: PaymentInvoiceItem[] = plannedTransactions
@@ -1449,7 +1356,7 @@ export async function getPaymentsDueData(
       ...filteredSubscriptions.map((subscription) => subscription.nextDate),
       ...bills.map((bill) => bill.date),
     ]
-      .sort()
+      .sort((left, right) => left.localeCompare(right))
       .at(0) ?? null;
 
   return {
@@ -1498,42 +1405,14 @@ async function getPaymentMethodForMutation(paymentMethodId: string) {
   assertUuid(paymentMethodId, "Payment method");
 
   const { supabase, userId } = await getUserContext();
-  const paymentMethodResult = await supabase
+  // payment_methods has no is_default column (see docs/database.md) — do not
+  // select it, that column has never existed in any migration.
+  const { data, error } = await supabase
     .from("payment_methods")
-    .select("id, name, type, is_default, credit_limit, due_day, closing_day")
+    .select("id, name, type, credit_limit, due_day, closing_day")
     .eq("id", paymentMethodId)
     .eq("user_id", userId)
     .maybeSingle();
-  let data = paymentMethodResult.data as PaymentMethodRow | null;
-  let error = paymentMethodResult.error;
-
-  if (error?.code === "42703") {
-    const fallbackWithLimit = await supabase
-      .from("payment_methods")
-      .select("id, name, type, is_default, credit_limit, due_day")
-      .eq("id", paymentMethodId)
-      .eq("user_id", userId)
-      .maybeSingle();
-    const fallback =
-      fallbackWithLimit.error?.code === "42703"
-        ? await supabase
-            .from("payment_methods")
-            .select("id, name, type, credit_limit, due_day")
-            .eq("id", paymentMethodId)
-            .eq("user_id", userId)
-            .maybeSingle()
-        : fallbackWithLimit;
-
-    data = fallback.data
-      ? ({
-          ...fallback.data,
-          closing_day: null,
-          is_default:
-            "is_default" in fallback.data ? fallback.data.is_default : null,
-        } as PaymentMethodRow)
-      : null;
-    error = fallback.error;
-  }
 
   if (error) {
     throw new Error(`Unable to load payment method: ${error.message}`);
@@ -1571,11 +1450,7 @@ export async function getTransactionFormOptions(options?: {
     dueDay:
       paymentMethod.due_day == null ? null : Number(paymentMethod.due_day),
     id: paymentMethod.id,
-    label: toPaymentMethodLabelKey(
-      paymentMethod.name,
-      paymentMethod.type,
-      paymentMethod.is_default,
-    ),
+    label: toPaymentMethodLabelKey(paymentMethod.name, paymentMethod.type, null),
     type: paymentMethod.type,
   }));
 
@@ -1633,12 +1508,7 @@ export async function createTransaction(input: NewTransactionInput) {
     input.paymentMethod,
     "Payment method",
   );
-  const kind: DbTransactionKind =
-    input.type === "income"
-      ? "income"
-      : input.type === "saving"
-        ? "saving"
-        : "expense";
+  const kind: DbTransactionKind = input.type;
   const date = toIsoDate(input.date);
   const installmentCount = Number(input.installmentCount);
 
@@ -1734,9 +1604,10 @@ export async function createTransaction(input: NewTransactionInput) {
 }
 
 function parseCreditCardInvoiceId(invoiceId: string) {
-  const match = invoiceId.match(
-    /^credit-card-invoice:([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}):(\d{4}-\d{2})$/i,
-  );
+  const match =
+    /^credit-card-invoice:([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}):(\d{4}-\d{2})$/i.exec(
+      invoiceId,
+    );
 
   if (!match) {
     throw new Error("Invoice is invalid.");
@@ -1784,7 +1655,7 @@ export async function createInvoiceAdvancePayment(
     );
   }
 
-  if (!invoicePaymentMethod || invoicePaymentMethod.type !== "credit") {
+  if (invoicePaymentMethod?.type !== "credit") {
     throw new Error("Invoice is invalid.");
   }
 
@@ -2066,34 +1937,6 @@ export async function createPaymentMethod(input: CreatePaymentMethodInput) {
     user_id: userId,
   });
 
-  if (error?.code === "42703") {
-    const fallbackWithLimit = await supabase.from("payment_methods").insert({
-      credit_limit: creditLimit,
-      due_day: dueDay,
-      name,
-      type: input.type,
-      user_id: userId,
-    });
-    const fallbackError =
-      fallbackWithLimit.error?.code === "42703"
-        ? (
-            await supabase.from("payment_methods").insert({
-              name,
-              type: input.type,
-              user_id: userId,
-            })
-          ).error
-        : fallbackWithLimit.error;
-
-    if (fallbackError) {
-      throw new Error(
-        `Unable to save payment method: ${fallbackError.message}`,
-      );
-    }
-
-    return;
-  }
-
   if (error) {
     throw new Error(`Unable to save payment method: ${error.message}`);
   }
@@ -2137,40 +1980,6 @@ export async function updatePaymentMethod(input: UpdatePaymentMethodInput) {
     })
     .eq("id", input.id)
     .eq("user_id", userId);
-
-  if (error?.code === "42703") {
-    const fallbackWithLimit = await supabase
-      .from("payment_methods")
-      .update({
-        credit_limit: creditLimit,
-        due_day: dueDay,
-        name,
-        type: input.type,
-      })
-      .eq("id", input.id)
-      .eq("user_id", userId);
-    const fallbackError =
-      fallbackWithLimit.error?.code === "42703"
-        ? (
-            await supabase
-              .from("payment_methods")
-              .update({
-                name,
-                type: input.type,
-              })
-              .eq("id", input.id)
-              .eq("user_id", userId)
-          ).error
-        : fallbackWithLimit.error;
-
-    if (fallbackError) {
-      throw new Error(
-        `Unable to update payment method: ${fallbackError.message}`,
-      );
-    }
-
-    return;
-  }
 
   if (error) {
     throw new Error(`Unable to update payment method: ${error.message}`);
@@ -2310,32 +2119,14 @@ export async function createCategory(input: CreateCategoryInput) {
     throw new Error("Category monthly limit is invalid.");
   }
 
-  const payload = {
+  const { error } = await supabase.from("categories").insert({
     group_type: input.group,
     icon: toCategoryIcon(input.name, input.icon),
     is_default: false,
     monthly_limit: monthlyLimit,
     name,
     user_id: userId,
-  };
-
-  const { error } = await supabase.from("categories").insert(payload);
-
-  if (error?.code === "42703") {
-    const fallbackPayload: Omit<typeof payload, "icon"> & { icon?: string } = {
-      ...payload,
-    };
-    delete fallbackPayload.icon;
-    const { error: fallbackError } = await supabase
-      .from("categories")
-      .insert(fallbackPayload);
-
-    if (fallbackError) {
-      throw new Error(`Unable to save category: ${fallbackError.message}`);
-    }
-
-    return;
-  }
+  });
 
   if (error) {
     throw new Error(`Unable to save category: ${error.message}`);
@@ -2356,36 +2147,16 @@ export async function updateCategory(input: UpdateCategoryInput) {
 
   const { supabase, userId } = await getCategoryForMutation(input.id);
 
-  const payload = {
-    group_type: input.group,
-    icon: toCategoryIcon(input.name, input.icon),
-    monthly_limit: monthlyLimit,
-    name,
-  };
-
   const { error } = await supabase
     .from("categories")
-    .update(payload)
+    .update({
+      group_type: input.group,
+      icon: toCategoryIcon(input.name, input.icon),
+      monthly_limit: monthlyLimit,
+      name,
+    })
     .eq("id", input.id)
     .eq("user_id", userId);
-
-  if (error?.code === "42703") {
-    const fallbackPayload: Omit<typeof payload, "icon"> & { icon?: string } = {
-      ...payload,
-    };
-    delete fallbackPayload.icon;
-    const { error: fallbackError } = await supabase
-      .from("categories")
-      .update(fallbackPayload)
-      .eq("id", input.id)
-      .eq("user_id", userId);
-
-    if (fallbackError) {
-      throw new Error(`Unable to update category: ${fallbackError.message}`);
-    }
-
-    return;
-  }
 
   if (error) {
     throw new Error(`Unable to update category: ${error.message}`);
@@ -2562,7 +2333,7 @@ export async function deleteInstallments(input: DeleteInstallmentsInput) {
 export async function advanceInstallments(input: AdvanceInstallmentsInput) {
   assertUuid(input.transactionId, "Transaction");
 
-  if (!input.targetMonth.match(/^\d{4}-\d{2}$/)) {
+  if (!/^\d{4}-\d{2}$/.exec(input.targetMonth)) {
     throw new Error("Target month is invalid.");
   }
 
@@ -2618,7 +2389,7 @@ export async function previewInstallmentPrepayment(
 ): Promise<InstallmentPrepaymentPreview> {
   assertUuid(input.transactionId, "Transaction");
 
-  if (!input.targetMonth.match(/^\d{4}-\d{2}$/)) {
+  if (!/^\d{4}-\d{2}$/.exec(input.targetMonth)) {
     throw new Error("Target month is invalid.");
   }
 
@@ -2750,6 +2521,195 @@ export async function deleteSubscriptionOccurrences(
   }
 }
 
+function resolveMonthRange(month: string | undefined, includeFuture: boolean) {
+  if (!month) return null;
+  return includeFuture ? getMonthRange(month) : getCollectedMonthRange(month);
+}
+
+function resolveQueryStart(
+  monthRange: ReturnType<typeof getMonthRange> | null,
+  useFinancialMonth: boolean,
+  includeCreditCardInvoices: boolean,
+) {
+  if (!monthRange) return null;
+  if (useFinancialMonth) {
+    return `${getPreviousMonthValue(monthRange.month)}-01`;
+  }
+  if (includeCreditCardInvoices) {
+    return `${getMonthOffsetValue(monthRange.month, -2)}-01`;
+  }
+  return monthRange.start;
+}
+
+function finalizeTransactionRows(
+  rows: TransactionRow[],
+  params: {
+    filterByMonth: typeof filterByFinancialMonth;
+    includeCreditCardInvoices: boolean;
+    includeFuture: boolean;
+    includePausedSubscriptions?: boolean;
+    includePrevious: boolean;
+    monthRange: ReturnType<typeof getMonthRange> | null;
+    preserveCreditCardInvoicePurchases: boolean;
+  },
+) {
+  const transactions = rows.map(toTransaction).filter(
+    (transaction) =>
+      !transaction.notes?.startsWith("subscription") ||
+      shouldShowSubscriptionOccurrenceInTransactionHistory({
+        includePausedSubscriptions: params.includePausedSubscriptions,
+        occurrence: transaction,
+      }),
+  );
+  const filteredTransactions = params.monthRange
+    ? params.filterByMonth(
+        transactions,
+        params.monthRange.month,
+        params.includePrevious,
+      )
+    : transactions;
+  const resultTransactions =
+    params.includeCreditCardInvoices && params.monthRange
+      ? withCreditCardInvoiceTransactions({
+          month: params.monthRange.month,
+          preservePurchases: params.preserveCreditCardInvoicePurchases,
+          sourceTransactions: transactions,
+          visibleTransactions: filteredTransactions,
+        })
+      : filteredTransactions;
+
+  return params.includeFuture
+    ? markPlannedTransactions(resultTransactions)
+    : resultTransactions;
+}
+
+function applyTransactionDateRange<
+  Query extends {
+    gte: (column: string, value: string) => Query;
+    lte: (column: string, value: string) => Query;
+  },
+>(
+  query: Query,
+  params: {
+    includeFuture: boolean;
+    includePrevious: boolean;
+    monthRange: ReturnType<typeof getMonthRange> | null;
+    queryStart: string | null;
+  },
+): Query {
+  if (!params.monthRange) {
+    return params.includeFuture ? query : query.lte("date", getTodayValue());
+  }
+
+  const rangeQuery = query.lte("date", params.monthRange.end);
+  return !params.includePrevious && params.queryStart
+    ? rangeQuery.gte("date", params.queryStart)
+    : rangeQuery;
+}
+
+async function fetchAdvancedInstallmentRows(
+  supabase: SupabaseClient,
+  userId: string,
+  targetMonth: string,
+) {
+  const { data, error } = await supabase
+    .from("transactions")
+    .select(transactionSelect)
+    .eq("user_id", userId)
+    .eq("advanced_to_month", targetMonth)
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error && error.code !== "42703") {
+    throw new Error(`Unable to load advanced installments: ${error.message}`);
+  }
+
+  return (data ?? []) as unknown as TransactionRow[];
+}
+
+function mergeAdvancedInstallmentRows(
+  rows: TransactionRow[],
+  advancedRows: TransactionRow[],
+) {
+  const merged = [...rows];
+  const existingIds = new Set(merged.map((row) => row.id));
+
+  for (const row of advancedRows) {
+    if (!existingIds.has(row.id)) {
+      merged.push(row);
+      existingIds.add(row.id);
+    }
+  }
+
+  return merged;
+}
+
+async function fetchTransactionRows(
+  supabase: SupabaseClient,
+  userId: string,
+  params: {
+    includeFuture: boolean;
+    includePrevious: boolean;
+    limit?: number;
+    monthRange: ReturnType<typeof getMonthRange> | null;
+    queryStart: string | null;
+  },
+) {
+  let query = applyTransactionDateRange(
+    supabase
+      .from("transactions")
+      .select(transactionSelect)
+      .eq("user_id", userId)
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false }),
+    params,
+  );
+
+  if (params.limit) {
+    query = query.limit(params.limit);
+  }
+
+  const { data, error } = await query;
+
+  if (!error) {
+    const rows = [...((data ?? []) as unknown as TransactionRow[])];
+
+    if (!params.monthRange || !params.includeFuture) {
+      return rows;
+    }
+
+    const advancedRows = await fetchAdvancedInstallmentRows(
+      supabase,
+      userId,
+      params.monthRange.month,
+    );
+    return mergeAdvancedInstallmentRows(rows, advancedRows);
+  }
+
+  if (error.code !== "42703") {
+    throw new Error(`Unable to load transactions: ${error.message}`);
+  }
+
+  // Environments that haven't run migration 006 lack the
+  // advanced_at/advanced_to_month columns — retry without them.
+  const fallbackQuery = applyTransactionDateRange(
+    supabase
+      .from("transactions")
+      .select(transactionSelectWithoutAdvancedMetadata)
+      .eq("user_id", userId)
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false }),
+    params,
+  );
+  const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+
+  if (fallbackError) {
+    throw new Error(`Unable to load transactions: ${fallbackError.message}`);
+  }
+
+  return (fallbackData ?? []) as unknown as TransactionRow[];
+}
+
 export async function listTransactions(options?: {
   includeCreditCardInvoices?: boolean;
   includePausedSubscriptions?: boolean;
@@ -2767,210 +2727,35 @@ export async function listTransactions(options?: {
   const includeFuture = options?.includeFuture ?? false;
   const includeCreditCardInvoices = options?.includeCreditCardInvoices ?? false;
   const useFinancialMonth = options?.useFinancialMonth ?? true;
-  const limit = options?.limit;
-  const monthRange = options?.month
-    ? includeFuture
-      ? getMonthRange(options.month)
-      : getCollectedMonthRange(options.month)
-    : null;
-  const queryStart = monthRange
-    ? useFinancialMonth
-      ? `${getPreviousMonthValue(monthRange.month)}-01`
-      : includeCreditCardInvoices
-        ? `${getMonthOffsetValue(monthRange.month, -2)}-01`
-        : monthRange.start
-    : null;
+  const preserveCreditCardInvoicePurchases =
+    options?.preserveCreditCardInvoicePurchases ?? false;
+  const monthRange = resolveMonthRange(options?.month, includeFuture);
+  const queryStart = resolveQueryStart(
+    monthRange,
+    useFinancialMonth,
+    includeCreditCardInvoices,
+  );
   const filterByMonth = useFinancialMonth
     ? filterByFinancialMonth
     : filterByTransactionMonth;
 
-  let query = supabase
-    .from("transactions")
-    .select(transactionSelect)
-    .eq("user_id", userId)
-    .order("date", { ascending: false })
-    .order("created_at", { ascending: false });
+  const rows = await fetchTransactionRows(supabase, userId, {
+    includeFuture,
+    includePrevious,
+    limit: options?.limit,
+    monthRange,
+    queryStart,
+  });
 
-  if (monthRange) {
-    query = query.lte("date", monthRange.end);
-    if (!includePrevious && queryStart) {
-      query = query.gte("date", queryStart);
-    }
-  } else if (!includeFuture) {
-    query = query.lte("date", getTodayValue());
-  }
-
-  if (limit) {
-    query = query.limit(limit);
-  }
-
-  const { data, error } = await query;
-
-  if (!error) {
-    const rows = [...((data ?? []) as unknown as TransactionRow[])];
-
-    if (monthRange && includeFuture) {
-      const { data: advancedData, error: advancedError } = await supabase
-        .from("transactions")
-        .select(transactionSelect)
-        .eq("user_id", userId)
-        .eq("advanced_to_month", monthRange.month)
-        .order("date", { ascending: false })
-        .order("created_at", { ascending: false });
-
-      if (advancedError && advancedError.code !== "42703") {
-        throw new Error(
-          `Unable to load advanced installments: ${advancedError.message}`,
-        );
-      }
-
-      for (const row of (advancedData ?? []) as unknown as TransactionRow[]) {
-        if (!rows.some((existingRow) => existingRow.id === row.id)) {
-          rows.push(row);
-        }
-      }
-    }
-
-    const transactions = rows.map(toTransaction).filter(
-      (transaction) =>
-        !transaction.notes?.startsWith("subscription") ||
-        shouldShowSubscriptionOccurrenceInTransactionHistory({
-          includePausedSubscriptions: options?.includePausedSubscriptions,
-          occurrence: transaction,
-        }),
-    );
-    const filteredTransactions = monthRange
-      ? filterByMonth(transactions, monthRange.month, includePrevious)
-      : transactions;
-    const resultTransactions =
-      includeCreditCardInvoices && monthRange
-        ? withCreditCardInvoiceTransactions({
-            month: monthRange.month,
-            preservePurchases:
-              options?.preserveCreditCardInvoicePurchases ?? false,
-            sourceTransactions: transactions,
-            visibleTransactions: filteredTransactions,
-          })
-        : filteredTransactions;
-
-    return includeFuture
-      ? markPlannedTransactions(resultTransactions)
-      : resultTransactions;
-  }
-
-  if (error.code === "42703") {
-    let metadataFallbackQuery = supabase
-      .from("transactions")
-      .select(transactionSelectWithoutAdvancedMetadata)
-      .eq("user_id", userId)
-      .order("date", { ascending: false })
-      .order("created_at", { ascending: false });
-
-    if (monthRange) {
-      metadataFallbackQuery = metadataFallbackQuery.lte("date", monthRange.end);
-      if (!includePrevious && queryStart) {
-        metadataFallbackQuery = metadataFallbackQuery.gte("date", queryStart);
-      }
-    } else if (!includeFuture) {
-      metadataFallbackQuery = metadataFallbackQuery.lte(
-        "date",
-        getTodayValue(),
-      );
-    }
-
-    const { data: metadataFallbackData, error: metadataFallbackError } =
-      await metadataFallbackQuery;
-
-    if (!metadataFallbackError) {
-      const transactions = (
-        (metadataFallbackData ?? []) as unknown as TransactionRow[]
-      )
-        .map(toTransaction)
-        .filter(
-          (transaction) =>
-            !transaction.notes?.startsWith("subscription") ||
-            shouldShowSubscriptionOccurrenceInTransactionHistory({
-              includePausedSubscriptions: options?.includePausedSubscriptions,
-              occurrence: transaction,
-            }),
-        );
-      const filteredTransactions = monthRange
-        ? filterByMonth(transactions, monthRange.month, includePrevious)
-        : transactions;
-      const resultTransactions =
-        includeCreditCardInvoices && monthRange
-          ? withCreditCardInvoiceTransactions({
-              month: monthRange.month,
-              preservePurchases:
-                options?.preserveCreditCardInvoicePurchases ?? false,
-              sourceTransactions: transactions,
-              visibleTransactions: filteredTransactions,
-            })
-          : filteredTransactions;
-
-      return includeFuture
-        ? markPlannedTransactions(resultTransactions)
-        : resultTransactions;
-    }
-
-    if (metadataFallbackError.code !== "42703") {
-      throw new Error(
-        `Unable to load transactions: ${metadataFallbackError.message}`,
-      );
-    }
-
-    let fallbackQuery = supabase
-      .from("transactions")
-      .select(transactionSelectWithoutCategoryIcon)
-      .eq("user_id", userId)
-      .order("date", { ascending: false })
-      .order("created_at", { ascending: false });
-
-    if (monthRange) {
-      fallbackQuery = fallbackQuery.lte("date", monthRange.end);
-      if (!includePrevious && queryStart) {
-        fallbackQuery = fallbackQuery.gte("date", queryStart);
-      }
-    } else if (!includeFuture) {
-      fallbackQuery = fallbackQuery.lte("date", getTodayValue());
-    }
-
-    const { data: fallbackData, error: fallbackError } = await fallbackQuery;
-
-    if (fallbackError) {
-      throw new Error(`Unable to load transactions: ${fallbackError.message}`);
-    }
-
-    const transactions = ((fallbackData ?? []) as unknown as TransactionRow[])
-      .map(toTransaction)
-      .filter(
-        (transaction) =>
-          !transaction.notes?.startsWith("subscription") ||
-          shouldShowSubscriptionOccurrenceInTransactionHistory({
-            includePausedSubscriptions: options?.includePausedSubscriptions,
-            occurrence: transaction,
-          }),
-      );
-    const filteredTransactions = monthRange
-      ? filterByMonth(transactions, monthRange.month, includePrevious)
-      : transactions;
-    const resultTransactions =
-      includeCreditCardInvoices && monthRange
-        ? withCreditCardInvoiceTransactions({
-            month: monthRange.month,
-            preservePurchases:
-              options?.preserveCreditCardInvoicePurchases ?? false,
-            sourceTransactions: transactions,
-            visibleTransactions: filteredTransactions,
-          })
-        : filteredTransactions;
-
-    return includeFuture
-      ? markPlannedTransactions(resultTransactions)
-      : resultTransactions;
-  }
-
-  throw new Error(`Unable to load transactions: ${error.message}`);
+  return finalizeTransactionRows(rows, {
+    filterByMonth,
+    includeCreditCardInvoices,
+    includeFuture,
+    includePausedSubscriptions: options?.includePausedSubscriptions,
+    includePrevious,
+    monthRange,
+    preserveCreditCardInvoicePurchases,
+  });
 }
 
 async function getTotalSavedForMonth(
@@ -3016,6 +2801,33 @@ export async function getMonthlySummary(
     totalExpenses: sumTransactionsByType(transactions, "expense"),
     totalSavings: sumTransactionsByType(transactions, "saving"),
   };
+}
+
+function mergeLatestTransactions(
+  actualTransactions: Transaction[],
+  scheduledTransactions: Transaction[],
+  today: string,
+) {
+  const byId = new Map<string, Transaction>();
+
+  for (const transaction of actualTransactions) {
+    byId.set(transaction.id, transaction);
+  }
+
+  // Scheduled (future) transactions fill in gaps only — an actual
+  // transaction for the same id always takes precedence.
+  for (const transaction of scheduledTransactions) {
+    if (!byId.has(transaction.id)) {
+      byId.set(transaction.id, {
+        ...transaction,
+        isPlanned: transaction.date > today,
+      });
+    }
+  }
+
+  return [...byId.values()]
+    .sort((left, right) => right.date.localeCompare(left.date))
+    .slice(0, 10);
 }
 
 function getPercentageChange(currentValue: number, previousValue: number) {
@@ -3170,27 +2982,11 @@ export async function getDashboardData(
     expensesOverTime,
     // Merge recent actual transactions with scheduled (future) transactions,
     // marking scheduled ones with `isPlanned` so the UI can render them faded.
-    latestTransactions: (() => {
-      const today = getTodayValue();
-      const byId = new Map<string, Transaction>();
-
-      for (const tx of displayTransactions) {
-        byId.set(tx.id, tx);
-      }
-
-      for (const tx of displayScheduledTransactions) {
-        // if already present (actual), skip; otherwise add as planned only
-        if (!byId.has(tx.id)) {
-          // mark planned if in the future relative to today
-          const isPlanned = tx.date > today;
-          byId.set(tx.id, { ...tx, isPlanned });
-        }
-      }
-
-      return [...byId.values()]
-        .sort((a, b) => b.date.localeCompare(a.date))
-        .slice(0, 10);
-    })(),
+    latestTransactions: mergeLatestTransactions(
+      displayTransactions,
+      displayScheduledTransactions,
+      getTodayValue(),
+    ),
     paymentMethods,
     summaryData: {
       currentBalance: totalIncome - totalExpenses,
@@ -3267,7 +3063,7 @@ export async function getReportsData(
     .sort((left, right) => right.date.localeCompare(left.date));
 
   return {
-    monthlyReports: monthlyReports.reverse(),
+    monthlyReports: monthlyReports.toReversed(),
     periodMonths: safePeriodMonths,
     selectedMonth,
     transactions: reportTransactions,
