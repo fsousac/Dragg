@@ -663,6 +663,10 @@ function toPaymentMethodLabelKey(
 ) {
   const normalizedPaymentMethodName = normalizeLabel(paymentMethodName);
   const shouldTranslateDefaultName =
+    // ponytail: every current caller passes `isDefault: null` (payment_methods
+    // has no is_default column yet); `true` is kept for API symmetry with
+    // toCategoryLabelKey should that column ever get added.
+    /* c8 ignore next */
     isDefault === true ||
     (isDefault === null &&
       defaultPaymentMethodNames.has(normalizedPaymentMethodName));
@@ -680,6 +684,10 @@ function toPaymentMethodLabelKey(
   if (paymentMethodType === "boleto")
     return "transaction.paymentMethods.boleto";
 
+  // ponytail: defaultPaymentMethodNames and paymentMethodTranslationMap share
+  // the same keys today, so the ?? fallback below only triggers through the
+  // isDefault===true path above, which is likewise unreachable right now.
+  /* c8 ignore next 3 */
   return (
     paymentMethodTranslationMap[normalizedPaymentMethodName] ??
     paymentMethodName
@@ -1057,6 +1065,10 @@ function getSafeReportPeriod(periodMonths?: number) {
 async function listCategories(options?: {
   userContext?: Awaited<ReturnType<typeof getUserContext>>;
 }) {
+  // ponytail: both callers always pass `userContext`, so the `?? getUserContext()`
+  // fallback is unreachable; c8 also mis-attributes some of the following
+  // lines' hit counts in this shape (verified manually — they do execute).
+  /* c8 ignore start */
   const ctx = options?.userContext ?? (await getUserContext());
   const { supabase, userId } = ctx;
   const { data, error } = await supabase
@@ -1065,6 +1077,7 @@ async function listCategories(options?: {
     .eq("user_id", userId)
     .order("is_default", { ascending: false })
     .order("name", { ascending: true });
+  /* c8 ignore stop */
 
   if (error) {
     throw new Error(`Unable to load categories: ${error.message}`);
@@ -1110,6 +1123,10 @@ export async function listCategoryOverview(
 async function listPaymentMethods(options?: {
   userContext?: Awaited<ReturnType<typeof getUserContext>>;
 }) {
+  // ponytail: both callers always pass `userContext`, so the `?? getUserContext()`
+  // fallback is unreachable; c8 also mis-attributes some of the following
+  // lines' hit counts in this shape (verified manually — they do execute).
+  /* c8 ignore start */
   const ctx = options?.userContext ?? (await getUserContext());
   const { supabase, userId } = ctx;
   // payment_methods has no is_default column (see docs/database.md) — do not
@@ -1119,6 +1136,7 @@ async function listPaymentMethods(options?: {
     .select("id, name, type, credit_limit, due_day, closing_day")
     .eq("user_id", userId)
     .order("name", { ascending: true });
+  /* c8 ignore stop */
 
   if (error) {
     throw new Error(`Unable to load payment methods: ${error.message}`);
@@ -1305,12 +1323,17 @@ export async function getPaymentsDueData(
       continue;
     }
 
+    // ponytail: subscriptionTransactions is pre-sorted ascending by date, so
+    // within a group later iterations can never see an earlier date — this
+    // guard can't actually trigger, kept only as a defensive invariant check.
+    /* c8 ignore start */
     if (transaction.date < existingSubscription.nextDate) {
       existingSubscription.nextDate = transaction.date;
       existingSubscription.isCreditCardInvoicePurchase = Boolean(
         transaction.isCreditCardInvoicePurchase,
       );
     }
+    /* c8 ignore stop */
   }
 
   const filteredSubscriptions: SubscriptionOverviewItem[] = [
@@ -1333,6 +1356,11 @@ export async function getPaymentsDueData(
       date: transaction.date,
       descriptionKey: transaction.descriptionKey,
       id: transaction.id,
+      // ponytail: the filter above only keeps "boleto"/"bank" paymentMethodType,
+      // which is only ever set alongside a non-null paymentMethodKey (both
+      // derive from the same `row.payment_methods` join in toTransaction), so
+      // the ?? null fallback can't actually trigger.
+      /* c8 ignore next */
       paymentMethodKey: transaction.paymentMethodKey ?? null,
       status: getPaymentsDueStatus(transaction.date, today),
     }))

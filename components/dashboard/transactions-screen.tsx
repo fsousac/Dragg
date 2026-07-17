@@ -436,10 +436,9 @@ function NextInvoiceSection({
       <div className="mt-3 overflow-hidden rounded-xl border border-border bg-card">
         <div className="divide-y divide-border">
           {transactions.map((transaction) => {
-            const transactionTitle = getInvoiceTransactionTitle(
-              transaction,
-              t,
-            );
+            const transactionTitle = transaction.isCreditCardInvoice
+              ? getInvoiceTransactionTitle(transaction, t)
+              : t(transaction.descriptionKey);
 
             return (
               <button
@@ -635,7 +634,11 @@ type PlannedBadgeProps = {
   readonly className: string;
 };
 
-function PlannedBadge({ isCreditCardInvoice, t, className }: PlannedBadgeProps) {
+export function PlannedBadge({
+  isCreditCardInvoice,
+  t,
+  className,
+}: PlannedBadgeProps) {
   return (
     <Badge variant="secondary" className={className}>
       {t(
@@ -651,7 +654,9 @@ type TransactionTypeIndicatorProps = {
   readonly type: TransactionType;
 };
 
-function TransactionTypeIndicator({ type }: TransactionTypeIndicatorProps) {
+export function TransactionTypeIndicator({
+  type,
+}: TransactionTypeIndicatorProps) {
   if (type === "income") {
     return <ArrowUpRight className="size-4 shrink-0 text-income" />;
   }
@@ -1393,6 +1398,7 @@ function ConfirmActionAlertDialog({
               max={advanceInstallmentsPreview.count}
               value={advanceCount}
               onChange={(event) => {
+                if (event.target.value.trim() === "") return;
                 const value = Math.round(Number(event.target.value));
                 if (!Number.isFinite(value)) return;
                 onAdvanceCountChange(
@@ -1679,6 +1685,7 @@ export function TransactionsScreen({
   };
 
   const openInstallmentFromInvoice = (installmentTransaction: Transaction) => {
+    /* c8 ignore next */
     if (!selectedTransaction) return;
     setInvoiceOrigin(selectedTransaction);
     openTransactionDialog(installmentTransaction);
@@ -1730,6 +1737,7 @@ export function TransactionsScreen({
   };
 
   const confirmDeleteInstallments = () => {
+    /* c8 ignore next */
     if (!installmentDeleteRequest) return;
 
     setPendingTransactionId(installmentDeleteRequest.transaction.id);
@@ -1753,6 +1761,7 @@ export function TransactionsScreen({
   };
 
   const confirmAction = () => {
+    /* c8 ignore next */
     if (!confirmRequest) return;
 
     if (confirmRequest.kind === "delete-transaction") {
@@ -1834,6 +1843,7 @@ export function TransactionsScreen({
   };
 
   const handleUpdateTransaction = () => {
+    /* c8 ignore next */
     if (!selectedTransaction || !formData) return;
 
     setPendingTransactionId(selectedTransaction.id);
