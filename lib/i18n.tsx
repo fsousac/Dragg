@@ -290,6 +290,29 @@ const messages = {
     "goals.updateError": "Failed to update goal.",
     "goals.updateSuccess": "Goal updated successfully.",
     "goals.validationError": "Enter a name and a target amount.",
+    "landing.description": "Personal finance, open source and free.",
+    "landing.feature.control.description":
+      "Supabase RLS: only you can access your data.",
+    "landing.feature.control.title": "Your data, your control",
+    "landing.feature.free.description":
+      "Self-hostable. No paid plans, no tracking.",
+    "landing.feature.free.title": "Free & open source",
+    "landing.feature.goals.description":
+      "Set objectives and track your progress.",
+    "landing.feature.goals.title": "Financial goals",
+    "landing.feature.income.description":
+      "Log earnings, spending, and installments.",
+    "landing.feature.income.title": "Income & expenses",
+    "landing.feature.reports.description":
+      "Visualize the 50/30/20 balance and net worth.",
+    "landing.feature.reports.title": "Monthly reports",
+    "landing.feature.smartCategories.description":
+      "Needs, wants, and savings — neatly organized.",
+    "landing.feature.smartCategories.title": "Smart categories",
+    "landing.featuresLabel": "Features",
+    "landing.heading": "Dragg – Personal Finance Dashboard",
+    "landing.license": "MIT License",
+    "landing.openSource": "Open source",
     "nav.budgets": "Budgets",
     "nav.categories": "Categories",
     "nav.goals": "Goals",
@@ -892,6 +915,29 @@ const messages = {
     "goals.updateError": "Não foi possível atualizar a meta.",
     "goals.updateSuccess": "Meta atualizada com sucesso.",
     "goals.validationError": "Informe o nome e o valor alvo.",
+    "landing.description": "Finanças pessoais, open source e gratuito.",
+    "landing.feature.control.description":
+      "Supabase RLS: só você acessa seus dados.",
+    "landing.feature.control.title": "Seus dados, seu controle",
+    "landing.feature.free.description":
+      "Auto-hospedável. Sem planos pagos, sem rastreamento.",
+    "landing.feature.free.title": "Gratuito e open source",
+    "landing.feature.goals.description":
+      "Defina objetivos e acompanhe seu progresso.",
+    "landing.feature.goals.title": "Metas financeiras",
+    "landing.feature.income.description":
+      "Registre ganhos, gastos e parcelamentos.",
+    "landing.feature.income.title": "Receitas e despesas",
+    "landing.feature.reports.description":
+      "Visualize o equilíbrio 50/30/20 e o patrimônio líquido.",
+    "landing.feature.reports.title": "Relatórios mensais",
+    "landing.feature.smartCategories.description":
+      "Necessidades, desejos e poupança — organizados.",
+    "landing.feature.smartCategories.title": "Categorias inteligentes",
+    "landing.featuresLabel": "Funcionalidades",
+    "landing.heading": "Dragg – Painel de Finanças Pessoais",
+    "landing.license": "Licença MIT",
+    "landing.openSource": "Open source",
     "nav.budgets": "Orçamentos",
     "nav.categories": "Categorias",
     "nav.goals": "Metas",
