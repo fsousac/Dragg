@@ -106,6 +106,7 @@ describe("email/password auth validation", () => {
   it("requires a first name on sign up", () => {
     expect(
       validateEmailPasswordAuth({
+        acceptedTerms: true,
         confirmPassword: validPassword,
         email: "user@example.com",
         mode: "signUp",
@@ -115,6 +116,7 @@ describe("email/password auth validation", () => {
 
     expect(
       validateEmailPasswordAuth({
+        acceptedTerms: true,
         confirmPassword: validPassword,
         email: "user@example.com",
         firstName: "Felipe",
@@ -126,6 +128,48 @@ describe("email/password auth validation", () => {
       errors: {},
       isValid: true,
     });
+  });
+
+  it("requires accepting the Terms of Use and Privacy Policy on sign up", () => {
+    expect(
+      validateEmailPasswordAuth({
+        confirmPassword: validPassword,
+        email: "user@example.com",
+        firstName: "Felipe",
+        mode: "signUp",
+        password: validPassword,
+      }).errors.acceptedTerms,
+    ).toBe("auth.acceptTermsRequired");
+
+    expect(
+      validateEmailPasswordAuth({
+        acceptedTerms: false,
+        confirmPassword: validPassword,
+        email: "user@example.com",
+        firstName: "Felipe",
+        mode: "signUp",
+        password: validPassword,
+      }).errors.acceptedTerms,
+    ).toBe("auth.acceptTermsRequired");
+
+    expect(
+      validateEmailPasswordAuth({
+        acceptedTerms: true,
+        confirmPassword: validPassword,
+        email: "user@example.com",
+        firstName: "Felipe",
+        mode: "signUp",
+        password: validPassword,
+      }).errors.acceptedTerms,
+    ).toBeUndefined();
+
+    expect(
+      validateEmailPasswordAuth({
+        email: "user@example.com",
+        mode: "signIn",
+        password: validPassword,
+      }).errors.acceptedTerms,
+    ).toBeUndefined();
   });
 
   it("builds sign up metadata for Supabase and the profile trigger", () => {
@@ -193,6 +237,7 @@ describe("email/password auth validation", () => {
 
     expect(
       validateEmailPasswordAuth({
+        acceptedTerms: true,
         confirmPassword: validPassword,
         email: "user@example.com",
         firstName: "Felipe",

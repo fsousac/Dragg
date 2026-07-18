@@ -4,9 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 import { getSafeRedirectPath } from "@/lib/auth/redirect";
 import { LoginCard } from "@/components/auth/login-card";
 import { PasswordRequirementsChecklist } from "@/components/auth/password-requirements-checklist";
+import { TermsAcceptanceCheckbox } from "@/components/auth/terms-acceptance-checkbox";
 import { UpdatePasswordCard } from "@/components/auth/update-password-card";
 
 const translations: Record<string, string> = {
+  "auth.acceptTermsAnd": "and",
+  "auth.acceptTermsPrefix": "I have read and agree to the",
   "auth.backToSignIn": "Back to sign in",
   "auth.checkYourEmail": "Check your email",
   "auth.confirmPassword": "Confirm password",
@@ -19,6 +22,7 @@ const translations: Record<string, string> = {
   "auth.newPassword": "New password",
   "auth.orContinueWithEmail": "or continue with email",
   "auth.password": "Password",
+  "auth.privacyPolicy": "Privacy Policy",
   "auth.passwordRequirementsTitle": "Your password must include:",
   "auth.passwordRequirementMinLength": "At least 8 characters",
   "auth.passwordRequirementLowercase": "One lowercase letter",
@@ -31,6 +35,7 @@ const translations: Record<string, string> = {
   "auth.signInWithEmail": "Sign in with email",
   "auth.signUp": "Sign up",
   "auth.signUpDescription": "Create an account with your name, email, and password.",
+  "auth.termsOfUse": "Terms of Use",
   "screen.settings.firstName": "First Name",
   "screen.settings.lastName": "Last Name",
   "auth.updatePassword": "Update password",
@@ -110,6 +115,30 @@ describe("auth UI", () => {
     expect(html).toContain("One uppercase letter");
     expect(html).toContain("One number");
     expect(html).toContain("One symbol");
+  });
+
+  it("renders the terms acceptance checkbox with links and an error", () => {
+    const html = renderToStaticMarkup(
+      <TermsAcceptanceCheckbox
+        checked={false}
+        disabled={false}
+        error="You must accept the Terms of Use and Privacy Policy to create an account."
+        onCheckedChange={() => {}}
+      />,
+    );
+
+    expect(html).toContain("I have read and agree to the");
+    expect(html).toContain("Terms of Use");
+    expect(html).toContain("Privacy Policy");
+    expect(html).toContain(
+      'href="https://github.com/fsousac/Dragg/blob/main/docs/terms-of-use.md"',
+    );
+    expect(html).toContain(
+      'href="https://github.com/fsousac/Dragg/blob/main/docs/privacy-policy.md"',
+    );
+    expect(html).toContain(
+      "You must accept the Terms of Use and Privacy Policy to create an account.",
+    );
   });
 
   it("renders the password update form", () => {

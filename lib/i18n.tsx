@@ -17,11 +17,16 @@ const messages = {
     "app.description":
       "A modern personal finance dashboard to track your income, expenses, and savings with beautiful visualizations.",
     "auth.kicker": "Personal finance clarity",
+    "auth.termsOfUse": "Terms of Use",
     "auth.title": "Simple money tracking for everyday decisions.",
     "auth.description":
       "Track your money, budgets, and goals with a simple open-source finance dashboard.",
     "auth.footer":
       "Open source. Free to run. Built for personal finance clarity.",
+    "auth.acceptTermsAnd": "and",
+    "auth.acceptTermsPrefix": "I have read and agree to the",
+    "auth.acceptTermsRequired":
+      "You must accept the Terms of Use and Privacy Policy to create an account.",
     "auth.alreadyHaveAccount": "Already have an account? Sign in",
     "auth.backToSignIn": "Back to sign in",
     "auth.checkYourEmail": "Check your email to finish signing in.",
@@ -60,6 +65,7 @@ const messages = {
     "auth.passwordRequirementUppercase": "One uppercase letter",
     "auth.passwordRequired": "Enter your password.",
     "auth.passwordUpdated": "Password updated successfully.",
+    "auth.privacyPolicy": "Privacy Policy",
     "auth.rateLimitError": "Too many attempts. Wait a moment and try again.",
     "auth.redirectNotAllowed":
       "This app URL is not allowed in Supabase. Add it under Authentication → URL Configuration.",
@@ -641,11 +647,16 @@ const messages = {
     "app.description":
       "Um painel moderno de finanças pessoais para acompanhar sua renda, seus gastos e suas economias com visualizações bonitas.",
     "auth.kicker": "Clareza para suas finanças",
+    "auth.termsOfUse": "Termos de Uso",
     "auth.title": "Controle simples do dinheiro para decisões do dia a dia.",
     "auth.description":
       "Acompanhe seu dinheiro, orçamentos e metas com um painel financeiro simples e open-source.",
     "auth.footer":
       "Open source. Gratuito para usar. Feito para dar clareza às suas finanças.",
+    "auth.acceptTermsAnd": "e a",
+    "auth.acceptTermsPrefix": "Li e concordo com os",
+    "auth.acceptTermsRequired":
+      "Você deve aceitar os Termos de Uso e a Política de Privacidade para criar uma conta.",
     "auth.alreadyHaveAccount": "Já tem uma conta? Entrar",
     "auth.backToSignIn": "Voltar para entrar",
     "auth.checkYourEmail": "Confira seu email para concluir o acesso.",
@@ -684,6 +695,7 @@ const messages = {
     "auth.passwordRequirementUppercase": "Uma letra maiúscula",
     "auth.passwordRequired": "Informe sua senha.",
     "auth.passwordUpdated": "Senha atualizada com sucesso.",
+    "auth.privacyPolicy": "Política de Privacidade",
     "auth.rateLimitError":
       "Muitas tentativas. Aguarde um momento e tente novamente.",
     "auth.redirectNotAllowed":

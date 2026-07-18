@@ -4,6 +4,7 @@ export const authNameMaxLength = 80;
 export type EmailPasswordAuthMode = "reset" | "signIn" | "signUp";
 
 export type EmailPasswordAuthValidationInput = {
+  acceptedTerms?: boolean;
   confirmPassword?: string;
   email?: string;
   firstName?: string;
@@ -14,6 +15,7 @@ export type EmailPasswordAuthValidationInput = {
 
 export type EmailPasswordAuthValidationResult = {
   errors: {
+    acceptedTerms?: string;
     confirmPassword?: string;
     email?: string;
     firstName?: string;
@@ -62,6 +64,7 @@ export function meetsPasswordComplexityRules(password: string) {
 }
 
 export function validateEmailPasswordAuth({
+  acceptedTerms,
   confirmPassword,
   email,
   firstName,
@@ -95,30 +98,63 @@ export function validateEmailPasswordAuth({
   }
 
   if (mode === "signUp") {
-    if (!normalizedFirstName) {
-      errors.firstName = "auth.firstNameRequired";
-    } else if (normalizedFirstName.length > authNameMaxLength) {
-      errors.firstName = "auth.nameTooLong";
-    }
-
-    if (normalizedLastName.length > authNameMaxLength) {
-      errors.lastName = "auth.nameTooLong";
-    }
-
-    const confirmPasswordError = validatePasswordConfirmation(
-      normalizedPassword,
-      normalizedConfirmPassword,
+    Object.assign(
+      errors,
+      validateSignUpFields({
+        acceptedTerms,
+        firstName: normalizedFirstName,
+        lastName: normalizedLastName,
+        password: normalizedPassword,
+        confirmPassword: normalizedConfirmPassword,
+      }),
     );
-
-    if (confirmPasswordError) {
-      errors.confirmPassword = confirmPasswordError;
-    }
   }
 
   return {
     errors,
     isValid: Object.keys(errors).length === 0,
   };
+}
+
+function validateSignUpFields({
+  acceptedTerms,
+  confirmPassword,
+  firstName,
+  lastName,
+  password,
+}: {
+  acceptedTerms?: boolean;
+  confirmPassword: string;
+  firstName: string;
+  lastName: string;
+  password: string;
+}): EmailPasswordAuthValidationResult["errors"] {
+  const errors: EmailPasswordAuthValidationResult["errors"] = {};
+
+  if (!firstName) {
+    errors.firstName = "auth.firstNameRequired";
+  } else if (firstName.length > authNameMaxLength) {
+    errors.firstName = "auth.nameTooLong";
+  }
+
+  if (lastName.length > authNameMaxLength) {
+    errors.lastName = "auth.nameTooLong";
+  }
+
+  const confirmPasswordError = validatePasswordConfirmation(
+    password,
+    confirmPassword,
+  );
+
+  if (confirmPasswordError) {
+    errors.confirmPassword = confirmPasswordError;
+  }
+
+  if (!acceptedTerms) {
+    errors.acceptedTerms = "auth.acceptTermsRequired";
+  }
+
+  return errors;
 }
 
 export function validatePasswordConfirmation(
