@@ -404,7 +404,8 @@ export function TransactionForm({
             </span>
             <CurrencyInput
               id="amount"
-              label=""
+              label={t("transaction.amount")}
+              labelClassName="sr-only"
               className="max-w-[80%] min-w-fit"
               value={formData.amount}
               onValueChange={(amount) => setFormData({ ...formData, amount })}
