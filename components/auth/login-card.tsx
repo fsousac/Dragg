@@ -9,6 +9,7 @@ import { AuthCardHeader } from "@/components/auth/auth-card-header";
 import { GoogleLoginButton } from "@/components/auth/google-login-button";
 import { PasswordField } from "@/components/auth/password-field";
 import { PasswordRequirementsChecklist } from "@/components/auth/password-requirements-checklist";
+import { TermsAcceptanceCheckbox } from "@/components/auth/terms-acceptance-checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +23,22 @@ import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 
 type AuthMode = EmailPasswordAuthMode;
+
+function translateValidationErrors(
+  errors: ReturnType<typeof validateEmailPasswordAuth>["errors"],
+  t: (key: string) => string,
+) {
+  return {
+    acceptedTerms: errors.acceptedTerms ? t(errors.acceptedTerms) : undefined,
+    confirmPassword: errors.confirmPassword
+      ? t(errors.confirmPassword)
+      : undefined,
+    email: errors.email ? t(errors.email) : undefined,
+    firstName: errors.firstName ? t(errors.firstName) : undefined,
+    lastName: errors.lastName ? t(errors.lastName) : undefined,
+    password: errors.password ? t(errors.password) : undefined,
+  };
+}
 
 function getModeCopy(mode: AuthMode) {
   if (mode === "signUp") {
@@ -53,7 +70,9 @@ export function LoginCard() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [errors, setErrors] = useState<{
+    acceptedTerms?: string;
     confirmPassword?: string;
     email?: string;
     firstName?: string;
@@ -82,6 +101,7 @@ export function LoginCard() {
     setLastName("");
     setPassword("");
     setConfirmPassword("");
+    setAcceptedTerms(false);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -89,6 +109,7 @@ export function LoginCard() {
     setStatusMessage(null);
 
     const validation = validateEmailPasswordAuth({
+      acceptedTerms,
       confirmPassword,
       email,
       firstName,
@@ -96,21 +117,7 @@ export function LoginCard() {
       mode,
       password,
     });
-    setErrors({
-      confirmPassword: validation.errors.confirmPassword
-        ? t(validation.errors.confirmPassword)
-        : undefined,
-      email: validation.errors.email ? t(validation.errors.email) : undefined,
-      firstName: validation.errors.firstName
-        ? t(validation.errors.firstName)
-        : undefined,
-      lastName: validation.errors.lastName
-        ? t(validation.errors.lastName)
-        : undefined,
-      password: validation.errors.password
-        ? t(validation.errors.password)
-        : undefined,
-    });
+    setErrors(translateValidationErrors(validation.errors, t));
 
     if (!validation.isValid) return;
 
@@ -303,6 +310,15 @@ export function LoginCard() {
                 label={t("auth.confirmPassword")}
                 onChange={setConfirmPassword}
                 value={confirmPassword}
+              />
+            ) : null}
+
+            {isSignUpMode ? (
+              <TermsAcceptanceCheckbox
+                checked={acceptedTerms}
+                disabled={isLoading}
+                error={errors.acceptedTerms}
+                onCheckedChange={setAcceptedTerms}
               />
             ) : null}
           </>
