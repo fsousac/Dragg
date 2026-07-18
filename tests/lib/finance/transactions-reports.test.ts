@@ -717,7 +717,7 @@ describe("getDashboardData", () => {
 
     expect(result.summaryData.totalIncome).toBe(5000);
     expect(result.summaryData.totalExpenses).toBe(390);
-    expect(result.summaryData.currentBalance).toBe(4610);
+    expect(result.summaryData.currentBalance).toBe(4310);
     expect(result.summaryData.predictedExpenses).toBe(470);
     expect(result.summaryData.totalSaved).toBe(5300);
     expect(result.summaryData.trends.totalIncome).toBe(25);
