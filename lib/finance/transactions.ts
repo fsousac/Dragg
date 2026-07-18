@@ -2925,6 +2925,7 @@ export async function getDashboardData(
 
   const totalIncome = sumTransactionsByType(transactions, "income");
   const totalExpenses = sumTransactionsByType(transactions, "expense");
+  const totalMonthSavings = sumTransactionsByType(transactions, "saving");
   const previousTotalIncome = sumTransactionsByType(
     previousTransactions,
     "income",
@@ -3017,7 +3018,7 @@ export async function getDashboardData(
     ),
     paymentMethods,
     summaryData: {
-      currentBalance: totalIncome - totalExpenses,
+      currentBalance: totalIncome - totalExpenses - totalMonthSavings,
       predictedExpenses,
       totalExpenses,
       totalIncome,
