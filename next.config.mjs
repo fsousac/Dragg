@@ -7,6 +7,21 @@ const scriptSrc = [
   "https://va.vercel-scripts.com",
 ].join(" ");
 
+function getSupabaseOrigin() {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").origin;
+  } catch {
+    return null;
+  }
+}
+
+// Self-hosted or local (e.g. `supabase start`) Supabase instances don't live
+// under *.supabase.co, so the CSP must also allow the configured project URL.
+const supabaseOrigin = getSupabaseOrigin();
+const supabaseConnectSrc = ["https://*.supabase.co", supabaseOrigin]
+  .filter(Boolean)
+  .join(" ");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
@@ -47,7 +62,7 @@ const nextConfig = {
           {
             key: "Content-Security-Policy",
             value:
-              `default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; form-action 'self' https://*.supabase.co; connect-src 'self' https://*.supabase.co https://va.vercel-scripts.com https://vitals.vercel-insights.com; img-src 'self' data: blob: https://*.supabase.co https://*.googleusercontent.com https://lh3.googleusercontent.com; style-src 'self' 'unsafe-inline'; script-src ${scriptSrc};`,
+              `default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; form-action 'self' ${supabaseConnectSrc}; connect-src 'self' ${supabaseConnectSrc} https://va.vercel-scripts.com https://vitals.vercel-insights.com; img-src 'self' data: blob: ${supabaseConnectSrc} https://*.googleusercontent.com https://lh3.googleusercontent.com; style-src 'self' 'unsafe-inline'; script-src ${scriptSrc};`,
           },
         ],
       },

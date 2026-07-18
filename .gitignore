@@ -24,3 +24,9 @@ tsconfig.tsbuildinfo
 AGENTS.md
 **.csv
 **/.temp
+
+# Playwright
+/playwright-report/
+/test-results/
+/blob-report/
+e2e/.auth/
