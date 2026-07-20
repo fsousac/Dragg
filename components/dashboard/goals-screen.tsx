@@ -79,13 +79,17 @@ type GoalFormState = {
 };
 
 const goalIcons = ["🎯", "🏦", "✈️", "🚗", "🏠", "📈", "🎓", "💻"];
+// Fixed hex values (not CSS var(--...) references) because the goal color
+// is persisted server-side and validated against a strict hex pattern
+// (see app/goals/actions.ts) — a stored value must render the same way
+// regardless of which theme is active when it's read back.
 const goalColors = [
-  "var(--chart-1)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-  "var(--chart-3)",
-  "var(--chart-2)",
-  "var(--savings)",
+  "#22c55e",
+  "#6d28d9",
+  "#c2410c",
+  "#be185d",
+  "#15803d",
+  "#a78bfa",
 ];
 
 function getTodayValue() {
