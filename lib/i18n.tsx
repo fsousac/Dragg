@@ -24,9 +24,13 @@ const messages = {
     "auth.footer":
       "Open source. Free to run. Built for personal finance clarity.",
     "auth.acceptTermsAnd": "and",
+    "auth.acceptTermsDescription":
+      "Before you continue, please confirm you accept the Terms of Use and Privacy Policy.",
     "auth.acceptTermsPrefix": "I have read and agree to the",
     "auth.acceptTermsRequired":
       "You must accept the Terms of Use and Privacy Policy to create an account.",
+    "auth.acceptTermsSubmit": "Continue",
+    "auth.acceptTermsTitle": "Accept our Terms",
     "auth.alreadyHaveAccount": "Already have an account? Sign in",
     "auth.backToSignIn": "Back to sign in",
     "auth.checkYourEmail": "Check your email to finish signing in.",
@@ -670,9 +674,13 @@ const messages = {
     "auth.footer":
       "Open source. Gratuito para usar. Feito para dar clareza às suas finanças.",
     "auth.acceptTermsAnd": "e a",
+    "auth.acceptTermsDescription":
+      "Antes de continuar, confirme que você aceita os Termos de Uso e a Política de Privacidade.",
     "auth.acceptTermsPrefix": "Li e concordo com os",
     "auth.acceptTermsRequired":
       "Você deve aceitar os Termos de Uso e a Política de Privacidade para criar uma conta.",
+    "auth.acceptTermsSubmit": "Continuar",
+    "auth.acceptTermsTitle": "Aceite nossos Termos",
     "auth.alreadyHaveAccount": "Já tem uma conta? Entrar",
     "auth.backToSignIn": "Voltar para entrar",
     "auth.checkYourEmail": "Confira seu email para concluir o acesso.",
@@ -1036,8 +1044,7 @@ const messages = {
     "paymentMethod.createDescription":
       "Crie uma forma de pagamento para acompanhar limites absolutos e gastos.",
     "paymentMethod.createError": "Não foi possível criar a forma de pagamento.",
-    "paymentMethod.createSuccess":
-      "Forma de pagamento criada com sucesso.",
+    "paymentMethod.createSuccess": "Forma de pagamento criada com sucesso.",
     "paymentMethod.createValidationError":
       "Informe um nome para a forma de pagamento.",
     "paymentMethod.creditLimit": "Limite de crédito",
@@ -1279,7 +1286,8 @@ const messages = {
     "transactions.subscriptions.deleteOnlyThis": "Excluir esta ocorrência",
     "transactions.subscriptions.deleteOnlyThisConfirm":
       "Isso excluirá somente a ocorrência selecionada da assinatura.",
-    "transactions.subscriptions.deleteOnlyThisTitle": "Excluir esta ocorrência?",
+    "transactions.subscriptions.deleteOnlyThisTitle":
+      "Excluir esta ocorrência?",
     "transactions.subscriptions.deleteThisAndFollowingUnpaid":
       "Excluir esta e as próximas ocorrências não pagas",
     "transactions.subscriptions.deleteThisAndFollowingUnpaidConfirm":
@@ -1342,7 +1350,17 @@ function resolveLocale(value?: string | null): Locale {
   return value?.toLowerCase().startsWith("pt") ? "pt-BR" : "en";
 }
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
+function resolveCurrency(
+  candidate: string | null | undefined,
+  locale: Locale,
+): Currency {
+  if (isSupportedCurrency(candidate)) return candidate;
+  return locale === "pt-BR" ? "BRL" : "USD";
+}
+
+export function LanguageProvider({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   const [locale, setLocaleState] = React.useState<Locale>("en");
   const [currency, setCurrencyState] = React.useState<Currency>("USD");
 
@@ -1354,13 +1372,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const storedCurrency = window.localStorage.getItem(currencyStorageKey);
 
     setLocaleState(nextLocale);
-    setCurrencyState(
-      isSupportedCurrency(storedCurrency)
-        ? storedCurrency
-        : nextLocale === "pt-BR"
-          ? "BRL"
-          : "USD",
-    );
+    setCurrencyState(resolveCurrency(storedCurrency, nextLocale));
   }, []);
 
   React.useEffect(() => {
@@ -1380,7 +1392,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       },
       formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions) {
         const value =
-          typeof date === "string" && date.match(/^\d{4}-\d{2}-\d{2}$/)
+          typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
             ? new Date(`${date}T00:00:00`)
             : new Date(date);
 
@@ -1391,13 +1403,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       },
       locale,
       setCurrency(nextCurrency: Currency) {
-        setCurrencyState(
-          isSupportedCurrency(nextCurrency)
-            ? nextCurrency
-            : locale === "pt-BR"
-              ? "BRL"
-              : "USD",
-        );
+        setCurrencyState(resolveCurrency(nextCurrency, locale));
       },
       setLocale(nextLocale: Locale) {
         setLocaleState(nextLocale);

@@ -13,17 +13,17 @@ export function TermsAcceptanceCheckbox({
   disabled,
   error,
   onCheckedChange,
-}: {
+}: Readonly<{
   checked: boolean;
   disabled: boolean;
   error?: string;
   onCheckedChange: (checked: boolean) => void;
-}) {
+}>) {
   const { t } = useI18n();
 
   return (
     <div className="space-y-2">
-      <div className="flex items-start gap-2">
+      <div className="flex items-center gap-2">
         <Checkbox
           aria-invalid={Boolean(error)}
           checked={checked}
@@ -35,26 +35,29 @@ export function TermsAcceptanceCheckbox({
           htmlFor="auth-accept-terms"
           className="text-sm font-normal leading-5 text-zinc-300"
         >
-          {t("auth.acceptTermsPrefix")}{" "}
-          <a
-            className="underline underline-offset-4 hover:text-white"
-            href={termsOfUseUrl}
-            onClick={(event) => event.stopPropagation()}
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            {t("auth.termsOfUse")}
-          </a>{" "}
-          {t("auth.acceptTermsAnd")}{" "}
-          <a
-            className="underline underline-offset-4 hover:text-white"
-            href={privacyPolicyUrl}
-            onClick={(event) => event.stopPropagation()}
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            {t("auth.privacyPolicy")}
-          </a>.
+          <p>
+            {t("auth.acceptTermsPrefix")}{" "}
+            <a
+              className="underline underline-offset-4 hover:text-white"
+              href={termsOfUseUrl}
+              onClick={(event) => event.stopPropagation()}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              {t("auth.termsOfUse")}
+            </a>{" "}
+            {t("auth.acceptTermsAnd")}{" "}
+            <a
+              className="underline underline-offset-4 hover:text-white"
+              href={privacyPolicyUrl}
+              onClick={(event) => event.stopPropagation()}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              {t("auth.privacyPolicy")}
+            </a>
+            {"."}
+          </p>
         </Label>
       </div>
       {error ? (

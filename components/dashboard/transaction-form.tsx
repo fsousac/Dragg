@@ -58,6 +58,17 @@ function getCategoryChipClass(group: string | undefined, isSelected: boolean) {
   }
 }
 
+function getAmountColorClass(type: TransactionFormData["type"]) {
+  switch (type) {
+    case "expense":
+      return "text-red-400";
+    case "income":
+      return "text-green-400";
+    default:
+      return "text-blue-400";
+  }
+}
+
 export function TransactionForm({
   categories,
   createCategoryAction,
@@ -154,37 +165,44 @@ export function TransactionForm({
     [categoryOptions],
   );
 
-  const displayedCategoryOptions =
-    formData.type === "income"
-      ? [incomeCategoryOption]
-      : formData.type === "saving"
-        ? savingsCategoryOptions.length > 0
-          ? savingsCategoryOptions
-          : categoryOptions
-        : expenseOnlyCategoryOptions;
+  let displayedCategoryOptions = expenseOnlyCategoryOptions;
+  if (formData.type === "income") {
+    displayedCategoryOptions = [incomeCategoryOption];
+  } else if (formData.type === "saving") {
+    displayedCategoryOptions =
+      savingsCategoryOptions.length > 0
+        ? savingsCategoryOptions
+        : categoryOptions;
+  }
 
   useEffect(() => {
-    setFormData((currentFormData) => ({
-      ...currentFormData,
-      category:
-        currentFormData.type === "income"
-          ? incomeCategoryId
-          : currentFormData.type === "saving"
-            ? savingsCategories.some(
-                (category) => category.id === currentFormData.category,
-              )
-              ? currentFormData.category
-              : fallbackSavingsCategoryId
-            : expenseCategories.some(
-                  (category) => category.id === currentFormData.category,
-                )
-              ? currentFormData.category
-              : fallbackExpenseCategoryId,
-      paymentMethod:
-        currentFormData.paymentMethod !== "none"
-          ? currentFormData.paymentMethod
-          : (paymentMethods[0]?.id ?? "none"),
-    }));
+    setFormData((currentFormData) => {
+      let category: string;
+      if (currentFormData.type === "income") {
+        category = incomeCategoryId;
+      } else if (currentFormData.type === "saving") {
+        category = savingsCategories.some(
+          (c) => c.id === currentFormData.category,
+        )
+          ? currentFormData.category
+          : fallbackSavingsCategoryId;
+      } else {
+        category = expenseCategories.some(
+          (c) => c.id === currentFormData.category,
+        )
+          ? currentFormData.category
+          : fallbackExpenseCategoryId;
+      }
+
+      return {
+        ...currentFormData,
+        category,
+        paymentMethod:
+          currentFormData.paymentMethod !== "none"
+            ? currentFormData.paymentMethod
+            : (paymentMethods[0]?.id ?? "none"),
+      };
+    });
   }, [
     expenseCategories,
     fallbackExpenseCategoryId,
@@ -392,13 +410,7 @@ export function TransactionForm({
           </p>
           <div className="flex items-center justify-center align-middle gap-1.5 mx-2">
             <span
-              className={`text-md font-semibold pt-1.5 ${
-                formData.type === "expense"
-                  ? "text-red-400"
-                  : formData.type === "income"
-                    ? "text-green-400"
-                    : "text-blue-400"
-              }`}
+              className={`text-md font-semibold pt-1.5 ${getAmountColorClass(formData.type)}`}
             >
               R$
             </span>

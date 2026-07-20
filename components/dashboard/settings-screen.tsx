@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { type OAuthProfile } from "@/lib/auth/profile"
 import { useI18n } from "@/lib/i18n"
+import { isSupportedCurrency } from "@/lib/i18n/currency"
 
 function SettingsCard({
   children,
@@ -144,7 +145,7 @@ export function SettingsScreen({ profile }: SettingsScreenProps) {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>{t("screen.settings.currency")}</Label>
-              <Select value={currency} onValueChange={(value) => setCurrency(value === "EUR" ? "EUR" : value === "BRL" ? "BRL" : "USD")}>
+              <Select value={currency} onValueChange={(value) => setCurrency(isSupportedCurrency(value) ? value : "USD")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

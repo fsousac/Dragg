@@ -3,7 +3,7 @@
 
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type SubmitEvent, useState } from "react";
 
 import { AuthCardHeader } from "@/components/auth/auth-card-header";
 import { GoogleLoginButton } from "@/components/auth/google-login-button";
@@ -24,6 +24,16 @@ import { createClient } from "@/lib/supabase/client";
 
 type AuthMode = EmailPasswordAuthMode;
 
+type FormErrors = {
+  acceptedTerms?: string;
+  confirmPassword?: string;
+  email?: string;
+  firstName?: string;
+  form?: string;
+  lastName?: string;
+  password?: string;
+};
+
 function translateValidationErrors(
   errors: ReturnType<typeof validateEmailPasswordAuth>["errors"],
   t: (key: string) => string,
@@ -38,6 +48,12 @@ function translateValidationErrors(
     lastName: errors.lastName ? t(errors.lastName) : undefined,
     password: errors.password ? t(errors.password) : undefined,
   };
+}
+
+function getSubmitLabel(mode: AuthMode) {
+  if (mode === "signUp") return "auth.signUpWithEmail" as const;
+  if (mode === "reset") return "auth.resetPassword" as const;
+  return "auth.signInWithEmail" as const;
 }
 
 function getModeCopy(mode: AuthMode) {
@@ -61,6 +77,115 @@ function getModeCopy(mode: AuthMode) {
   };
 }
 
+type SubmitAuthFormParams = {
+  acceptedTerms: boolean;
+  confirmPassword: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  mode: AuthMode;
+  password: string;
+  router: ReturnType<typeof useRouter>;
+  setErrors: (errors: FormErrors) => void;
+  setIsLoading: (isLoading: boolean) => void;
+  setStatusMessage: (message: string | null) => void;
+  t: (key: string) => string;
+};
+
+async function submitAuthForm({
+  acceptedTerms,
+  confirmPassword,
+  email,
+  firstName,
+  lastName,
+  mode,
+  password,
+  router,
+  setErrors,
+  setIsLoading,
+  setStatusMessage,
+  t,
+}: SubmitAuthFormParams) {
+  setStatusMessage(null);
+
+  const validation = validateEmailPasswordAuth({
+    acceptedTerms,
+    confirmPassword,
+    email,
+    firstName,
+    lastName,
+    mode,
+    password,
+  });
+  setErrors(translateValidationErrors(validation.errors, t));
+
+  if (!validation.isValid) return;
+
+  setIsLoading(true);
+  const supabase = createClient();
+  const normalizedEmail = email.trim();
+
+  if (mode === "signIn") {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    });
+
+    if (error) {
+      setErrors({ form: t(mapSupabaseAuthError(error, mode)) });
+      setIsLoading(false);
+      return;
+    }
+
+    router.replace("/dashboard");
+    router.refresh();
+    return;
+  }
+
+  if (mode === "signUp") {
+    const { data, error } = await supabase.auth.signUp({
+      email: normalizedEmail,
+      password,
+      options: {
+        data: buildSignUpUserMetadata(firstName, lastName),
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    if (error) {
+      setErrors({ form: t(mapSupabaseAuthError(error, mode)) });
+      setIsLoading(false);
+      return;
+    }
+
+    if (data.session) {
+      router.replace("/dashboard");
+      router.refresh();
+      return;
+    }
+
+    setStatusMessage(t("auth.checkYourEmail"));
+    setIsLoading(false);
+    return;
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(
+    normalizedEmail,
+    {
+      redirectTo: `${window.location.origin}/auth/callback?next=/auth/update-password`,
+    },
+  );
+
+  if (error) {
+    setErrors({ form: t(mapSupabaseAuthError(error, mode)) });
+    setIsLoading(false);
+    return;
+  }
+
+  setStatusMessage(t("auth.checkYourEmail"));
+  setIsLoading(false);
+}
+
 export function LoginCard() {
   const router = useRouter();
   const { t } = useI18n();
@@ -71,27 +196,14 @@ export function LoginCard() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [errors, setErrors] = useState<{
-    acceptedTerms?: string;
-    confirmPassword?: string;
-    email?: string;
-    firstName?: string;
-    form?: string;
-    lastName?: string;
-    password?: string;
-  }>({});
+  const [errors, setErrors] = useState<FormErrors>({});
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const isResetMode = mode === "reset";
   const isSignUpMode = mode === "signUp";
   const modeCopy = getModeCopy(mode);
-  const submitLabel =
-    mode === "signUp"
-      ? "auth.signUpWithEmail"
-      : mode === "reset"
-        ? "auth.resetPassword"
-        : "auth.signInWithEmail";
+  const submitLabel = getSubmitLabel(mode);
 
   function updateMode(nextMode: AuthMode) {
     setMode(nextMode);
@@ -104,11 +216,9 @@ export function LoginCard() {
     setAcceptedTerms(false);
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    setStatusMessage(null);
-
-    const validation = validateEmailPasswordAuth({
+    await submitAuthForm({
       acceptedTerms,
       confirmPassword,
       email,
@@ -116,74 +226,12 @@ export function LoginCard() {
       lastName,
       mode,
       password,
+      router,
+      setErrors,
+      setIsLoading,
+      setStatusMessage,
+      t,
     });
-    setErrors(translateValidationErrors(validation.errors, t));
-
-    if (!validation.isValid) return;
-
-    setIsLoading(true);
-    const supabase = createClient();
-    const normalizedEmail = email.trim();
-
-    if (mode === "signIn") {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
-        password,
-      });
-
-      if (error) {
-        setErrors({ form: t(mapSupabaseAuthError(error, mode)) });
-        setIsLoading(false);
-        return;
-      }
-
-      router.replace("/dashboard");
-      router.refresh();
-      return;
-    }
-
-    if (mode === "signUp") {
-      const { data, error } = await supabase.auth.signUp({
-        email: normalizedEmail,
-        password,
-        options: {
-          data: buildSignUpUserMetadata(firstName, lastName),
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) {
-        setErrors({ form: t(mapSupabaseAuthError(error, mode)) });
-        setIsLoading(false);
-        return;
-      }
-
-      if (data.session) {
-        router.replace("/dashboard");
-        router.refresh();
-        return;
-      }
-
-      setStatusMessage(t("auth.checkYourEmail"));
-      setIsLoading(false);
-      return;
-    }
-
-    const { error } = await supabase.auth.resetPasswordForEmail(
-      normalizedEmail,
-      {
-        redirectTo: `${window.location.origin}/auth/callback?next=/auth/update-password`,
-      },
-    );
-
-    if (error) {
-      setErrors({ form: t(mapSupabaseAuthError(error, mode)) });
-      setIsLoading(false);
-      return;
-    }
-
-    setStatusMessage(t("auth.checkYourEmail"));
-    setIsLoading(false);
   }
 
   return (
@@ -344,9 +392,9 @@ export function LoginCard() {
       </form>
 
       {statusMessage ? (
-        <p className="mt-4 text-center text-sm text-zinc-300" role="status">
+        <output className="mt-4 block text-center text-sm text-zinc-300">
           {statusMessage}
-        </p>
+        </output>
       ) : null}
 
       <div className="mt-5 justify-around flex flex-row items-center gap-2 text-sm">

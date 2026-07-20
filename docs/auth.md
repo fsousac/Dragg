@@ -58,6 +58,12 @@ Do not duplicate this default data creation in frontend code.
 
 Email/password sign-up collects first and last name on the registration form. The app sends `full_name`, `first_name`, and `last_name` in Supabase `signUp` user metadata so `private.handle_new_user()` can populate `public.profiles.name` and settings can display the same fields as Google OAuth users.
 
+## Terms of Use acceptance
+
+`public.profiles.terms_accepted` tracks whether a user has accepted the Terms of Use and Privacy Policy. Email/password sign-up requires checking the acceptance box, which sends `terms_accepted: true` in `signUp` metadata so `private.handle_new_user()` sets the column on creation. Google OAuth sends no such metadata, so new Google sign-ups land with `terms_accepted = false`.
+
+`AppShell` (rendered by every authenticated page) calls `requireAcceptedTerms()`, which redirects to `/auth/accept-terms` whenever the column is `false`. That page persists acceptance via a server action and redirects to `/dashboard`. Users that existed before this column was added were grandfathered in as already accepted by the migration backfill.
+
 ## Local flow
 
 1. Enable Google and Email providers in Supabase.

@@ -178,6 +178,7 @@ describe("email/password auth validation", () => {
       full_name: "Felipe Souza",
       last_name: "Souza",
       name: "Felipe Souza",
+      terms_accepted: true,
     });
 
     expect(buildSignUpUserMetadata("Felipe", "")).toEqual({
@@ -185,6 +186,7 @@ describe("email/password auth validation", () => {
       full_name: "Felipe",
       last_name: "",
       name: "Felipe",
+      terms_accepted: true,
     });
   });
 
@@ -215,7 +217,9 @@ describe("email/password auth validation", () => {
 
   it("validates password confirmation", () => {
     expect(validatePasswordConfirmation()).toBe("auth.confirmPasswordRequired");
-    expect(validatePasswordConfirmation(validPassword, validPassword)).toBeUndefined();
+    expect(
+      validatePasswordConfirmation(validPassword, validPassword),
+    ).toBeUndefined();
     expect(validatePasswordConfirmation(validPassword, "")).toBe(
       "auth.confirmPasswordRequired",
     );
@@ -308,7 +312,9 @@ describe("email/password auth validation", () => {
     expect(validateNewPassword()).toBe("auth.passwordRequired");
     expect(validateNewPassword("")).toBe("auth.passwordRequired");
     expect(validateNewPassword("Sec1!ab")).toBe("auth.passwordMinLength");
-    expect(validateNewPassword("password123")).toBe("auth.passwordRequirements");
+    expect(validateNewPassword("password123")).toBe(
+      "auth.passwordRequirements",
+    );
     expect(validateNewPassword(validPassword)).toBeUndefined();
 
     expect(

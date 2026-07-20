@@ -6,6 +6,7 @@ import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { NavigationPrefetcher } from "@/components/dashboard/navigation-prefetcher";
 import { PageTransition } from "@/components/dashboard/page-transition";
 import { Sidebar } from "@/components/dashboard/sidebar";
+import { requireAcceptedTerms } from "@/lib/auth/terms";
 import type {
   AuthenticatedUserClaims,
   AuthenticatedUserContext,
@@ -45,6 +46,36 @@ function getMetadataValue(
   return null;
 }
 
+function isAvatarKey(key: string) {
+  const lowerKey = key.toLowerCase();
+  return (
+    lowerKey.includes("avatar") ||
+    lowerKey.includes("picture") ||
+    lowerKey.includes("photo")
+  );
+}
+
+function isImageUrl(value: string) {
+  return (
+    /^https?:\/\//.test(value) &&
+    /(googleusercontent|gravatar|avatar|photo|picture|image)/i.test(value)
+  );
+}
+
+function findAvatarInEntries(value: object, queue: unknown[]) {
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (typeof nestedValue === "string") {
+      if (isAvatarKey(key) || isImageUrl(nestedValue)) {
+        return nestedValue;
+      }
+    } else if (nestedValue && typeof nestedValue === "object") {
+      queue.push(nestedValue);
+    }
+  }
+
+  return null;
+}
+
 function getAvatarUrl(
   metadata: Array<Record<string, unknown> | undefined | null>,
 ) {
@@ -74,25 +105,9 @@ function getAvatarUrl(
       continue;
     }
 
-    for (const [key, nestedValue] of Object.entries(value)) {
-      if (typeof nestedValue === "string") {
-        const lowerKey = key.toLowerCase();
-        const looksLikeAvatarKey =
-          lowerKey.includes("avatar") ||
-          lowerKey.includes("picture") ||
-          lowerKey.includes("photo");
-        const looksLikeImageUrl =
-          /^https?:\/\//.test(nestedValue) &&
-          /(googleusercontent|gravatar|avatar|photo|picture|image)/i.test(
-            nestedValue,
-          );
-
-        if (looksLikeAvatarKey || looksLikeImageUrl) {
-          return nestedValue;
-        }
-      } else if (nestedValue && typeof nestedValue === "object") {
-        queue.push(nestedValue);
-      }
+    const found = findAvatarInEntries(value, queue);
+    if (found) {
+      return found;
     }
   }
 
@@ -108,6 +123,7 @@ async function getShellUser(userContext?: AuthenticatedUserContext) {
   if (userContext) {
     return {
       claims: userContext.claims,
+      supabase: userContext.supabase,
       user: userContext.user,
     };
   }
@@ -120,16 +136,30 @@ async function getShellUser(userContext?: AuthenticatedUserContext) {
 
   return {
     claims: claimsData?.claims as AuthenticatedUserClaims | undefined,
+    supabase,
     user: userData?.user,
   };
 }
 
-export async function AppShell({ children, userContext }: AppShellProps) {
-  const { claims, user } = await getShellUser(userContext);
+async function signOut() {
+  "use server";
+
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect("/");
+}
+
+export async function AppShell({
+  children,
+  userContext,
+}: Readonly<AppShellProps>) {
+  const { claims, supabase, user } = await getShellUser(userContext);
 
   if (!claims || !user) {
     redirect("/");
   }
+
+  await requireAcceptedTerms(supabase, user.id);
 
   const userEmail = user.email ?? claims.email ?? "";
   const userName =
@@ -146,14 +176,6 @@ export async function AppShell({ children, userContext }: AppShellProps) {
     claims as Record<string, unknown>,
     ...(identityMetadata ?? []),
   ]);
-
-  async function signOut() {
-    "use server";
-
-    const supabase = await createClient();
-    await supabase.auth.signOut();
-    redirect("/");
-  }
 
   return (
     <div className="flex min-h-screen bg-background">

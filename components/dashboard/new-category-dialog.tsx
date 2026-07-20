@@ -249,11 +249,10 @@ export function NewCategoryDialog({
             </Button>
             <Button type="submit" disabled={isSaving}>
               <Plus className="size-4" />
-              {isSaving
-                ? t("category.saving")
-                : isEditing
-                  ? t("category.update")
-                  : t("category.create")}
+              {(() => {
+                if (isSaving) return t("category.saving");
+                return isEditing ? t("category.update") : t("category.create");
+              })()}
             </Button>
           </DialogFooter>
         </form>

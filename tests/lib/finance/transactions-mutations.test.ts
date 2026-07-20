@@ -194,24 +194,14 @@ describe("createTransaction", () => {
     ).rejects.toThrow("Unable to validate payment method: pm boom");
   });
 
-  it("throws for a non-integer installment count", async () => {
+  it.each([
+    ["a non-integer", 2.5],
+    ["below 1", 0],
+    ["above 120", 121],
+  ])("throws for an installment count that is %s", async (_label, installmentCount) => {
     setup([]);
     await expect(
-      createTransaction({ ...validInput, installmentCount: 2.5 }),
-    ).rejects.toThrow("Installment count is invalid.");
-  });
-
-  it("throws for an installment count below 1", async () => {
-    setup([]);
-    await expect(
-      createTransaction({ ...validInput, installmentCount: 0 }),
-    ).rejects.toThrow("Installment count is invalid.");
-  });
-
-  it("throws for an installment count above 120", async () => {
-    setup([]);
-    await expect(
-      createTransaction({ ...validInput, installmentCount: 121 }),
+      createTransaction({ ...validInput, installmentCount }),
     ).rejects.toThrow("Installment count is invalid.");
   });
 

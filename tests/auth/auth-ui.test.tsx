@@ -73,6 +73,7 @@ vi.mock("@/lib/i18n", () => ({
 describe("auth callback redirect safety", () => {
   it("falls back to /dashboard for null, non-absolute, and protocol-relative paths", () => {
     expect(getSafeRedirectPath(null)).toBe("/dashboard");
+    // eslint-disable-next-line sonarjs/no-clear-text-protocols -- asserting this insecure URL is rejected
     expect(getSafeRedirectPath("http://evil.com")).toBe("/dashboard");
     expect(getSafeRedirectPath("//evil.com")).toBe("/dashboard");
   });

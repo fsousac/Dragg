@@ -251,12 +251,12 @@ export function BudgetsScreen({
               /* c8 ignore next */
               const displaySpent = includePlanned ? group.plannedSpent : group.spent;
               const usage = calculateBudgetUsage(displaySpent, group.budget);
-              const trend =
-                usage.isOverBudget || usage.usagePercentage > 80
-                  ? "over"
-                  : usage.usagePercentage > 50
-                    ? "normal"
-                    : "under";
+              let trend: "over" | "normal" | "under" = "under";
+              if (usage.isOverBudget || usage.usagePercentage > 80) {
+                trend = "over";
+              } else if (usage.usagePercentage > 50) {
+                trend = "normal";
+              }
               return (
                 <div key={group.key}>
                   <div className="mb-2 flex items-center justify-between gap-3">

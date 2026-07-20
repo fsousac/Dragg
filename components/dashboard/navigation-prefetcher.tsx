@@ -20,6 +20,12 @@ export const sidebarRoutes = [
   "/settings",
 ];
 
+function getPrefetchTargets(pathname: string, searchParams: URLSearchParams) {
+  return sidebarRoutes
+    .filter((route) => route !== pathname)
+    .map((route) => withSelectedMonth(route, searchParams));
+}
+
 export function NavigationPrefetcher() {
   const pathname = usePathname();
   const router = useRouter();
@@ -44,17 +50,14 @@ export function NavigationPrefetcher() {
     // Start prefetch only after the page has fully loaded (or after 1s fallback).
     const startPrefetch = () => {
       const prefetchRoutes = () => {
-        sidebarRoutes
-          .filter((route) => route !== pathname)
-          .map((route) => withSelectedMonth(route, searchParams))
-          .forEach((route) => {
-            if (!prefetched.current.has(route)) {
-              prefetched.current.add(route);
-              try {
-                router.prefetch(route);
-              } catch {}
-            }
-          });
+        for (const route of getPrefetchTargets(pathname, searchParams)) {
+          if (!prefetched.current.has(route)) {
+            prefetched.current.add(route);
+            try {
+              router.prefetch(route);
+            } catch {}
+          }
+        }
       };
 
       if (typeof window.requestIdleCallback === "function") {

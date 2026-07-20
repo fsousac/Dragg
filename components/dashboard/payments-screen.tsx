@@ -1395,11 +1395,12 @@ export function PaymentsScreen({
               }
               disabled={isPending}
             >
-              {isPending
-                ? t("payments.subscriptionCreating")
-                : editingSubscription
+              {(() => {
+                if (isPending) return t("payments.subscriptionCreating");
+                return editingSubscription
                   ? t("transaction.saveChanges")
-                  : t("screen.payments.addSubscription")}
+                  : t("screen.payments.addSubscription");
+              })()}
             </Button>
           </DialogFooter>
         </DialogContent>

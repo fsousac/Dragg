@@ -21,6 +21,12 @@ function buildYears(selectedYear: number) {
   return Array.from({ length: YEAR_RANGE * 2 + 1 }, (_, i) => start + i);
 }
 
+const DISTANCE_OPACITY = [1, 0.5, 0.25] as const;
+
+function opacityForDistance(distance: number) {
+  return DISTANCE_OPACITY[distance] ?? 0.1;
+}
+
 function monthNames(locale: string) {
   return Array.from({ length: 12 }, (_, i) => {
     const name = new Date(2020, i, 1).toLocaleDateString(locale, {
@@ -191,8 +197,7 @@ function Wheel({ items, index, align, onCommit }: WheelProps) {
       <div style={{ height: PAD }} />
       {items.map((item, i) => {
         const dist = Math.abs(i - center);
-        const opacity =
-          dist === 0 ? 1 : dist === 1 ? 0.5 : dist === 2 ? 0.25 : 0.1;
+        const opacity = opacityForDistance(dist);
         return (
           <div
             key={i}
