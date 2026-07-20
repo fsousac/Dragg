@@ -26,7 +26,8 @@ test.describe("dashboard", () => {
 
     for (const [name, path] of sections) {
       await page.getByRole("link", { name, exact: true }).click();
-      await expect(page).toHaveURL(new RegExp(path.replace(/\//g, "\\/")));
+      await page.waitForURL((url) => url.pathname === path);
+      expect(new URL(page.url()).pathname).toBe(path);
     }
   });
 });
