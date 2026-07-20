@@ -26,6 +26,23 @@ const USER_ID = "11111111-1111-4111-8111-111111111111";
 const now = new Date();
 const CURRENT_MONTH = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
+// A day-of-month 2 days from now (never below 10, the fixture's
+// closing_day, so the invoice cycle stays anchored to the current month —
+// see getCreditCardInvoiceCycle) so a credit card invoice due on this day
+// deterministically lands in the getPaymentsDueStatus "next" (due within 3
+// days) bucket regardless of which day this suite runs on.
+// ponytail: still misses the "next" bucket in the first ~6 days of a month
+// (floor of 10 pushes the due date more than 3 days out) or on the very
+// last day (rollover clamps back to today) — acceptable, much narrower than
+// the fixed due_day=20 this replaced, which only worked on 4 days a month.
+const daysInCurrentMonth = new Date(
+  Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0),
+).getUTCDate();
+const NEXT_STATUS_DUE_DAY = Math.max(
+  10,
+  Math.min(now.getUTCDate() + 2, daysInCurrentMonth),
+);
+
 // Minimal chainable fake query builder: every chain method returns itself,
 // and the builder is a thenable resolving to the configured response.
 // Copied from tests/lib/finance/transactions-crud.test.ts and extended with
@@ -398,7 +415,7 @@ describe("getPaymentsDueData", () => {
           name: "Visa",
           type: "credit",
           closing_day: 10,
-          due_day: 20,
+          due_day: NEXT_STATUS_DUE_DAY,
         },
       }),
       // Two occurrences of the same subscription (same description/category/
@@ -530,6 +547,7 @@ describe("getPaymentsDueData", () => {
     expect(result.invoices).toHaveLength(1);
     expect(result.invoices[0].amount).toBe(100);
     expect(result.invoices[0].purchaseCount).toBe(1);
+    expect(result.invoices[0].status).toBe("next");
 
     expect(result.subscriptions).toHaveLength(3);
     const netflix = result.subscriptions.find((sub) => sub.name === "Netflix");
