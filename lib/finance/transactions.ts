@@ -644,7 +644,6 @@ function normalizeOptionalString(value: string | undefined, maxLength = 500) {
 }
 
 function toCategoryLabelKey(categoryName: string, isDefault: boolean | null) {
-  // Treat null as true (default to translating if is_default column doesn't exist)
   if (isDefault === false) {
     return categoryName;
   }
@@ -663,9 +662,6 @@ function toPaymentMethodLabelKey(
 ) {
   const normalizedPaymentMethodName = normalizeLabel(paymentMethodName);
   const shouldTranslateDefaultName =
-    // ponytail: every current caller passes `isDefault: null` (payment_methods
-    // has no is_default column yet); `true` is kept for API symmetry with
-    // toCategoryLabelKey should that column ever get added.
     /* c8 ignore next */
     isDefault === true ||
     (isDefault === null &&
@@ -684,9 +680,6 @@ function toPaymentMethodLabelKey(
   if (paymentMethodType === "boleto")
     return "transaction.paymentMethods.boleto";
 
-  // ponytail: defaultPaymentMethodNames and paymentMethodTranslationMap share
-  // the same keys today, so the ?? fallback below only triggers through the
-  // isDefault===true path above, which is likewise unreachable right now.
   /* c8 ignore next 3 */
   return (
     paymentMethodTranslationMap[normalizedPaymentMethodName] ??
@@ -913,23 +906,77 @@ function markPlannedTransactions(transactions: Transaction[]) {
   );
 }
 
-function toTransaction(row: TransactionRow): Transaction {
-  const amount = Number(row.amount);
-  const group =
-    row.kind === "income" ? "income" : (row.categories?.group_type ?? "wants");
-  const signedAmount = row.kind === "income" ? amount : -amount;
-  const rawCategoryName = row.categories?.name ?? row.kind;
-  const categoryName = toCategoryLabelKey(
+function resolveTransactionGroup(row: TransactionRow): TransactionGroup {
+  return row.kind === "income"
+    ? "income"
+    : (row.categories?.group_type ?? "wants");
+}
+
+function resolveTransactionCategoryName(
+  row: TransactionRow,
+  rawCategoryName: string,
+) {
+  return toCategoryLabelKey(
     rawCategoryName,
     row.categories?.is_default ?? false,
   );
-  const paymentMethodKey = row.payment_methods
+}
+
+function resolveTransactionPaymentMethodKey(row: TransactionRow) {
+  return row.payment_methods
     ? toPaymentMethodLabelKey(
         row.payment_methods.name,
         row.payment_methods.type,
         null,
       )
     : null;
+}
+
+function resolveTransactionIcon(row: TransactionRow, rawCategoryName: string) {
+  return row.kind === "income"
+    ? groupIcons.income
+    : toCategoryIcon(rawCategoryName, row.categories?.icon);
+}
+
+function resolveInstallmentNumber(row: TransactionRow) {
+  return row.installment_number == null ? null : Number(row.installment_number);
+}
+
+function resolveInstallmentTotal(row: TransactionRow) {
+  return row.installment_total == null ? null : Number(row.installment_total);
+}
+
+function resolveTransactionPaymentMethodClosingDay(row: TransactionRow) {
+  return row.payment_methods?.closing_day == null
+    ? null
+    : Number(row.payment_methods.closing_day);
+}
+
+function resolveTransactionPaymentMethodDueDay(row: TransactionRow) {
+  return row.payment_methods?.due_day == null
+    ? null
+    : Number(row.payment_methods.due_day);
+}
+
+function resolveSignedAmount(row: TransactionRow, amount: number) {
+  return row.kind === "income" ? amount : -amount;
+}
+
+function resolveRawCategoryName(row: TransactionRow) {
+  return row.categories?.name ?? row.kind;
+}
+
+function resolveDescriptionKey(row: TransactionRow, categoryName: string) {
+  return row.description || row.notes || categoryName;
+}
+
+function toTransaction(row: TransactionRow): Transaction {
+  const amount = Number(row.amount);
+  const group = resolveTransactionGroup(row);
+  const signedAmount = resolveSignedAmount(row, amount);
+  const rawCategoryName = resolveRawCategoryName(row);
+  const categoryName = resolveTransactionCategoryName(row, rawCategoryName);
+  const paymentMethodKey = resolveTransactionPaymentMethodKey(row);
 
   return {
     id: row.id,
@@ -939,27 +986,16 @@ function toTransaction(row: TransactionRow): Transaction {
     categoryId: row.category_id,
     categoryKey: categoryName,
     date: row.date,
-    descriptionKey: row.description || row.notes || categoryName,
+    descriptionKey: resolveDescriptionKey(row, categoryName),
     group,
-    icon:
-      row.kind === "income"
-        ? groupIcons.income
-        : toCategoryIcon(rawCategoryName, row.categories?.icon),
+    icon: resolveTransactionIcon(row, rawCategoryName),
     installmentGroupId: row.installment_group_id ?? null,
-    installmentNumber:
-      row.installment_number == null ? null : Number(row.installment_number),
-    installmentTotal:
-      row.installment_total == null ? null : Number(row.installment_total),
+    installmentNumber: resolveInstallmentNumber(row),
+    installmentTotal: resolveInstallmentTotal(row),
     notes: row.notes,
     paymentMethodId: row.payment_method_id,
-    paymentMethodClosingDay:
-      row.payment_methods?.closing_day == null
-        ? null
-        : Number(row.payment_methods.closing_day),
-    paymentMethodDueDay:
-      row.payment_methods?.due_day == null
-        ? null
-        : Number(row.payment_methods.due_day),
+    paymentMethodClosingDay: resolveTransactionPaymentMethodClosingDay(row),
+    paymentMethodDueDay: resolveTransactionPaymentMethodDueDay(row),
     paymentMethodKey,
     paymentMethodType: row.payment_methods?.type ?? null,
     type: row.kind,
@@ -1065,9 +1101,6 @@ function getSafeReportPeriod(periodMonths?: number) {
 async function listCategories(options?: {
   userContext?: Awaited<ReturnType<typeof getUserContext>>;
 }) {
-  // ponytail: both callers always pass `userContext`, so the `?? getUserContext()`
-  // fallback is unreachable; c8 also mis-attributes some of the following
-  // lines' hit counts in this shape (verified manually — they do execute).
   /* c8 ignore start */
   const ctx = options?.userContext ?? (await getUserContext());
   const { supabase, userId } = ctx;
@@ -1123,14 +1156,9 @@ export async function listCategoryOverview(
 async function listPaymentMethods(options?: {
   userContext?: Awaited<ReturnType<typeof getUserContext>>;
 }) {
-  // ponytail: both callers always pass `userContext`, so the `?? getUserContext()`
-  // fallback is unreachable; c8 also mis-attributes some of the following
-  // lines' hit counts in this shape (verified manually — they do execute).
   /* c8 ignore start */
   const ctx = options?.userContext ?? (await getUserContext());
   const { supabase, userId } = ctx;
-  // payment_methods has no is_default column (see docs/database.md) — do not
-  // select/order by it, that column has never existed in any migration.
   const { data, error } = await supabase
     .from("payment_methods")
     .select("id, name, type, credit_limit, due_day, closing_day")
@@ -1175,6 +1203,61 @@ async function getCategoryForMutation(categoryId: string) {
   };
 }
 
+type PaymentMethodOverviewContext = {
+  selectedMonth: string;
+  today: string;
+  transactions: Transaction[];
+  registeredTransactions: Transaction[];
+};
+
+function buildPaymentMethodOverviewItem(
+  paymentMethod: Awaited<ReturnType<typeof listPaymentMethods>>[number],
+  context: PaymentMethodOverviewContext,
+): PaymentMethodOverviewItem {
+  const closingDay =
+    paymentMethod.closing_day == null
+      ? null
+      : Number(paymentMethod.closing_day);
+  const dueDay =
+    paymentMethod.due_day == null ? null : Number(paymentMethod.due_day);
+
+  const label = toPaymentMethodLabelKey(
+    paymentMethod.name,
+    paymentMethod.type,
+    null,
+  );
+  const detail = getPaymentMethodDetail({
+    paymentMethod: {
+      closingDay,
+      dueDay,
+      id: paymentMethod.id,
+      label,
+      name: paymentMethod.name,
+      type: paymentMethod.type,
+    },
+    selectedMonth: context.selectedMonth,
+    today: context.today,
+    transactions:
+      paymentMethod.type === "credit"
+        ? context.registeredTransactions
+        : context.transactions,
+  });
+
+  return {
+    canModify: !isProtectedPaymentMethod(paymentMethod),
+    closingDay,
+    creditLimit: Number(paymentMethod.credit_limit ?? 0),
+    detail,
+    dueDay,
+    id: paymentMethod.id,
+    isDefault: false,
+    label,
+    name: paymentMethod.name,
+    spent: detail.totalAmount,
+    type: paymentMethod.type,
+  };
+}
+
 export async function listPaymentMethodOverview(
   month?: string,
   userContext?: Awaited<ReturnType<typeof getUserContext>>,
@@ -1189,50 +1272,14 @@ export async function listPaymentMethodOverview(
       listTransactions({ includeFuture: true, userContext: ctx }),
     ]);
 
-  return paymentMethods.map((paymentMethod) => {
-    const closingDay =
-      paymentMethod.closing_day == null
-        ? null
-        : Number(paymentMethod.closing_day);
-    const dueDay =
-      paymentMethod.due_day == null ? null : Number(paymentMethod.due_day);
-
-    // payment_methods has no is_default column; toPaymentMethodLabelKey
-    // falls back to matching well-known default names when passed null.
-    const label = toPaymentMethodLabelKey(
-      paymentMethod.name,
-      paymentMethod.type,
-      null,
-    );
-    const detail = getPaymentMethodDetail({
-      paymentMethod: {
-        closingDay,
-        dueDay,
-        id: paymentMethod.id,
-        label,
-        name: paymentMethod.name,
-        type: paymentMethod.type,
-      },
+  return paymentMethods.map((paymentMethod) =>
+    buildPaymentMethodOverviewItem(paymentMethod, {
       selectedMonth,
       today,
-      transactions:
-        paymentMethod.type === "credit" ? registeredTransactions : transactions,
-    });
-
-    return {
-      canModify: !isProtectedPaymentMethod(paymentMethod),
-      closingDay,
-      creditLimit: Number(paymentMethod.credit_limit ?? 0),
-      detail,
-      dueDay,
-      id: paymentMethod.id,
-      isDefault: false,
-      label,
-      name: paymentMethod.name,
-      spent: detail.totalAmount,
-      type: paymentMethod.type,
-    };
-  });
+      transactions,
+      registeredTransactions,
+    }),
+  );
 }
 
 export async function listSubscriptionOverview(): Promise<
@@ -1246,24 +1293,11 @@ export async function listSubscriptionOverview(): Promise<
   return buildSubscriptionOverview(transactions, getTodayValue());
 }
 
-export async function getPaymentsDueData(
-  month?: string,
-  userContext?: Awaited<ReturnType<typeof getUserContext>>,
-): Promise<PaymentsDueData> {
-  const selectedMonth = normalizeMonthValue(month);
-  const monthRange = getMonthRange(selectedMonth);
-  const ctx = userContext ?? (await getUserContext());
-  const plannedTransactions = await listTransactions({
-    includeCreditCardInvoices: true,
-    includeFuture: true,
-    month: selectedMonth,
-    preserveCreditCardInvoicePurchases: true,
-    useFinancialMonth: false,
-    userContext: ctx,
-  });
-  const today = getTodayValue();
-
-  const invoices: PaymentInvoiceItem[] = plannedTransactions
+function buildPaymentInvoices(
+  plannedTransactions: Transaction[],
+  today: string,
+): PaymentInvoiceItem[] {
+  return plannedTransactions
     .filter((transaction) => transaction.isCreditCardInvoice)
     .map((transaction) => {
       const invoice = transaction.invoice as CreditCardInvoiceDetails;
@@ -1281,7 +1315,16 @@ export async function getPaymentsDueData(
       };
     })
     .sort((left, right) => left.dueDate.localeCompare(right.dueDate));
+}
 
+type GroupedSubscription = SubscriptionOverviewItem & {
+  isCreditCardInvoicePurchase: boolean;
+};
+
+function groupSubscriptionTransactions(
+  plannedTransactions: Transaction[],
+  monthRange: { start: string; end: string },
+): Map<string, GroupedSubscription> {
   const subscriptionTransactions = plannedTransactions
     .filter((transaction) => transaction.notes?.startsWith("subscription"))
     .filter(
@@ -1290,10 +1333,7 @@ export async function getPaymentsDueData(
         transaction.date <= monthRange.end,
     )
     .sort((left, right) => left.date.localeCompare(right.date));
-  const groupedSubscriptions = new Map<
-    string,
-    SubscriptionOverviewItem & { isCreditCardInvoicePurchase: boolean }
-  >();
+  const groupedSubscriptions = new Map<string, GroupedSubscription>();
 
   for (const transaction of subscriptionTransactions) {
     const groupKey = [
@@ -1323,9 +1363,6 @@ export async function getPaymentsDueData(
       continue;
     }
 
-    // ponytail: subscriptionTransactions is pre-sorted ascending by date, so
-    // within a group later iterations can never see an earlier date — this
-    // guard can't actually trigger, kept only as a defensive invariant check.
     /* c8 ignore start */
     if (transaction.date < existingSubscription.nextDate) {
       existingSubscription.nextDate = transaction.date;
@@ -1336,11 +1373,14 @@ export async function getPaymentsDueData(
     /* c8 ignore stop */
   }
 
-  const filteredSubscriptions: SubscriptionOverviewItem[] = [
-    ...groupedSubscriptions.values(),
-  ];
+  return groupedSubscriptions;
+}
 
-  const bills: PaymentBillItem[] = plannedTransactions
+function buildPaymentBills(
+  plannedTransactions: Transaction[],
+  today: string,
+): PaymentBillItem[] {
+  return plannedTransactions
     .filter(
       (transaction) =>
         transaction.type === "expense" &&
@@ -1356,24 +1396,29 @@ export async function getPaymentsDueData(
       date: transaction.date,
       descriptionKey: transaction.descriptionKey,
       id: transaction.id,
-      // ponytail: the filter above only keeps "boleto"/"bank" paymentMethodType,
-      // which is only ever set alongside a non-null paymentMethodKey (both
-      // derive from the same `row.payment_methods` join in toTransaction), so
-      // the ?? null fallback can't actually trigger.
       /* c8 ignore next */
       paymentMethodKey: transaction.paymentMethodKey ?? null,
       status: getPaymentsDueStatus(transaction.date, today),
     }))
     .sort((left, right) => left.date.localeCompare(right.date));
+}
 
+function buildPaymentsDueSummary({
+  invoices,
+  groupedSubscriptions,
+  filteredSubscriptions,
+  bills,
+}: {
+  invoices: PaymentInvoiceItem[];
+  groupedSubscriptions: Map<string, GroupedSubscription>;
+  filteredSubscriptions: SubscriptionOverviewItem[];
+  bills: PaymentBillItem[];
+}): PaymentsDueData["summary"] {
   const totalInvoices = invoices.reduce(
     (sum, invoice) => sum + invoice.amount,
     0,
   );
   const totalSubscriptions = [...groupedSubscriptions.values()]
-    // Subscriptions inside the current credit card invoice cycle are
-    // already counted in totalInvoices; skip them here to avoid double
-    // counting, even though they still show up in the subscriptions list.
     .filter((subscription) => !subscription.isCreditCardInvoicePurchase)
     .reduce((sum, subscription) => sum + subscription.amount, 0);
   const totalBills = bills.reduce((sum, bill) => sum + bill.amount, 0);
@@ -1388,16 +1433,52 @@ export async function getPaymentsDueData(
       .at(0) ?? null;
 
   return {
+    nextDueDate,
+    totalBills,
+    totalDue,
+    totalInvoices,
+    totalSubscriptions,
+  };
+}
+
+export async function getPaymentsDueData(
+  month?: string,
+  userContext?: Awaited<ReturnType<typeof getUserContext>>,
+): Promise<PaymentsDueData> {
+  const selectedMonth = normalizeMonthValue(month);
+  const monthRange = getMonthRange(selectedMonth);
+  const ctx = userContext ?? (await getUserContext());
+  const plannedTransactions = await listTransactions({
+    includeCreditCardInvoices: true,
+    includeFuture: true,
+    month: selectedMonth,
+    preserveCreditCardInvoicePurchases: true,
+    useFinancialMonth: false,
+    userContext: ctx,
+  });
+  const today = getTodayValue();
+
+  const invoices = buildPaymentInvoices(plannedTransactions, today);
+  const groupedSubscriptions = groupSubscriptionTransactions(
+    plannedTransactions,
+    monthRange,
+  );
+  const filteredSubscriptions: SubscriptionOverviewItem[] = [
+    ...groupedSubscriptions.values(),
+  ];
+  const bills = buildPaymentBills(plannedTransactions, today);
+  const summary = buildPaymentsDueSummary({
+    invoices,
+    groupedSubscriptions,
+    filteredSubscriptions,
+    bills,
+  });
+
+  return {
     bills,
     invoices,
     subscriptions: filteredSubscriptions,
-    summary: {
-      nextDueDate,
-      totalBills,
-      totalDue,
-      totalInvoices,
-      totalSubscriptions,
-    },
+    summary,
   };
 }
 
@@ -1433,8 +1514,6 @@ async function getPaymentMethodForMutation(paymentMethodId: string) {
   assertUuid(paymentMethodId, "Payment method");
 
   const { supabase, userId } = await getUserContext();
-  // payment_methods has no is_default column (see docs/database.md) — do not
-  // select it, that column has never existed in any migration.
   const { data, error } = await supabase
     .from("payment_methods")
     .select("id, name, type, credit_limit, due_day, closing_day")
@@ -1457,6 +1536,56 @@ async function getPaymentMethodForMutation(paymentMethodId: string) {
   };
 }
 
+function mapTransactionFormCategories(
+  categories: Awaited<ReturnType<typeof listCategories>>,
+): TransactionFormCategory[] {
+  const mappedCategories = categories.map((category) => ({
+    group: category.group_type,
+    id: category.id,
+    icon: toCategoryIcon(category.name, category.icon),
+    label: toCategoryLabelKey(category.name, category.is_default),
+    monthlyLimit: Number(category.monthly_limit ?? 0),
+  }));
+
+  return mappedCategories.length > 0
+    ? mappedCategories
+    : [
+        {
+          group: "wants" as DbCategoryGroup,
+          id: "none",
+          icon: "🏷️",
+          label: "none",
+          monthlyLimit: 0,
+        },
+      ];
+}
+
+function mapTransactionFormPaymentMethods(
+  paymentMethods: Awaited<ReturnType<typeof listPaymentMethods>>,
+): TransactionFormPaymentMethod[] {
+  const mappedPaymentMethods = paymentMethods.map((paymentMethod) => ({
+    dueDay:
+      paymentMethod.due_day == null ? null : Number(paymentMethod.due_day),
+    id: paymentMethod.id,
+    label: toPaymentMethodLabelKey(
+      paymentMethod.name,
+      paymentMethod.type,
+      null,
+    ),
+    type: paymentMethod.type,
+  }));
+
+  return mappedPaymentMethods.length > 0
+    ? mappedPaymentMethods
+    : [
+        {
+          id: "none",
+          label: "none",
+          type: "cash",
+        },
+      ];
+}
+
 export async function getTransactionFormOptions(options?: {
   userContext?: Awaited<ReturnType<typeof getUserContext>>;
 }): Promise<TransactionFormOptions> {
@@ -1466,86 +1595,22 @@ export async function getTransactionFormOptions(options?: {
     listPaymentMethods({ userContext: ctx }),
   ]);
 
-  const mappedCategories = categories.map((category) => ({
-    group: category.group_type,
-    id: category.id,
-    icon: toCategoryIcon(category.name, category.icon),
-    label: toCategoryLabelKey(category.name, category.is_default),
-    monthlyLimit: Number(category.monthly_limit ?? 0),
-  }));
-
-  const mappedPaymentMethods = paymentMethods.map((paymentMethod) => ({
-    dueDay:
-      paymentMethod.due_day == null ? null : Number(paymentMethod.due_day),
-    id: paymentMethod.id,
-    label: toPaymentMethodLabelKey(paymentMethod.name, paymentMethod.type, null),
-    type: paymentMethod.type,
-  }));
-
-  // If user has no categories or payment methods yet, provide a sentinel
-  // "none" option so the form can render a placeholder and handle selection.
-  const categoriesResult: TransactionFormCategory[] =
-    mappedCategories.length > 0
-      ? mappedCategories
-      : [
-          {
-            group: "wants" as DbCategoryGroup,
-            id: "none",
-            icon: "🏷️",
-            label: "none",
-            monthlyLimit: 0,
-          },
-        ];
-
-  const paymentMethodsResult: TransactionFormPaymentMethod[] =
-    mappedPaymentMethods.length > 0
-      ? mappedPaymentMethods
-      : [
-          {
-            id: "none",
-            label: "none",
-            type: "cash",
-          },
-        ];
-
   return {
-    categories: categoriesResult,
-    paymentMethods: paymentMethodsResult,
+    categories: mapTransactionFormCategories(categories),
+    paymentMethods: mapTransactionFormPaymentMethods(paymentMethods),
   };
 }
 
-export async function createTransaction(input: NewTransactionInput) {
-  const { createdAt, supabase, userId } = await getUserContext();
-  const description = assertNonEmptyString(input.description, "Description");
-  const amount = Math.abs(input.amount);
-  assertPositiveFiniteAmount(amount, "Amount");
-
-  if (
-    input.type !== "income" &&
-    input.type !== "expense" &&
-    input.type !== "saving"
-  ) {
+function resolveNewTransactionKind(
+  type: NewTransactionInput["type"],
+): DbTransactionKind {
+  if (type !== "income" && type !== "expense" && type !== "saving") {
     throw new Error("Transaction type is invalid.");
   }
+  return type;
+}
 
-  const categoryId =
-    input.type === "income"
-      ? null
-      : normalizeNullableId(input.category, "Category");
-  const paymentMethodId = normalizeNullableId(
-    input.paymentMethod,
-    "Payment method",
-  );
-  const kind: DbTransactionKind = input.type;
-  const date = toIsoDate(input.date);
-  const installmentCount = Number(input.installmentCount);
-
-  assertValidIsoDate(date);
-  await Promise.all([
-    assertUserCategory(supabase, userId, categoryId),
-    assertUserPaymentMethod(supabase, userId, paymentMethodId),
-  ]);
-
+function assertValidInstallmentCount(installmentCount: number) {
   if (
     !Number.isInteger(installmentCount) ||
     installmentCount < 1 ||
@@ -1553,9 +1618,60 @@ export async function createTransaction(input: NewTransactionInput) {
   ) {
     throw new Error("Installment count is invalid.");
   }
+}
 
-  const isInstallmentPurchase =
-    input.type === "expense" && installmentCount > 1;
+type ResolvedNewTransactionInput = {
+  description: string;
+  amount: number;
+  kind: DbTransactionKind;
+  categoryId: string | null;
+  paymentMethodId: string | null;
+  date: string;
+  installmentCount: number;
+};
+
+function resolveNewTransactionInput(
+  input: NewTransactionInput,
+): ResolvedNewTransactionInput {
+  const description = assertNonEmptyString(input.description, "Description");
+  const amount = Math.abs(input.amount);
+  assertPositiveFiniteAmount(amount, "Amount");
+  const kind = resolveNewTransactionKind(input.type);
+  const categoryId =
+    kind === "income" ? null : normalizeNullableId(input.category, "Category");
+  const paymentMethodId = normalizeNullableId(
+    input.paymentMethod,
+    "Payment method",
+  );
+  const date = toIsoDate(input.date);
+  const installmentCount = Number(input.installmentCount);
+  assertValidIsoDate(date);
+
+  return {
+    description,
+    amount,
+    kind,
+    categoryId,
+    paymentMethodId,
+    date,
+    installmentCount,
+  };
+}
+
+type InstallmentPlan = {
+  isInstallmentPurchase: boolean;
+  occurrenceCount: number;
+  installmentGroupId: string | null;
+  installmentAmount: number;
+  installmentRemainder: number;
+};
+
+function computeInstallmentPlan(
+  kind: DbTransactionKind,
+  amount: number,
+  installmentCount: number,
+): InstallmentPlan {
+  const isInstallmentPurchase = kind === "expense" && installmentCount > 1;
   const occurrenceCount = isInstallmentPurchase ? installmentCount : 1;
   const installmentGroupId = isInstallmentPurchase ? crypto.randomUUID() : null;
   const installmentAmount = isInstallmentPurchase
@@ -1567,68 +1683,183 @@ export async function createTransaction(input: NewTransactionInput) {
   const installmentRemainder = Number(
     (amount - totalRoundedInstallments).toFixed(2),
   );
-  const notes = normalizeOptionalString(input.notes);
 
-  const [year, month, day] = date.split("-").map(Number);
+  return {
+    isInstallmentPurchase,
+    occurrenceCount,
+    installmentGroupId,
+    installmentAmount,
+    installmentRemainder,
+  };
+}
+
+type InstallmentRowContext = {
+  resolved: ResolvedNewTransactionInput;
+  plan: InstallmentPlan;
+  notes: string | null;
+  userId: string;
+  baseDate: Date;
+};
+
+function formatOccurrenceDate(baseDate: Date, index: number) {
+  const occurrenceDate = addMonthsClamped(baseDate, index);
+  return [
+    occurrenceDate.getFullYear(),
+    String(occurrenceDate.getMonth() + 1).padStart(2, "0"),
+    String(occurrenceDate.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function resolveOccurrenceInstallmentMetadata(
+  index: number,
+  plan: InstallmentPlan,
+  installmentCount: number,
+) {
+  return plan.isInstallmentPurchase && plan.installmentGroupId
+    ? createInstallmentMetadata({
+        groupId: plan.installmentGroupId,
+        installmentNumber: index + 1,
+        installmentTotal: installmentCount,
+      })
+    : null;
+}
+
+function resolveOccurrenceNotes(
+  installmentMetadata: ReturnType<typeof createInstallmentMetadata> | null,
+  notes: string | null,
+) {
+  const scheduleNote = installmentMetadata
+    ? `${installmentMetadata.installmentNumber}/${installmentMetadata.installmentTotal}`
+    : null;
+  return [scheduleNote, notes].filter(Boolean).join(" - ") || null;
+}
+
+function resolveOccurrenceAmount(index: number, plan: InstallmentPlan) {
+  return index === plan.occurrenceCount - 1
+    ? Number((plan.installmentAmount + plan.installmentRemainder).toFixed(2))
+    : plan.installmentAmount;
+}
+
+function resolveOccurrenceDescription({
+  description,
+  installmentMetadata,
+  index,
+  installmentCount,
+}: {
+  description: string;
+  installmentMetadata: ReturnType<typeof createInstallmentMetadata> | null;
+  index: number;
+  installmentCount: number;
+}) {
+  return installmentMetadata
+    ? `${description} (${index + 1}/${installmentCount})`
+    : description;
+}
+
+function buildInstallmentRow(index: number, context: InstallmentRowContext) {
+  const { resolved, plan, notes, userId, baseDate } = context;
+  const { description, categoryId, kind, paymentMethodId, installmentCount } =
+    resolved;
+  const installmentMetadata = resolveOccurrenceInstallmentMetadata(
+    index,
+    plan,
+    installmentCount,
+  );
+
+  return {
+    amount: resolveOccurrenceAmount(index, plan),
+    category_id: categoryId,
+    date: formatOccurrenceDate(baseDate, index),
+    description: resolveOccurrenceDescription({
+      description,
+      installmentMetadata,
+      index,
+      installmentCount,
+    }),
+    installment_group_id: installmentMetadata?.installmentGroupId ?? null,
+    installment_number: installmentMetadata?.installmentNumber ?? null,
+    installment_total: installmentMetadata?.installmentTotal ?? null,
+    kind,
+    notes: resolveOccurrenceNotes(installmentMetadata, notes),
+    payment_method_id: paymentMethodId,
+    user_id: userId,
+  };
+}
+
+function buildInstallmentTransactionRows({
+  resolved,
+  plan,
+  notes,
+  userId,
+}: Omit<InstallmentRowContext, "baseDate">) {
+  const [year, month, day] = resolved.date.split("-").map(Number);
   const baseDate = new Date(year, month - 1, day);
-  const rows = Array.from({ length: occurrenceCount }, (_, index) => {
-    const occurrenceDate = addMonthsClamped(baseDate, index);
-    const dateValue = [
-      occurrenceDate.getFullYear(),
-      String(occurrenceDate.getMonth() + 1).padStart(2, "0"),
-      String(occurrenceDate.getDate()).padStart(2, "0"),
-    ].join("-");
-    const installmentMetadata =
-      isInstallmentPurchase && installmentGroupId
-        ? createInstallmentMetadata({
-            groupId: installmentGroupId,
-            installmentNumber: index + 1,
-            installmentTotal: installmentCount,
-          })
-        : null;
-    const scheduleNote = installmentMetadata
-      ? `${installmentMetadata.installmentNumber}/${installmentMetadata.installmentTotal}`
-      : null;
-    const finalNotes =
-      [scheduleNote, notes].filter(Boolean).join(" - ") || null;
-    const rowAmount =
-      index === occurrenceCount - 1
-        ? Number((installmentAmount + installmentRemainder).toFixed(2))
-        : installmentAmount;
+  const context: InstallmentRowContext = {
+    resolved,
+    plan,
+    notes,
+    userId,
+    baseDate,
+  };
 
-    return {
-      amount: rowAmount,
-      category_id: categoryId,
-      date: dateValue,
-      description: installmentMetadata
-        ? `${description} (${index + 1}/${installmentCount})`
-        : description,
-      installment_group_id: installmentMetadata?.installmentGroupId ?? null,
-      installment_number: installmentMetadata?.installmentNumber ?? null,
-      installment_total: installmentMetadata?.installmentTotal ?? null,
-      kind,
-      notes: finalNotes,
-      payment_method_id: paymentMethodId,
-      user_id: userId,
-    };
-  });
+  return Array.from({ length: plan.occurrenceCount }, (_, index) =>
+    buildInstallmentRow(index, context),
+  );
+}
 
-  const userCreatedMonth = getUserCreatedMonth(createdAt);
-  const filteredRows = userCreatedMonth
+function filterRowsByUserCreatedMonth<T extends { date: string }>(
+  rows: T[],
+  userCreatedMonth: string | null,
+): T[] {
+  return userCreatedMonth
     ? rows.filter((row) => row.date.slice(0, 7) >= userCreatedMonth)
     : rows;
+}
 
-  if (filteredRows.length === 0) {
+async function insertTransactionRows(
+  supabase: SupabaseClient,
+  rows: ReturnType<typeof buildInstallmentTransactionRows>,
+) {
+  if (rows.length === 0) {
     throw new Error(
       "Transaction date cannot be earlier than the user creation month.",
     );
   }
 
-  const { error } = await supabase.from("transactions").insert(filteredRows);
+  const { error } = await supabase.from("transactions").insert(rows);
 
   if (error) {
     throw new Error(`Unable to save transaction: ${error.message}`);
   }
+}
+
+export async function createTransaction(input: NewTransactionInput) {
+  const { createdAt, supabase, userId } = await getUserContext();
+  const resolved = resolveNewTransactionInput(input);
+  await Promise.all([
+    assertUserCategory(supabase, userId, resolved.categoryId),
+    assertUserPaymentMethod(supabase, userId, resolved.paymentMethodId),
+  ]);
+  assertValidInstallmentCount(resolved.installmentCount);
+
+  const plan = computeInstallmentPlan(
+    resolved.kind,
+    resolved.amount,
+    resolved.installmentCount,
+  );
+  const notes = normalizeOptionalString(input.notes);
+  const rows = buildInstallmentTransactionRows({
+    resolved,
+    plan,
+    notes,
+    userId,
+  });
+  const filteredRows = filterRowsByUserCreatedMonth(
+    rows,
+    getUserCreatedMonth(createdAt),
+  );
+
+  await insertTransactionRows(supabase, filteredRows);
 }
 
 function parseCreditCardInvoiceId(invoiceId: string) {
@@ -1647,11 +1878,10 @@ function parseCreditCardInvoiceId(invoiceId: string) {
   };
 }
 
-export async function createInvoiceAdvancePayment(
+function resolveInvoiceAdvancePaymentInput(
   input: CreateInvoiceAdvancePaymentInput,
+  createdAt: string | null,
 ) {
-  const ctx = await getUserContext();
-  const { createdAt, supabase, userId } = ctx;
   const amount = Math.abs(input.amount);
   assertPositiveFiniteAmount(amount, "Amount");
 
@@ -1666,6 +1896,20 @@ export async function createInvoiceAdvancePayment(
     "Payment method",
   );
 
+  return { amount, date, month, invoicePaymentMethodId, paymentMethodId };
+}
+
+async function assertValidInvoicePaymentMethod({
+  supabase,
+  userId,
+  invoicePaymentMethodId,
+  paymentMethodId,
+}: {
+  supabase: SupabaseClient;
+  userId: string;
+  invoicePaymentMethodId: string | null;
+  paymentMethodId: string | null;
+}) {
   const [{ data: invoicePaymentMethod, error: invoicePaymentMethodError }] =
     await Promise.all([
       supabase
@@ -1686,7 +1930,19 @@ export async function createInvoiceAdvancePayment(
   if (invoicePaymentMethod?.type !== "credit") {
     throw new Error("Invoice is invalid.");
   }
+}
 
+async function findAdvanceableInvoice({
+  ctx,
+  month,
+  invoiceId,
+  amount,
+}: {
+  ctx: Awaited<ReturnType<typeof getUserContext>>;
+  month: string;
+  invoiceId: string;
+  amount: number;
+}) {
   const invoices = await listTransactions({
     includeCreditCardInvoices: true,
     includeFuture: true,
@@ -1696,7 +1952,7 @@ export async function createInvoiceAdvancePayment(
   });
   const invoice = invoices.find(
     (transaction) =>
-      transaction.isCreditCardInvoice && transaction.id === input.invoiceId,
+      transaction.isCreditCardInvoice && transaction.id === invoiceId,
   );
 
   if (!invoice) {
@@ -1706,6 +1962,30 @@ export async function createInvoiceAdvancePayment(
   if (amount > Math.abs(invoice.amount)) {
     throw new Error("Advance payment cannot exceed the remaining invoice.");
   }
+
+  return invoice;
+}
+
+export async function createInvoiceAdvancePayment(
+  input: CreateInvoiceAdvancePaymentInput,
+) {
+  const ctx = await getUserContext();
+  const { createdAt, supabase, userId } = ctx;
+  const { amount, date, month, invoicePaymentMethodId, paymentMethodId } =
+    resolveInvoiceAdvancePaymentInput(input, createdAt);
+
+  await assertValidInvoicePaymentMethod({
+    supabase,
+    userId,
+    invoicePaymentMethodId,
+    paymentMethodId,
+  });
+  await findAdvanceableInvoice({
+    ctx,
+    month,
+    invoiceId: input.invoiceId,
+    amount,
+  });
 
   const { error } = await supabase.from("transactions").insert({
     amount,
@@ -1721,6 +2001,45 @@ export async function createInvoiceAdvancePayment(
   if (error) {
     throw new Error(`Unable to save invoice advance payment: ${error.message}`);
   }
+}
+
+function buildSubscriptionRows({
+  date,
+  amount,
+  categoryId,
+  description,
+  paymentMethodId,
+  userId,
+}: {
+  date: string;
+  amount: number;
+  categoryId: string | null;
+  description: string;
+  paymentMethodId: string | null;
+  userId: string;
+}) {
+  const [year, month, day] = date.split("-").map(Number);
+  const baseDate = new Date(year, month - 1, day);
+
+  return Array.from({ length: 12 }, (_, index) => {
+    const occurrenceDate = addMonthsClamped(baseDate, index);
+    const dateValue = [
+      occurrenceDate.getFullYear(),
+      String(occurrenceDate.getMonth() + 1).padStart(2, "0"),
+      String(occurrenceDate.getDate()).padStart(2, "0"),
+    ].join("-");
+
+    return {
+      amount,
+      category_id: categoryId,
+      date: dateValue,
+      description,
+      kind: "expense" as DbTransactionKind,
+      notes: `subscription ${index + 1}/12`,
+      payment_method_id: paymentMethodId,
+      user_id: userId,
+    };
+  });
 }
 
 export async function createSubscription(input: CreateSubscriptionInput) {
@@ -1743,26 +2062,13 @@ export async function createSubscription(input: CreateSubscriptionInput) {
     assertUserPaymentMethod(supabase, userId, paymentMethodId),
   ]);
 
-  const [year, month, day] = date.split("-").map(Number);
-  const baseDate = new Date(year, month - 1, day);
-  const rows = Array.from({ length: 12 }, (_, index) => {
-    const occurrenceDate = addMonthsClamped(baseDate, index);
-    const dateValue = [
-      occurrenceDate.getFullYear(),
-      String(occurrenceDate.getMonth() + 1).padStart(2, "0"),
-      String(occurrenceDate.getDate()).padStart(2, "0"),
-    ].join("-");
-
-    return {
-      amount,
-      category_id: categoryId,
-      date: dateValue,
-      description,
-      kind: "expense" as DbTransactionKind,
-      notes: `subscription ${index + 1}/12`,
-      payment_method_id: paymentMethodId,
-      user_id: userId,
-    };
+  const rows = buildSubscriptionRows({
+    date,
+    amount,
+    categoryId,
+    description,
+    paymentMethodId,
+    userId,
   });
 
   const { error } = await supabase.from("transactions").insert(rows);
@@ -1785,9 +2091,11 @@ type SubscriptionOccurrenceRow = {
   id: string;
 };
 
-async function getSubscriptionOccurrences(subscriptionId: string) {
-  assertUuid(subscriptionId, "Subscription");
-  const { supabase, userId } = await getUserContext();
+async function loadSubscriptionReference(
+  supabase: SupabaseClient,
+  userId: string,
+  subscriptionId: string,
+) {
   const { data: reference, error: referenceError } = await supabase
     .from("transactions")
     .select("id, description, category_id, payment_method_id, notes")
@@ -1805,6 +2113,14 @@ async function getSubscriptionOccurrences(subscriptionId: string) {
     throw new Error("Subscription is invalid.");
   }
 
+  return subscription;
+}
+
+async function queryFutureSubscriptionOccurrences(
+  supabase: SupabaseClient,
+  userId: string,
+  subscription: SubscriptionReferenceRow,
+) {
   let query = supabase
     .from("transactions")
     .select("id, date")
@@ -1834,11 +2150,30 @@ async function getSubscriptionOccurrences(subscriptionId: string) {
     throw new Error("No future subscription charges found.");
   }
 
+  return occurrences;
+}
+
+async function getSubscriptionOccurrences(subscriptionId: string) {
+  assertUuid(subscriptionId, "Subscription");
+  const { supabase, userId } = await getUserContext();
+  const subscription = await loadSubscriptionReference(
+    supabase,
+    userId,
+    subscriptionId,
+  );
+  const occurrences = await queryFutureSubscriptionOccurrences(
+    supabase,
+    userId,
+    subscription,
+  );
+
   return { occurrences, subscription, supabase, userId };
 }
 
-export async function updateSubscription(input: UpdateSubscriptionInput) {
-  const { createdAt } = await getUserContext();
+function resolveUpdateSubscriptionInput(
+  input: UpdateSubscriptionInput,
+  createdAt: string | null,
+) {
   const description = assertNonEmptyString(input.description, "Subscription");
   const amount = Math.abs(input.amount);
   assertPositiveFiniteAmount(amount, "Amount");
@@ -1853,6 +2188,70 @@ export async function updateSubscription(input: UpdateSubscriptionInput) {
   assertValidIsoDate(date);
   assertDateNotBeforeUserCreated(date, createdAt);
 
+  return { description, amount, categoryId, paymentMethodId, date };
+}
+
+async function relabelSubscriptionOccurrences(
+  supabase: SupabaseClient,
+  userId: string,
+  occurrences: SubscriptionOccurrenceRow[],
+) {
+  const occurrenceIds = occurrences.map((occurrence) => occurrence.id);
+  const { error } = await supabase
+    .from("transactions")
+    .update({ notes: `subscription ${occurrences.length}/12` })
+    .in("id", occurrenceIds)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(`Unable to update subscription: ${error.message}`);
+  }
+}
+
+async function applySubscriptionOccurrenceUpdates({
+  supabase,
+  userId,
+  occurrences,
+  baseDate,
+  fields,
+}: {
+  supabase: SupabaseClient;
+  userId: string;
+  occurrences: SubscriptionOccurrenceRow[];
+  baseDate: Date;
+  fields: {
+    amount: number;
+    categoryId: string | null;
+    description: string;
+    paymentMethodId: string | null;
+  };
+}) {
+  const results = await Promise.all(
+    occurrences.map((occurrence, index) =>
+      supabase
+        .from("transactions")
+        .update({
+          amount: fields.amount,
+          category_id: fields.categoryId,
+          date: toDateValue(addMonthsClamped(baseDate, index)),
+          description: fields.description,
+          payment_method_id: fields.paymentMethodId,
+        })
+        .eq("id", occurrence.id)
+        .eq("user_id", userId),
+    ),
+  );
+  const error = results.find((result) => result.error)?.error;
+
+  if (error) {
+    throw new Error(`Unable to update subscription: ${error.message}`);
+  }
+}
+
+export async function updateSubscription(input: UpdateSubscriptionInput) {
+  const { createdAt } = await getUserContext();
+  const { description, amount, categoryId, paymentMethodId, date } =
+    resolveUpdateSubscriptionInput(input, createdAt);
   const { occurrences, supabase, userId } = await getSubscriptionOccurrences(
     input.id,
   );
@@ -1864,37 +2263,14 @@ export async function updateSubscription(input: UpdateSubscriptionInput) {
 
   const [year, month, day] = date.split("-").map(Number);
   const baseDate = new Date(year, month - 1, day);
-  const occurrenceIds = occurrences.map((o) => o.id);
-  const { error: notesError } = await supabase
-    .from("transactions")
-    .update({ notes: `subscription ${occurrences.length}/12` })
-    .in("id", occurrenceIds)
-    .eq("user_id", userId);
-
-  if (notesError) {
-    throw new Error(`Unable to update subscription: ${notesError.message}`);
-  }
-
-  const results = await Promise.all(
-    occurrences.map((occurrence, index) =>
-      supabase
-        .from("transactions")
-        .update({
-          amount,
-          category_id: categoryId,
-          date: toDateValue(addMonthsClamped(baseDate, index)),
-          description,
-          payment_method_id: paymentMethodId,
-        })
-        .eq("id", occurrence.id)
-        .eq("user_id", userId),
-    ),
-  );
-  const error = results.find((result) => result.error)?.error;
-
-  if (error) {
-    throw new Error(`Unable to update subscription: ${error.message}`);
-  }
+  await relabelSubscriptionOccurrences(supabase, userId, occurrences);
+  await applySubscriptionOccurrenceUpdates({
+    supabase,
+    userId,
+    occurrences,
+    baseDate,
+    fields: { amount, categoryId, description, paymentMethodId },
+  });
 }
 
 export async function setSubscriptionPaused(
@@ -1970,8 +2346,7 @@ export async function createPaymentMethod(input: CreatePaymentMethodInput) {
   }
 }
 
-export async function updatePaymentMethod(input: UpdatePaymentMethodInput) {
-  assertUuid(input.id, "Payment method");
+function resolveUpdatePaymentMethodInput(input: UpdatePaymentMethodInput) {
   const name = assertNonEmptyString(input.name, "Payment method name");
   const creditLimit = Number(input.creditLimit ?? 0);
   const dueDay = input.type === "credit" ? (input.dueDay ?? null) : null;
@@ -1989,6 +2364,13 @@ export async function updatePaymentMethod(input: UpdatePaymentMethodInput) {
   assertValidMonthDay(dueDay, "Payment method due day");
   assertValidMonthDay(closingDay, "Payment method closing day");
 
+  return { name, creditLimit, dueDay, closingDay, type: input.type };
+}
+
+export async function updatePaymentMethod(input: UpdatePaymentMethodInput) {
+  assertUuid(input.id, "Payment method");
+  const { name, creditLimit, dueDay, closingDay, type } =
+    resolveUpdatePaymentMethodInput(input);
   const { paymentMethod, supabase, userId } = await getPaymentMethodForMutation(
     input.id,
   );
@@ -2004,7 +2386,7 @@ export async function updatePaymentMethod(input: UpdatePaymentMethodInput) {
       credit_limit: creditLimit,
       due_day: dueDay,
       name,
-      type: input.type,
+      type,
     })
     .eq("id", input.id)
     .eq("user_id", userId);
@@ -2034,8 +2416,10 @@ export async function deletePaymentMethod(paymentMethodId: string) {
   }
 }
 
-export async function createGoal(input: CreateGoalInput) {
-  const { createdAt, supabase, userId } = await getUserContext();
+function resolveGoalInput(
+  input: CreateGoalInput | UpdateGoalInput,
+  createdAt: string | null,
+) {
   const name = assertNonEmptyString(input.name, "Goal name");
   const icon = assertNonEmptyString(input.icon, "Goal icon", 32);
   const targetAmount = Number(input.targetAmount);
@@ -2049,6 +2433,14 @@ export async function createGoal(input: CreateGoalInput) {
   assertValidIsoDate(deadline);
   assertDateNotBeforeUserCreated(deadline, createdAt);
   assertValidColor(input.color);
+
+  return { name, icon, targetAmount, currentAmount, deadline };
+}
+
+export async function createGoal(input: CreateGoalInput) {
+  const { createdAt, supabase, userId } = await getUserContext();
+  const { name, icon, targetAmount, currentAmount, deadline } =
+    resolveGoalInput(input, createdAt);
 
   const { error } = await supabase.from("goals").insert({
     color: input.color,
@@ -2068,19 +2460,8 @@ export async function createGoal(input: CreateGoalInput) {
 export async function updateGoal(input: UpdateGoalInput) {
   assertUuid(input.id, "Goal");
   const { createdAt, supabase, userId } = await getUserContext();
-  const name = assertNonEmptyString(input.name, "Goal name");
-  const icon = assertNonEmptyString(input.icon, "Goal icon", 32);
-  const targetAmount = Number(input.targetAmount);
-  const currentAmount = Number(input.currentAmount ?? 0);
-  const deadline = toIsoDate(input.deadline);
-
-  assertPositiveFiniteAmount(targetAmount, "Target amount");
-  if (!Number.isFinite(currentAmount) || currentAmount < 0) {
-    throw new Error("Current amount is invalid.");
-  }
-  assertValidIsoDate(deadline);
-  assertDateNotBeforeUserCreated(deadline, createdAt);
-  assertValidColor(input.color);
+  const { name, icon, targetAmount, currentAmount, deadline } =
+    resolveGoalInput(input, createdAt);
 
   const { error } = await supabase
     .from("goals")
@@ -2205,9 +2586,10 @@ export async function deleteCategory(categoryId: string) {
   }
 }
 
-export async function updateTransaction(input: UpdateTransactionInput) {
-  const { createdAt, supabase, userId } = await getUserContext();
-  assertUuid(input.id, "Transaction");
+function resolveUpdateTransactionInput(
+  input: UpdateTransactionInput,
+  createdAt: string | null,
+) {
   const amount = Math.abs(input.amount);
   const date = toIsoDate(input.date);
   const description = assertNonEmptyString(input.description, "Description");
@@ -2227,6 +2609,22 @@ export async function updateTransaction(input: UpdateTransactionInput) {
   const paymentMethodId =
     input.paymentMethod === "none" ? null : input.paymentMethod;
 
+  return {
+    amount,
+    date,
+    description,
+    categoryId,
+    paymentMethodId,
+    kind: input.type,
+  };
+}
+
+export async function updateTransaction(input: UpdateTransactionInput) {
+  const { createdAt, supabase, userId } = await getUserContext();
+  assertUuid(input.id, "Transaction");
+  const { amount, date, description, categoryId, paymentMethodId, kind } =
+    resolveUpdateTransactionInput(input, createdAt);
+
   await Promise.all([
     assertUserCategory(supabase, userId, categoryId),
     assertUserPaymentMethod(supabase, userId, paymentMethodId),
@@ -2239,7 +2637,7 @@ export async function updateTransaction(input: UpdateTransactionInput) {
       category_id: categoryId,
       date,
       description,
-      kind: input.type,
+      kind,
       notes: input.notes?.trim() || null,
       payment_method_id: paymentMethodId,
     })
@@ -2307,6 +2705,54 @@ async function getInstallmentGroupTransactions(
   return ((data ?? []) as unknown as TransactionRow[]).map(toTransaction);
 }
 
+async function resolveInstallmentIdsToDelete({
+  supabase,
+  userId,
+  input,
+  selectedTransaction,
+}: {
+  supabase: SupabaseClient;
+  userId: string;
+  input: DeleteInstallmentsInput;
+  selectedTransaction: Transaction;
+}) {
+  const installments = await getInstallmentGroupTransactions(
+    supabase,
+    userId,
+    selectedTransaction.installmentGroupId as string,
+  );
+  const selectedInstallments = selectInstallmentsForDeletion({
+    scope: input.scope,
+    selectedTransaction,
+    transactions: installments,
+  });
+
+  return selectedInstallments.map((transaction) => transaction.id);
+}
+
+async function deleteInstallmentsByIds({
+  supabase,
+  userId,
+  installmentGroupId,
+  ids,
+}: {
+  supabase: SupabaseClient;
+  userId: string;
+  installmentGroupId: string;
+  ids: string[];
+}) {
+  const { error } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("user_id", userId)
+    .eq("installment_group_id", installmentGroupId)
+    .in("id", ids);
+
+  if (error) {
+    throw new Error(`Unable to delete installments: ${error.message}`);
+  }
+}
+
 export async function deleteInstallments(input: DeleteInstallmentsInput) {
   assertUuid(input.transactionId, "Transaction");
   const { supabase, userId } = await getUserContext();
@@ -2327,35 +2773,23 @@ export async function deleteInstallments(input: DeleteInstallmentsInput) {
     return;
   }
 
-  const installments = await getInstallmentGroupTransactions(
+  const selectedIds = await resolveInstallmentIdsToDelete({
     supabase,
     userId,
-    selectedTransaction.installmentGroupId as string,
-  );
-  const selectedInstallments = selectInstallmentsForDeletion({
-    scope: input.scope,
+    input,
     selectedTransaction,
-    transactions: installments,
   });
-  const selectedIds = selectedInstallments.map((transaction) => transaction.id);
 
   if (!selectedIds.length) {
     return;
   }
 
-  const { error } = await supabase
-    .from("transactions")
-    .delete()
-    .eq("user_id", userId)
-    .eq(
-      "installment_group_id",
-      selectedTransaction.installmentGroupId as string,
-    )
-    .in("id", selectedIds);
-
-  if (error) {
-    throw new Error(`Unable to delete installments: ${error.message}`);
-  }
+  await deleteInstallmentsByIds({
+    supabase,
+    userId,
+    installmentGroupId: selectedTransaction.installmentGroupId as string,
+    ids: selectedIds,
+  });
 }
 
 export async function advanceInstallments(input: AdvanceInstallmentsInput) {
@@ -2437,9 +2871,6 @@ export async function previewInstallmentPrepayment(
     userId,
     selectedTransaction.installmentGroupId as string,
   );
-  // Always preview the full remaining set (ignore input.count here) so the
-  // UI can let the user pick how many months to advance and compute the
-  // total for that subset locally, without another round trip.
   const selectedInstallments = selectInstallmentsForPrepayment({
     currentMonth: input.targetMonth,
     scope: input.scope ?? "remaining",
@@ -2483,33 +2914,17 @@ function getSubscriptionGroupQuery(
   return query;
 }
 
-export async function deleteSubscriptionOccurrences(
-  input: DeleteSubscriptionOccurrencesInput,
-) {
-  assertUuid(input.transactionId, "Transaction");
-  const { supabase, userId } = await getUserContext();
-  const { data: reference, error: referenceError } = await supabase
-    .from("transactions")
-    .select("id, description, category_id, payment_method_id, notes")
-    .eq("id", input.transactionId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (referenceError) {
-    throw new Error(`Unable to load subscription: ${referenceError.message}`);
-  }
-
-  const subscription = reference as SubscriptionReferenceRow | null;
-
-  if (!subscription?.notes?.startsWith("subscription")) {
-    throw new Error("Subscription is invalid.");
-  }
-
-  if (input.scope === "single") {
-    await deleteTransaction(input.transactionId);
-    return;
-  }
-
+async function resolveSubscriptionOccurrenceIdsToDelete({
+  supabase,
+  userId,
+  subscription,
+  input,
+}: {
+  supabase: SupabaseClient;
+  userId: string;
+  subscription: SubscriptionReferenceRow;
+  input: DeleteSubscriptionOccurrencesInput;
+}) {
   const { data, error } = await getSubscriptionGroupQuery(
     supabase,
     userId,
@@ -2529,24 +2944,54 @@ export async function deleteSubscriptionOccurrences(
     throw new Error("Subscription occurrence not found.");
   }
 
-  const selectedIds = selectSubscriptionOccurrencesForDeletion({
+  return selectSubscriptionOccurrencesForDeletion({
     occurrences,
     scope: input.scope,
     selectedOccurrence,
     today: getTodayValue(),
   }).map((occurrence) => occurrence.id);
+}
 
-  const { error: deleteError } = await supabase
+async function deleteSubscriptionOccurrencesByIds(
+  supabase: SupabaseClient,
+  userId: string,
+  ids: string[],
+) {
+  const { error } = await supabase
     .from("transactions")
     .delete()
     .eq("user_id", userId)
-    .in("id", selectedIds);
+    .in("id", ids);
 
-  if (deleteError) {
-    throw new Error(
-      `Unable to delete subscription charges: ${deleteError.message}`,
-    );
+  if (error) {
+    throw new Error(`Unable to delete subscription charges: ${error.message}`);
   }
+}
+
+export async function deleteSubscriptionOccurrences(
+  input: DeleteSubscriptionOccurrencesInput,
+) {
+  assertUuid(input.transactionId, "Transaction");
+  const { supabase, userId } = await getUserContext();
+  const subscription = await loadSubscriptionReference(
+    supabase,
+    userId,
+    input.transactionId,
+  );
+
+  if (input.scope === "single") {
+    await deleteTransaction(input.transactionId);
+    return;
+  }
+
+  const selectedIds = await resolveSubscriptionOccurrenceIdsToDelete({
+    supabase,
+    userId,
+    subscription,
+    input,
+  });
+
+  await deleteSubscriptionOccurrencesByIds(supabase, userId, selectedIds);
 }
 
 function resolveMonthRange(month: string | undefined, includeFuture: boolean) {
@@ -2672,16 +3117,66 @@ function mergeAdvancedInstallmentRows(
   return merged;
 }
 
+type FetchTransactionRowsParams = {
+  includeFuture: boolean;
+  includePrevious: boolean;
+  limit?: number;
+  monthRange: ReturnType<typeof getMonthRange> | null;
+  queryStart: string | null;
+};
+
+async function resolvePrimaryTransactionRows({
+  supabase,
+  userId,
+  params,
+  data,
+}: {
+  supabase: SupabaseClient;
+  userId: string;
+  params: FetchTransactionRowsParams;
+  data: unknown;
+}) {
+  const rows = [...((data ?? []) as unknown as TransactionRow[])];
+
+  if (!params.monthRange || !params.includeFuture) {
+    return rows;
+  }
+
+  const advancedRows = await fetchAdvancedInstallmentRows(
+    supabase,
+    userId,
+    params.monthRange.month,
+  );
+  return mergeAdvancedInstallmentRows(rows, advancedRows);
+}
+
+async function fetchLegacyTransactionRows(
+  supabase: SupabaseClient,
+  userId: string,
+  params: FetchTransactionRowsParams,
+) {
+  const fallbackQuery = applyTransactionDateRange(
+    supabase
+      .from("transactions")
+      .select(transactionSelectWithoutAdvancedMetadata)
+      .eq("user_id", userId)
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false }),
+    params,
+  );
+  const { data, error } = await fallbackQuery;
+
+  if (error) {
+    throw new Error(`Unable to load transactions: ${error.message}`);
+  }
+
+  return (data ?? []) as unknown as TransactionRow[];
+}
+
 async function fetchTransactionRows(
   supabase: SupabaseClient,
   userId: string,
-  params: {
-    includeFuture: boolean;
-    includePrevious: boolean;
-    limit?: number;
-    monthRange: ReturnType<typeof getMonthRange> | null;
-    queryStart: string | null;
-  },
+  params: FetchTransactionRowsParams,
 ) {
   let query = applyTransactionDateRange(
     supabase
@@ -2700,45 +3195,17 @@ async function fetchTransactionRows(
   const { data, error } = await query;
 
   if (!error) {
-    const rows = [...((data ?? []) as unknown as TransactionRow[])];
-
-    if (!params.monthRange || !params.includeFuture) {
-      return rows;
-    }
-
-    const advancedRows = await fetchAdvancedInstallmentRows(
-      supabase,
-      userId,
-      params.monthRange.month,
-    );
-    return mergeAdvancedInstallmentRows(rows, advancedRows);
+    return resolvePrimaryTransactionRows({ supabase, userId, params, data });
   }
 
   if (error.code !== "42703") {
     throw new Error(`Unable to load transactions: ${error.message}`);
   }
 
-  // Environments that haven't run migration 006 lack the
-  // advanced_at/advanced_to_month columns — retry without them.
-  const fallbackQuery = applyTransactionDateRange(
-    supabase
-      .from("transactions")
-      .select(transactionSelectWithoutAdvancedMetadata)
-      .eq("user_id", userId)
-      .order("date", { ascending: false })
-      .order("created_at", { ascending: false }),
-    params,
-  );
-  const { data: fallbackData, error: fallbackError } = await fallbackQuery;
-
-  if (fallbackError) {
-    throw new Error(`Unable to load transactions: ${fallbackError.message}`);
-  }
-
-  return (fallbackData ?? []) as unknown as TransactionRow[];
+  return fetchLegacyTransactionRows(supabase, userId, params);
 }
 
-export async function listTransactions(options?: {
+type ListTransactionsOptions = {
   includeCreditCardInvoices?: boolean;
   includePausedSubscriptions?: boolean;
   preserveCreditCardInvoicePurchases?: boolean;
@@ -2748,28 +3215,60 @@ export async function listTransactions(options?: {
   useFinancialMonth?: boolean;
   limit?: number;
   userContext?: Awaited<ReturnType<typeof getUserContext>>;
-}) {
-  const ctx = options?.userContext ?? (await getUserContext());
-  const { supabase, userId } = ctx;
-  const includePrevious = options?.includePrevious ?? false;
-  const includeFuture = options?.includeFuture ?? false;
-  const includeCreditCardInvoices = options?.includeCreditCardInvoices ?? false;
-  const useFinancialMonth = options?.useFinancialMonth ?? true;
-  const preserveCreditCardInvoicePurchases =
-    options?.preserveCreditCardInvoicePurchases ?? false;
-  const monthRange = resolveMonthRange(options?.month, includeFuture);
+};
+
+function resolveListTransactionsRangeFlags(options?: ListTransactionsOptions) {
+  return {
+    includePrevious: options?.includePrevious ?? false,
+    includeFuture: options?.includeFuture ?? false,
+  };
+}
+
+function resolveListTransactionsInvoiceFlags(
+  options?: ListTransactionsOptions,
+) {
+  return {
+    includeCreditCardInvoices: options?.includeCreditCardInvoices ?? false,
+    useFinancialMonth: options?.useFinancialMonth ?? true,
+    preserveCreditCardInvoicePurchases:
+      options?.preserveCreditCardInvoicePurchases ?? false,
+  };
+}
+
+function resolveListTransactionsFlags(options?: ListTransactionsOptions) {
+  return {
+    ...resolveListTransactionsRangeFlags(options),
+    ...resolveListTransactionsInvoiceFlags(options),
+  };
+}
+
+function resolveListTransactionsQueryPlan(
+  options: ListTransactionsOptions | undefined,
+  flags: ReturnType<typeof resolveListTransactionsFlags>,
+) {
+  const monthRange = resolveMonthRange(options?.month, flags.includeFuture);
   const queryStart = resolveQueryStart(
     monthRange,
-    useFinancialMonth,
-    includeCreditCardInvoices,
+    flags.useFinancialMonth,
+    flags.includeCreditCardInvoices,
   );
-  const filterByMonth = useFinancialMonth
+  const filterByMonth = flags.useFinancialMonth
     ? filterByFinancialMonth
     : filterByTransactionMonth;
 
+  return { monthRange, queryStart, filterByMonth };
+}
+
+export async function listTransactions(options?: ListTransactionsOptions) {
+  const ctx = options?.userContext ?? (await getUserContext());
+  const { supabase, userId } = ctx;
+  const flags = resolveListTransactionsFlags(options);
+  const { monthRange, queryStart, filterByMonth } =
+    resolveListTransactionsQueryPlan(options, flags);
+
   const rows = await fetchTransactionRows(supabase, userId, {
-    includeFuture,
-    includePrevious,
+    includeFuture: flags.includeFuture,
+    includePrevious: flags.includePrevious,
     limit: options?.limit,
     monthRange,
     queryStart,
@@ -2777,12 +3276,13 @@ export async function listTransactions(options?: {
 
   return finalizeTransactionRows(rows, {
     filterByMonth,
-    includeCreditCardInvoices,
-    includeFuture,
+    includeCreditCardInvoices: flags.includeCreditCardInvoices,
+    includeFuture: flags.includeFuture,
     includePausedSubscriptions: options?.includePausedSubscriptions,
-    includePrevious,
+    includePrevious: flags.includePrevious,
     monthRange,
-    preserveCreditCardInvoicePurchases,
+    preserveCreditCardInvoicePurchases:
+      flags.preserveCreditCardInvoicePurchases,
   });
 }
 
@@ -2816,7 +3316,11 @@ function sumTransactionsByType(
 export async function getMonthlySummary(
   month?: string,
   userContext?: Awaited<ReturnType<typeof getUserContext>>,
-): Promise<{ totalIncome: number; totalExpenses: number; totalSavings: number }> {
+): Promise<{
+  totalIncome: number;
+  totalExpenses: number;
+  totalSavings: number;
+}> {
   const selectedMonth = normalizeMonthValue(month);
   const ctx = userContext ?? (await getUserContext());
   const transactions = await listTransactions({
@@ -2842,8 +3346,6 @@ function mergeLatestTransactions(
     byId.set(transaction.id, transaction);
   }
 
-  // Scheduled (future) transactions fill in gaps only — an actual
-  // transaction for the same id always takes precedence.
   for (const transaction of scheduledTransactions) {
     if (!byId.has(transaction.id)) {
       byId.set(transaction.id, {
@@ -2870,14 +3372,11 @@ function getPercentageChange(currentValue: number, previousValue: number) {
   );
 }
 
-export async function getDashboardData(
-  month?: string,
-  userContext?: Awaited<ReturnType<typeof getUserContext>>,
-): Promise<DashboardData> {
-  const selectedMonth = normalizeMonthValue(month);
-  const previousMonth = getPreviousMonthValue(selectedMonth);
-  const monthBuckets = getLastSixMonthKeys(selectedMonth);
-  const ctx = userContext ?? (await getUserContext());
+async function fetchDashboardTransactionSets(
+  selectedMonth: string,
+  previousMonth: string,
+  ctx: Awaited<ReturnType<typeof getUserContext>>,
+) {
   const [
     transactions,
     previousTransactions,
@@ -2885,9 +3384,6 @@ export async function getDashboardData(
     trendTransactions,
     displayTransactions,
     displayScheduledTransactions,
-    totalSaved,
-    previousTotalSaved,
-    { categories, paymentMethods },
   ] = await Promise.all([
     listTransactions({ month: selectedMonth, userContext: ctx }),
     listTransactions({ month: previousMonth, userContext: ctx }),
@@ -2912,17 +3408,53 @@ export async function getDashboardData(
       month: selectedMonth,
       userContext: ctx,
     }),
-    getTotalSavedForMonth(selectedMonth, ctx),
-    getTotalSavedForMonth(previousMonth, ctx),
-    getTransactionFormOptions({ userContext: ctx }),
   ]);
-  const trendExpenseTransactions = trendTransactions.filter(
-    (transaction) => transaction.type === "expense",
-  );
-  const scheduledExpenseTransactions = scheduledTransactions.filter(
-    (transaction) => transaction.type === "expense",
-  );
 
+  return {
+    transactions,
+    previousTransactions,
+    scheduledTransactions,
+    trendTransactions,
+    displayTransactions,
+    displayScheduledTransactions,
+  };
+}
+
+async function fetchDashboardSourceData(
+  selectedMonth: string,
+  previousMonth: string,
+  ctx: Awaited<ReturnType<typeof getUserContext>>,
+) {
+  const [transactionSets, totalSaved, previousTotalSaved, formOptions] =
+    await Promise.all([
+      fetchDashboardTransactionSets(selectedMonth, previousMonth, ctx),
+      getTotalSavedForMonth(selectedMonth, ctx),
+      getTotalSavedForMonth(previousMonth, ctx),
+      getTransactionFormOptions({ userContext: ctx }),
+    ]);
+
+  return {
+    ...transactionSets,
+    totalSaved,
+    previousTotalSaved,
+    categories: formOptions.categories,
+    paymentMethods: formOptions.paymentMethods,
+  };
+}
+
+function buildDashboardSummaryData({
+  transactions,
+  previousTransactions,
+  scheduledExpenseTransactions,
+  totalSaved,
+  previousTotalSaved,
+}: {
+  transactions: Transaction[];
+  previousTransactions: Transaction[];
+  scheduledExpenseTransactions: Transaction[];
+  totalSaved: number;
+  previousTotalSaved: number;
+}) {
   const totalIncome = sumTransactionsByType(transactions, "income");
   const totalExpenses = sumTransactionsByType(transactions, "expense");
   const totalMonthSavings = sumTransactionsByType(transactions, "saving");
@@ -2938,19 +3470,27 @@ export async function getDashboardData(
     (sum, transaction) => sum + Math.abs(transaction.amount),
     0,
   );
-  const actualUsageByGroup = sumBudgetUsageByGroup(transactions);
-  const plannedUsageByGroup = sumBudgetUsageByGroup(scheduledTransactions);
-  const budgetData = calculateBudgetData(
+
+  return {
+    currentBalance: totalIncome - totalExpenses - totalMonthSavings,
+    predictedExpenses,
+    totalExpenses,
     totalIncome,
-    actualUsageByGroup,
-    plannedUsageByGroup,
-  );
+    totalSaved,
+    trends: {
+      totalExpenses: getPercentageChange(totalExpenses, previousTotalExpenses),
+      totalIncome: getPercentageChange(totalIncome, previousTotalIncome),
+      totalSaved: getPercentageChange(totalSaved, previousTotalSaved),
+    },
+  };
+}
 
-  const expensesByCategory = buildExpensesByCategoryData(
-    scheduledTransactions,
-  );
-
-  const expensesOverTime = monthBuckets.map((monthBucket) => ({
+function buildExpensesOverTimeData(
+  monthBuckets: ReturnType<typeof getLastSixMonthKeys>,
+  trendExpenseTransactions: Transaction[],
+  scheduledExpenseTransactions: Transaction[],
+) {
+  return monthBuckets.map((monthBucket) => ({
     amount: trendExpenseTransactions
       .filter(
         (transaction) => getFinancialMonth(transaction) === monthBucket.key,
@@ -2963,16 +3503,42 @@ export async function getDashboardData(
       .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0),
     monthKey: monthBucket.monthKey,
   }));
+}
 
-  const dailyExpensesOverTime = transactions
+function buildDailyExpensesOverTime(transactions: Transaction[]) {
+  return transactions
     .filter((transaction) => transaction.type === "expense")
     .map((transaction) => ({
       amount: Math.abs(transaction.amount),
       date: transaction.date,
     }))
     .sort((left, right) => left.date.localeCompare(right.date));
+}
 
-  const budgetSplitData = [
+function buildDashboardBudgetContext(
+  transactions: Transaction[],
+  scheduledTransactions: Transaction[],
+  trendTransactions: Transaction[],
+) {
+  const trendExpenseTransactions = trendTransactions.filter(
+    (transaction) => transaction.type === "expense",
+  );
+  const scheduledExpenseTransactions = scheduledTransactions.filter(
+    (transaction) => transaction.type === "expense",
+  );
+  const budgetData = calculateBudgetData(
+    sumTransactionsByType(transactions, "income"),
+    sumBudgetUsageByGroup(transactions),
+    sumBudgetUsageByGroup(scheduledTransactions),
+  );
+
+  return { trendExpenseTransactions, scheduledExpenseTransactions, budgetData };
+}
+
+function buildDashboardBudgetSplitData(
+  budgetData: ReturnType<typeof calculateBudgetData>,
+) {
+  return [
     {
       amount: budgetData.needs.spent,
       color: groupColors.needs,
@@ -3001,38 +3567,112 @@ export async function getDashboardData(
       value: 20,
     },
   ];
+}
+
+function assembleDashboardData({
+  monthBuckets,
+  sourceData,
+  budgetContext,
+}: {
+  monthBuckets: ReturnType<typeof getLastSixMonthKeys>;
+  sourceData: Awaited<ReturnType<typeof fetchDashboardSourceData>>;
+  budgetContext: ReturnType<typeof buildDashboardBudgetContext>;
+}): DashboardData {
+  const { transactions, previousTransactions, scheduledTransactions, displayTransactions, displayScheduledTransactions, totalSaved, previousTotalSaved, categories, paymentMethods } = sourceData;
+  const { trendExpenseTransactions, scheduledExpenseTransactions, budgetData } = budgetContext;
 
   return {
     budgetData,
-    budgetSplitData,
+    budgetSplitData: buildDashboardBudgetSplitData(budgetData),
     categories,
-    dailyExpensesOverTime,
-    expensesByCategory,
-    expensesOverTime,
-    // Merge recent actual transactions with scheduled (future) transactions,
-    // marking scheduled ones with `isPlanned` so the UI can render them faded.
+    dailyExpensesOverTime: buildDailyExpensesOverTime(transactions),
+    expensesByCategory: buildExpensesByCategoryData(scheduledTransactions),
+    expensesOverTime: buildExpensesOverTimeData(
+      monthBuckets,
+      trendExpenseTransactions,
+      scheduledExpenseTransactions,
+    ),
     latestTransactions: mergeLatestTransactions(
       displayTransactions,
       displayScheduledTransactions,
       getTodayValue(),
     ),
     paymentMethods,
-    summaryData: {
-      currentBalance: totalIncome - totalExpenses - totalMonthSavings,
-      predictedExpenses,
-      totalExpenses,
-      totalIncome,
+    summaryData: buildDashboardSummaryData({
+      transactions,
+      previousTransactions,
+      scheduledExpenseTransactions,
       totalSaved,
-      trends: {
-        totalExpenses: getPercentageChange(
-          totalExpenses,
-          previousTotalExpenses,
-        ),
-        totalIncome: getPercentageChange(totalIncome, previousTotalIncome),
-        totalSaved: getPercentageChange(totalSaved, previousTotalSaved),
-      },
-    },
+      previousTotalSaved,
+    }),
   };
+}
+
+export async function getDashboardData(
+  month?: string,
+  userContext?: Awaited<ReturnType<typeof getUserContext>>,
+): Promise<DashboardData> {
+  const selectedMonth = normalizeMonthValue(month);
+  const previousMonth = getPreviousMonthValue(selectedMonth);
+  const monthBuckets = getLastSixMonthKeys(selectedMonth);
+  const ctx = userContext ?? (await getUserContext());
+  const sourceData = await fetchDashboardSourceData(selectedMonth, previousMonth, ctx);
+  const budgetContext = buildDashboardBudgetContext(
+    sourceData.transactions,
+    sourceData.scheduledTransactions,
+    sourceData.trendTransactions,
+  );
+
+  return assembleDashboardData({ monthBuckets, sourceData, budgetContext });
+}
+
+function buildMonthlyReports({
+  periodBuckets,
+  transactionMonthPairs,
+  baselineNetWorth,
+  bucketNetWorths,
+}: {
+  periodBuckets: ReturnType<typeof getLastMonthKeys>;
+  transactionMonthPairs: { financialMonth: string; transaction: Transaction }[];
+  baselineNetWorth: number;
+  bucketNetWorths: number[];
+}) {
+  const previousNetWorths = [baselineNetWorth, ...bucketNetWorths.slice(0, -1)];
+
+  return periodBuckets.map((bucket, index) => {
+    const monthTransactions = transactionMonthPairs
+      .filter((pair) => pair.financialMonth === bucket.key)
+      .map((pair) => pair.transaction);
+    const summary = getMonthlyFinanceSummary(monthTransactions);
+    const netWorth = bucketNetWorths[index];
+
+    return {
+      ...summary,
+      month: bucket.key,
+      monthKey: bucket.monthKey,
+      netWorth,
+      savings: netWorth - previousNetWorths[index],
+      year: bucket.year,
+    };
+  });
+}
+
+function buildReportTransactions(
+  transactionMonthPairs: { financialMonth: string; transaction: Transaction }[],
+  periodMonthSet: Set<string>,
+) {
+  return transactionMonthPairs
+    .filter((pair) => periodMonthSet.has(pair.financialMonth))
+    .map(({ financialMonth, transaction }) => ({
+      amount: Math.abs(transaction.amount),
+      category: transaction.categoryKey,
+      date: transaction.date,
+      description: transaction.descriptionKey,
+      financialMonth,
+      paymentMethod: transaction.paymentMethodKey ?? null,
+      type: transaction.type,
+    }))
+    .sort((left, right) => right.date.localeCompare(left.date));
 }
 
 export async function getReportsData(
@@ -3059,43 +3699,22 @@ export async function getReportsData(
     getTotalSavedForMonth(baselineMonth, ctx),
     ...periodBuckets.map((bucket) => getTotalSavedForMonth(bucket.key, ctx)),
   ]);
-  const previousNetWorths = [baselineNetWorth, ...bucketNetWorths.slice(0, -1)];
 
-  const monthlyReports = periodBuckets.map((bucket, index) => {
-    const monthTransactions = transactionMonthPairs
-      .filter((pair) => pair.financialMonth === bucket.key)
-      .map((pair) => pair.transaction);
-    const summary = getMonthlyFinanceSummary(monthTransactions);
-    const netWorth = bucketNetWorths[index];
-
-    return {
-      ...summary,
-      month: bucket.key,
-      monthKey: bucket.monthKey,
-      netWorth,
-      savings: netWorth - previousNetWorths[index],
-      year: bucket.year,
-    };
+  const monthlyReports = buildMonthlyReports({
+    periodBuckets,
+    transactionMonthPairs,
+    baselineNetWorth,
+    bucketNetWorths,
   });
-
-  const reportTransactions = transactionMonthPairs
-    .filter((pair) => periodMonthSet.has(pair.financialMonth))
-    .map(({ financialMonth, transaction }) => ({
-      amount: Math.abs(transaction.amount),
-      category: transaction.categoryKey,
-      date: transaction.date,
-      description: transaction.descriptionKey,
-      financialMonth,
-      paymentMethod: transaction.paymentMethodKey ?? null,
-      type: transaction.type,
-    }))
-    .sort((left, right) => right.date.localeCompare(left.date));
 
   return {
     monthlyReports: monthlyReports.toReversed(),
     periodMonths: safePeriodMonths,
     selectedMonth,
-    transactions: reportTransactions,
+    transactions: buildReportTransactions(
+      transactionMonthPairs,
+      periodMonthSet,
+    ),
   };
 }
 

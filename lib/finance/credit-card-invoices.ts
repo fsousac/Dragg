@@ -119,7 +119,7 @@ export function extractInstallmentLabel(transaction: Transaction) {
   return (
     getInstallmentLabel(transaction) ??
     transaction.notes?.match(/\b\d+\/\d+\b/)?.[0] ??
-    transaction.descriptionKey.match(/\b\d+\/\d+\b/)?.[0] ??
+    new RegExp(/\b\d+\/\d+\b/).exec(transaction.descriptionKey)?.[0] ??
     null
   );
 }
@@ -137,6 +137,142 @@ function toInvoicePurchase(
   };
 }
 
+function getInvoicePurchases(options: {
+  cycle: { closingDate: string; startsAt: string };
+  month: string;
+  paymentMethod: CreditCardInvoicePaymentMethod;
+  transactions: Transaction[];
+}): Transaction[] {
+  const { cycle, month, paymentMethod, transactions } = options;
+
+  return transactions
+    .filter(
+      (transaction) =>
+        transaction.paymentMethodId === paymentMethod.id &&
+        transaction.paymentMethodType === "credit" &&
+        transaction.type === "expense" &&
+        !getInvoiceAdvancePaymentInvoiceId(transaction) &&
+        (transaction.advancedToMonth
+          ? transaction.advancedToMonth === month
+          : transaction.date >= cycle.startsAt &&
+            transaction.date <= cycle.closingDate),
+    )
+    .sort((left, right) => left.date.localeCompare(right.date));
+}
+
+function getInvoicePaidAmount(
+  transactions: Transaction[],
+  invoiceId: string,
+): number {
+  return transactions
+    .filter(
+      (transaction) =>
+        transaction.type === "expense" &&
+        getInvoiceAdvancePaymentInvoiceId(transaction) === invoiceId,
+    )
+    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+}
+
+function buildCreditCardInvoiceTransaction(options: {
+  cycle: { closingDate: string; dueDate: string; startsAt: string };
+  invoiceId: string;
+  paidAmount: number;
+  paymentMethod: CreditCardInvoicePaymentMethod;
+  purchases: Transaction[];
+  totalAmount: number;
+}): CreditCardInvoiceTransaction {
+  const {
+    cycle,
+    invoiceId,
+    paidAmount,
+    paymentMethod,
+    purchases,
+    totalAmount,
+  } = options;
+  const remainingAmount = Number(
+    Math.max(totalAmount - paidAmount, 0).toFixed(2),
+  );
+
+  return {
+    amount: -remainingAmount,
+    categoryId: null,
+    categoryKey: "transaction.creditCardInvoice",
+    date: cycle.dueDate,
+    descriptionKey: "transaction.creditCardInvoice",
+    group: "needs",
+    icon: "💳",
+    id: invoiceId,
+    invoice: {
+      closingDate: cycle.closingDate,
+      dueDate: cycle.dueDate,
+      paidAmount: Number(paidAmount.toFixed(2)),
+      paymentMethodKey: paymentMethod.labelKey,
+      purchases: purchases.map(toInvoicePurchase),
+      totalAmount: Number(totalAmount.toFixed(2)),
+      startsAt: cycle.startsAt,
+    },
+    isCreditCardInvoice: true,
+    isPlanned: true,
+    notes: null,
+    paymentMethodId: paymentMethod.id,
+    paymentMethodKey: paymentMethod.labelKey,
+    paymentMethodClosingDay: paymentMethod.closingDay ?? null,
+    paymentMethodDueDay: paymentMethod.dueDay,
+    paymentMethodType: "credit",
+    type: "expense",
+  } satisfies CreditCardInvoiceTransaction;
+}
+
+function buildInvoicesForPaymentMethod(options: {
+  month: string;
+  paymentMethod: CreditCardInvoicePaymentMethod;
+  purchaseIds: Set<string>;
+  transactions: Transaction[];
+}): CreditCardInvoiceTransaction[] {
+  const { month, paymentMethod, purchaseIds, transactions } = options;
+
+  if (paymentMethod.dueDay == null) {
+    return [];
+  }
+
+  const invoiceId = getCreditCardInvoiceId(paymentMethod.id, month);
+  const cycle = getCreditCardInvoiceCycle({
+    closingDay: paymentMethod.closingDay,
+    dueDay: paymentMethod.dueDay,
+    month,
+  });
+  const purchases = getInvoicePurchases({
+    cycle,
+    month,
+    paymentMethod,
+    transactions,
+  });
+
+  if (!purchases.length) {
+    return [];
+  }
+
+  for (const purchase of purchases) {
+    purchaseIds.add(purchase.id);
+  }
+
+  const totalAmount = purchases.reduce(
+    (sum, transaction) => sum + Math.abs(transaction.amount),
+    0,
+  );
+  const paidAmount = getInvoicePaidAmount(transactions, invoiceId);
+  const invoiceTransaction = buildCreditCardInvoiceTransaction({
+    cycle,
+    invoiceId,
+    paidAmount,
+    paymentMethod,
+    purchases,
+    totalAmount,
+  });
+
+  return invoiceTransaction.amount === 0 ? [] : [invoiceTransaction];
+}
+
 export function createCreditCardInvoiceTransactions(options: {
   month: string;
   paymentMethods: CreditCardInvoicePaymentMethod[];
@@ -146,88 +282,14 @@ export function createCreditCardInvoiceTransactions(options: {
   purchaseIds: Set<string>;
 } {
   const purchaseIds = new Set<string>();
-  const invoices = options.paymentMethods.flatMap((paymentMethod) => {
-    if (paymentMethod.dueDay == null) {
-      return [];
-    }
-    const invoiceId = getCreditCardInvoiceId(paymentMethod.id, options.month);
-    const cycle = getCreditCardInvoiceCycle({
-      closingDay: paymentMethod.closingDay,
-      dueDay: paymentMethod.dueDay,
+  const invoices = options.paymentMethods.flatMap((paymentMethod) =>
+    buildInvoicesForPaymentMethod({
       month: options.month,
-    });
-    const purchases = options.transactions
-      .filter(
-        (transaction) =>
-          transaction.paymentMethodId === paymentMethod.id &&
-          transaction.paymentMethodType === "credit" &&
-          transaction.type === "expense" &&
-          !getInvoiceAdvancePaymentInvoiceId(transaction) &&
-          (transaction.advancedToMonth
-            ? transaction.advancedToMonth === options.month
-            : transaction.date >= cycle.startsAt &&
-              transaction.date <= cycle.closingDate),
-      )
-      .sort((left, right) => left.date.localeCompare(right.date));
-
-    if (!purchases.length) {
-      return [];
-    }
-
-    for (const purchase of purchases) {
-      purchaseIds.add(purchase.id);
-    }
-
-    const totalAmount = purchases.reduce(
-      (sum, transaction) => sum + Math.abs(transaction.amount),
-      0,
-    );
-    const paidAmount = options.transactions
-      .filter(
-        (transaction) =>
-          transaction.type === "expense" &&
-          getInvoiceAdvancePaymentInvoiceId(transaction) === invoiceId,
-      )
-      .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
-    const remainingAmount = Number(
-      Math.max(totalAmount - paidAmount, 0).toFixed(2),
-    );
-
-    if (remainingAmount <= 0) {
-      return [];
-    }
-
-    return [
-      {
-        amount: -remainingAmount,
-        categoryId: null,
-        categoryKey: "transaction.creditCardInvoice",
-        date: cycle.dueDate,
-        descriptionKey: "transaction.creditCardInvoice",
-        group: "needs",
-        icon: "💳",
-        id: invoiceId,
-        invoice: {
-          closingDate: cycle.closingDate,
-          dueDate: cycle.dueDate,
-          paidAmount: Number(paidAmount.toFixed(2)),
-          paymentMethodKey: paymentMethod.labelKey,
-          purchases: purchases.map(toInvoicePurchase),
-          totalAmount: Number(totalAmount.toFixed(2)),
-          startsAt: cycle.startsAt,
-        },
-        isCreditCardInvoice: true,
-        isPlanned: true,
-        notes: null,
-        paymentMethodId: paymentMethod.id,
-        paymentMethodKey: paymentMethod.labelKey,
-        paymentMethodClosingDay: paymentMethod.closingDay ?? null,
-        paymentMethodDueDay: paymentMethod.dueDay,
-        paymentMethodType: "credit",
-        type: "expense",
-      } satisfies CreditCardInvoiceTransaction,
-    ];
-  });
+      paymentMethod,
+      purchaseIds,
+      transactions: options.transactions,
+    }),
+  );
 
   return { invoices, purchaseIds };
 }

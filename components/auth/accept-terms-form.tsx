@@ -7,6 +7,20 @@ import { TermsAcceptanceCheckbox } from "@/components/auth/terms-acceptance-chec
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 
+function AcceptTermsHeader() {
+  const { t } = useI18n();
+  return (
+    <div className="space-y-3">
+      <h1 className="text-2xl font-bold tracking-normal text-white">
+        {t("auth.acceptTermsTitle")}
+      </h1>
+      <p className="text-sm leading-6 text-zinc-300">
+        {t("auth.acceptTermsDescription")}
+      </p>
+    </div>
+  );
+}
+
 export function AcceptTermsForm({
   acceptTermsAction,
 }: Readonly<{ acceptTermsAction: () => Promise<void> }>) {
@@ -26,14 +40,7 @@ export function AcceptTermsForm({
 
   return (
     <section className="w-full max-w-md rounded-lg border border-white/10 bg-zinc-950/88 p-6 shadow-2xl shadow-green-950/30 backdrop-blur md:p-8">
-      <div className="space-y-3">
-        <h1 className="text-2xl font-bold tracking-normal text-white">
-          {t("auth.acceptTermsTitle")}
-        </h1>
-        <p className="text-sm leading-6 text-zinc-300">
-          {t("auth.acceptTermsDescription")}
-        </p>
-      </div>
+      <AcceptTermsHeader />
 
       <form
         action={acceptTermsAction}

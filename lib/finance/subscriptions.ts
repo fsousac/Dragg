@@ -20,14 +20,14 @@ export type SubscriptionOverviewItem = {
   status: "active" | "paused";
 };
 
-// The same logical subscription gets a different `id` (an arbitrary
-// occurrence's transaction id) depending on which query built the list, so
-// UI code that needs to match a subscription across "Assinaturas do mês"
-// and "Assinaturas ativas" must key off this instead of `id`.
 export function getSubscriptionMatchKey(
   subscription: Pick<
     SubscriptionOverviewItem,
-    "categoryId" | "categoryKey" | "name" | "paymentMethodId" | "paymentMethodKey"
+    | "categoryId"
+    | "categoryKey"
+    | "name"
+    | "paymentMethodId"
+    | "paymentMethodKey"
   >,
 ) {
   return [
@@ -37,8 +37,52 @@ export function getSubscriptionMatchKey(
   ].join("|");
 }
 
-// Pure grouping logic behind listSubscriptionOverview (lib/finance/transactions.ts),
-// split out so it can be unit tested without mocking Supabase.
+function createSubscriptionOverviewItem(
+  transaction: Transaction,
+): SubscriptionOverviewItem {
+  return {
+    amount: Math.abs(transaction.amount),
+    categoryId: transaction.categoryId,
+    categoryKey: transaction.categoryKey,
+    frequency: "monthly",
+    icon: transaction.icon,
+    id: transaction.id,
+    name: transaction.descriptionKey,
+    nextDate: transaction.date,
+    paymentMethodId: transaction.paymentMethodId,
+    paymentMethodKey: transaction.paymentMethodKey,
+    status: transaction.notes?.includes("paused") ? "paused" : "active",
+  };
+}
+
+function applySubscriptionOccurrence(
+  existingSubscription: SubscriptionOverviewItem,
+  transaction: Transaction,
+  today: string,
+): void {
+  const isFutureOrToday = transaction.date >= today;
+
+  if (
+    isFutureOrToday &&
+    transaction.notes?.includes("paused") &&
+    existingSubscription.status === "active"
+  ) {
+    existingSubscription.status = "paused";
+  }
+
+  if (isFutureOrToday) {
+    if (
+      existingSubscription.nextDate < today ||
+      transaction.date < existingSubscription.nextDate
+    ) {
+      existingSubscription.nextDate = transaction.date;
+      existingSubscription.amount = Math.abs(transaction.amount);
+    }
+  } else {
+    existingSubscription.amount = Math.abs(transaction.amount);
+  }
+}
+
 export function buildSubscriptionOverview(
   transactions: Transaction[],
   today: string,
@@ -57,44 +101,16 @@ export function buildSubscriptionOverview(
       paymentMethodKey: transaction.paymentMethodKey,
     });
     const existingSubscription = groupedSubscriptions.get(groupKey);
-    const isFutureOrToday = transaction.date >= today;
 
     if (!existingSubscription) {
-      groupedSubscriptions.set(groupKey, {
-        amount: Math.abs(transaction.amount),
-        categoryId: transaction.categoryId,
-        categoryKey: transaction.categoryKey,
-        frequency: "monthly",
-        icon: transaction.icon,
-        id: transaction.id,
-        name: transaction.descriptionKey,
-        nextDate: transaction.date,
-        paymentMethodId: transaction.paymentMethodId,
-        paymentMethodKey: transaction.paymentMethodKey,
-        status: transaction.notes?.includes("paused") ? "paused" : "active",
-      });
+      groupedSubscriptions.set(
+        groupKey,
+        createSubscriptionOverviewItem(transaction),
+      );
       continue;
     }
 
-    if (
-      isFutureOrToday &&
-      transaction.notes?.includes("paused") &&
-      existingSubscription.status === "active"
-    ) {
-      existingSubscription.status = "paused";
-    }
-
-    if (isFutureOrToday) {
-      if (
-        existingSubscription.nextDate < today ||
-        transaction.date < existingSubscription.nextDate
-      ) {
-        existingSubscription.nextDate = transaction.date;
-        existingSubscription.amount = Math.abs(transaction.amount);
-      }
-    } else {
-      existingSubscription.amount = Math.abs(transaction.amount);
-    }
+    applySubscriptionOccurrence(existingSubscription, transaction, today);
   }
 
   return [...groupedSubscriptions.values()].filter(
@@ -103,8 +119,7 @@ export function buildSubscriptionOverview(
 }
 
 export type SubscriptionOccurrenceDeleteScope =
-  | "single"
-  | "this_and_following_unpaid";
+  "single" | "this_and_following_unpaid";
 
 export function isPausedSubscriptionOccurrence(
   occurrence: SubscriptionOccurrenceLike,

@@ -62,6 +62,46 @@ export function meetsPasswordComplexityRules(password: string) {
   return Object.values(getPasswordRequirementChecks(password)).every(Boolean);
 }
 
+function trimmed(value?: string) {
+  return value?.trim() ?? "";
+}
+
+function validateAuthEmail(email: string) {
+  if (!email) {
+    return "auth.emailRequired";
+  }
+
+  if (!isValidEmail(email)) {
+    return "auth.invalidEmail";
+  }
+
+  return undefined;
+}
+
+function validateAuthPassword(mode: EmailPasswordAuthMode, password: string) {
+  if (mode === "reset") {
+    return undefined;
+  }
+
+  if (!password) {
+    return "auth.passwordRequired";
+  }
+
+  if (mode !== "signUp") {
+    return undefined;
+  }
+
+  if (password.length < authPasswordMinLength) {
+    return "auth.passwordMinLength";
+  }
+
+  if (!meetsPasswordComplexityRules(password)) {
+    return "auth.passwordRequirements";
+  }
+
+  return undefined;
+}
+
 export function validateEmailPasswordAuth({
   acceptedTerms,
   confirmPassword,
@@ -72,31 +112,20 @@ export function validateEmailPasswordAuth({
   password,
 }: EmailPasswordAuthValidationInput): EmailPasswordAuthValidationResult {
   const errors: EmailPasswordAuthValidationResult["errors"] = {};
-  const normalizedEmail = email?.trim() ?? "";
+  const normalizedEmail = trimmed(email);
   const normalizedPassword = password ?? "";
   const normalizedConfirmPassword = confirmPassword ?? "";
-  const normalizedFirstName = firstName?.trim() ?? "";
-  const normalizedLastName = lastName?.trim() ?? "";
+  const normalizedFirstName = trimmed(firstName);
+  const normalizedLastName = trimmed(lastName);
 
-  if (!normalizedEmail) {
-    errors.email = "auth.emailRequired";
-  } else if (!isValidEmail(normalizedEmail)) {
-    errors.email = "auth.invalidEmail";
+  const emailError = validateAuthEmail(normalizedEmail);
+  if (emailError) {
+    errors.email = emailError;
   }
 
-  if (mode !== "reset") {
-    if (!normalizedPassword) {
-      // eslint-disable-next-line sonarjs/no-hardcoded-passwords -- i18n key, not a credential; NOSONAR
-      errors.password = "auth.passwordRequired";
-    } else if (mode === "signUp") {
-      if (normalizedPassword.length < authPasswordMinLength) {
-        // eslint-disable-next-line sonarjs/no-hardcoded-passwords -- i18n key, not a credential; NOSONAR
-        errors.password = "auth.passwordMinLength";
-      } else if (!meetsPasswordComplexityRules(normalizedPassword)) {
-        // eslint-disable-next-line sonarjs/no-hardcoded-passwords -- i18n key, not a credential; NOSONAR
-        errors.password = "auth.passwordRequirements";
-      }
-    }
+  const passwordError = validateAuthPassword(mode, normalizedPassword);
+  if (passwordError) {
+    errors.password = passwordError;
   }
 
   if (mode === "signUp") {

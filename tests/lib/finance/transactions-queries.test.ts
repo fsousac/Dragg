@@ -567,7 +567,13 @@ describe("getPaymentsDueData", () => {
   });
 
   it("sorts multiple invoices by due date and marks a far-future bill as 'planned'", async () => {
-    const farFuture = new Date(now.getTime() + 10 * 86400000)
+    // ponytail: clamped to stay inside CURRENT_MONTH (getPaymentsDueData
+    // filters by calendar month), narrower than a fixed +10 days near
+    // month-end but same acceptable trade-off as NEXT_STATUS_DUE_DAY above.
+    const farFutureDay = Math.min(now.getUTCDate() + 10, daysInCurrentMonth);
+    const farFuture = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), farFutureDay),
+    )
       .toISOString()
       .slice(0, 10);
     const rows = [

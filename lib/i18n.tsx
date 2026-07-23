@@ -1358,6 +1358,39 @@ function resolveCurrency(
   return locale === "pt-BR" ? "BRL" : "USD";
 }
 
+function readStoredLocalePreferences(): { currency: Currency; locale: Locale } {
+  const storedLocale = window.localStorage.getItem(localeStorageKey);
+  const locale = storedLocale
+    ? resolveLocale(storedLocale)
+    : resolveLocale(window.navigator.language);
+  const storedCurrency = window.localStorage.getItem(currencyStorageKey);
+
+  return { currency: resolveCurrency(storedCurrency, locale), locale };
+}
+
+function translateMessage(locale: Locale, key: string): string {
+  return (
+    messages[locale][key as keyof Messages] ??
+    messages[locale][`data.category.${key}` as keyof Messages] ??
+    messages[locale][`data.group.${key}` as keyof Messages] ??
+    messages[locale][`common.${key}` as keyof Messages] ??
+    key
+  );
+}
+
+function formatLocalizedDate(
+  locale: Locale,
+  date: string | Date,
+  options?: Intl.DateTimeFormatOptions,
+): string {
+  const value =
+    typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
+      ? new Date(`${date}T00:00:00`)
+      : new Date(date);
+
+  return new Intl.DateTimeFormat(locale, options).format(value);
+}
+
 export function LanguageProvider({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -1365,14 +1398,11 @@ export function LanguageProvider({
   const [currency, setCurrencyState] = React.useState<Currency>("USD");
 
   React.useEffect(() => {
-    const storedLocale = window.localStorage.getItem(localeStorageKey);
-    const nextLocale = storedLocale
-      ? resolveLocale(storedLocale)
-      : resolveLocale(window.navigator.language);
-    const storedCurrency = window.localStorage.getItem(currencyStorageKey);
+    const { currency: nextCurrency, locale: nextLocale } =
+      readStoredLocalePreferences();
 
     setLocaleState(nextLocale);
-    setCurrencyState(resolveCurrency(storedCurrency, nextLocale));
+    setCurrencyState(nextCurrency);
   }, []);
 
   React.useEffect(() => {
@@ -1391,12 +1421,7 @@ export function LanguageProvider({
         return formatCurrency(value, locale, currency);
       },
       formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions) {
-        const value =
-          typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
-            ? new Date(`${date}T00:00:00`)
-            : new Date(date);
-
-        return new Intl.DateTimeFormat(locale, options).format(value);
+        return formatLocalizedDate(locale, date, options);
       },
       formatNumber(value: number, options?: Intl.NumberFormatOptions) {
         return new Intl.NumberFormat(locale, options).format(value);
@@ -1409,13 +1434,7 @@ export function LanguageProvider({
         setLocaleState(nextLocale);
       },
       t(key: string) {
-        return (
-          messages[locale][key as keyof Messages] ??
-          messages[locale][`data.category.${key}` as keyof Messages] ??
-          messages[locale][`data.group.${key}` as keyof Messages] ??
-          messages[locale][`common.${key}` as keyof Messages] ??
-          key
-        );
+        return translateMessage(locale, key);
       },
     }),
     [currency, locale],

@@ -62,24 +62,24 @@ export function calculateBudgetData(
     : 0;
 
   return {
-    needs: createBudgetGroupData(
-      safeMonthlyIncome,
-      spentByGroup.needs,
-      BUDGET_GROUP_RATIOS.needs,
-      plannedSpentByGroup?.needs,
-    ),
-    savings: createBudgetGroupData(
-      safeMonthlyIncome,
-      spentByGroup.savings,
-      BUDGET_GROUP_RATIOS.savings,
-      plannedSpentByGroup?.savings,
-    ),
-    wants: createBudgetGroupData(
-      safeMonthlyIncome,
-      spentByGroup.wants,
-      BUDGET_GROUP_RATIOS.wants,
-      plannedSpentByGroup?.wants,
-    ),
+    needs: createBudgetGroupData({
+      budgetRatio: BUDGET_GROUP_RATIOS.needs,
+      monthlyIncome: safeMonthlyIncome,
+      plannedSpentAmount: plannedSpentByGroup?.needs,
+      spentAmount: spentByGroup.needs,
+    }),
+    savings: createBudgetGroupData({
+      budgetRatio: BUDGET_GROUP_RATIOS.savings,
+      monthlyIncome: safeMonthlyIncome,
+      plannedSpentAmount: plannedSpentByGroup?.savings,
+      spentAmount: spentByGroup.savings,
+    }),
+    wants: createBudgetGroupData({
+      budgetRatio: BUDGET_GROUP_RATIOS.wants,
+      monthlyIncome: safeMonthlyIncome,
+      plannedSpentAmount: plannedSpentByGroup?.wants,
+      spentAmount: spentByGroup.wants,
+    }),
   };
 }
 
@@ -110,19 +110,19 @@ export function sumBudgetUsageByGroup(
   );
 }
 
-function createBudgetGroupData(
-  monthlyIncome: number,
-  spentAmount: number,
-  budgetRatio: number,
-  plannedSpentAmount?: number,
-) {
-  const budget = toMoneyValue(monthlyIncome * budgetRatio);
-  const usage = calculateBudgetUsage(spentAmount, budget);
+function createBudgetGroupData(options: {
+  budgetRatio: number;
+  monthlyIncome: number;
+  plannedSpentAmount?: number;
+  spentAmount: number;
+}) {
+  const budget = toMoneyValue(options.monthlyIncome * options.budgetRatio);
+  const usage = calculateBudgetUsage(options.spentAmount, budget);
 
   return {
     budget,
     percentage: usage.usagePercentage,
-    plannedSpent: plannedSpentAmount ?? usage.spentAmount,
+    plannedSpent: options.plannedSpentAmount ?? usage.spentAmount,
     spent: usage.spentAmount,
   };
 }

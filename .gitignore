@@ -17,6 +17,7 @@ next.user-config.*
 
 # Common ignores
 node_modules
+package-lock.json
 .next/
 coverage/
 tsconfig.tsbuildinfo

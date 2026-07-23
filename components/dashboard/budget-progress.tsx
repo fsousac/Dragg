@@ -24,10 +24,16 @@ type DailyExpenseInput = {
 };
 
 type DailyExpensesSplineChartProps = {
-  expensesOverTime: DailyExpenseInput[];
-  selectedMonth?: string;
-  currency?: string;
-  locale?: string;
+  readonly expensesOverTime: DailyExpenseInput[];
+  readonly selectedMonth?: string;
+  readonly currency?: string;
+  readonly locale?: string;
+};
+
+type DailyChartItem = {
+  day: number;
+  label: string;
+  amount: number;
 };
 
 function getMonthKey(date: Date) {
@@ -63,16 +69,11 @@ function formatCurrency(value: number, locale: string, currency: string) {
   }).format(value);
 }
 
-export function DailyExpensesSplineChart({
-  expensesOverTime,
-  selectedMonth,
-  currency = "BRL",
-  locale = "pt-BR",
-}: DailyExpensesSplineChartProps) {
-  const fallbackMonth = getMonthKey(new Date());
-  const monthKey = selectedMonth ?? fallbackMonth;
-  const endDay = getChartEndDay(monthKey);
-
+function buildDailyChartData(
+  expensesOverTime: DailyExpenseInput[],
+  monthKey: string,
+  endDay: number,
+): DailyChartItem[] {
   const expensesByDay = expensesOverTime.reduce<Record<number, number>>(
     (accumulator, expense) => {
       if (!expense.date.startsWith(monthKey)) {
@@ -88,7 +89,7 @@ export function DailyExpensesSplineChart({
     {},
   );
 
-  const chartData = Array.from({ length: endDay }, (_, index) => {
+  return Array.from({ length: endDay }, (_, index) => {
     const day = index + 1;
     const amount = expensesByDay[day] ?? 0;
 
@@ -98,7 +99,125 @@ export function DailyExpensesSplineChart({
       amount,
     };
   });
+}
 
+type DailyExpensesAreaChartProps = {
+  readonly chartData: DailyChartItem[];
+  readonly currency: string;
+  readonly locale: string;
+};
+
+function DailyExpensesGradientDef() {
+  return (
+    <defs>
+      <linearGradient id="dailyExpensesFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%" stopColor="currentColor" stopOpacity={0.28} />
+        <stop offset="95%" stopColor="currentColor" stopOpacity={0.02} />
+      </linearGradient>
+    </defs>
+  );
+}
+
+const DAILY_EXPENSES_TOOLTIP_CONTENT_STYLE = {
+  borderRadius: "0.75rem",
+  border: "1px solid hsl(var(--border))",
+  background: "hsl(var(--card))",
+  color: "hsl(var(--card-foreground))",
+} as const;
+
+function DailyExpensesAreaChart({
+  chartData,
+  currency,
+  locale,
+}: DailyExpensesAreaChartProps) {
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <AreaChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+        <DailyExpensesGradientDef />
+
+        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+
+        <XAxis
+          dataKey="label"
+          tickLine={false}
+          axisLine={false}
+          tickMargin={8}
+          className="text-xs"
+        />
+
+        <YAxis
+          tickLine={false}
+          axisLine={false}
+          tickMargin={8}
+          width={72}
+          className="text-xs"
+          tickFormatter={(value) =>
+            formatCurrency(Number(value), locale, currency)
+          }
+        />
+
+        <Tooltip
+          cursor={{ strokeDasharray: "3 3" }}
+          formatter={(value) => [formatCurrency(Number(value), locale, currency), "Spent"]}
+          labelFormatter={(label) => `Day ${label}`}
+          contentStyle={DAILY_EXPENSES_TOOLTIP_CONTENT_STYLE}
+        />
+
+        <Area
+          type="monotone"
+          dataKey="amount"
+          stroke="currentColor"
+          strokeWidth={2.5}
+          fill="url(#dailyExpensesFill)"
+          dot={false}
+          activeDot={{ r: 5 }}
+          className="text-primary"
+        />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
+
+type DailyExpensesSummaryFooterProps = {
+  readonly currency: string;
+  readonly endDay: number;
+  readonly locale: string;
+  readonly totalSpent: number;
+};
+
+function DailyExpensesSummaryFooter({
+  currency,
+  endDay,
+  locale,
+  totalSpent,
+}: DailyExpensesSummaryFooterProps) {
+  return (
+    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+      <div className="rounded-lg border border-border bg-muted/30 p-3">
+        <p className="text-xs text-muted-foreground">Spent so far</p>
+        <p className="font-semibold">
+          {formatCurrency(totalSpent, locale, currency)}
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-border bg-muted/30 p-3">
+        <p className="text-xs text-muted-foreground">Days shown</p>
+        <p className="font-semibold">{endDay}</p>
+      </div>
+    </div>
+  );
+}
+
+export function DailyExpensesSplineChart({
+  expensesOverTime,
+  selectedMonth,
+  currency = "BRL",
+  locale = "pt-BR",
+}: DailyExpensesSplineChartProps) {
+  const fallbackMonth = getMonthKey(new Date());
+  const monthKey = selectedMonth ?? fallbackMonth;
+  const endDay = getChartEndDay(monthKey);
+  const chartData = buildDailyChartData(expensesOverTime, monthKey, endDay);
   const totalSpent = chartData.reduce((total, item) => total + item.amount, 0);
   const averagePerDay = endDay > 0 ? totalSpent / endDay : 0;
 
@@ -124,104 +243,19 @@ export function DailyExpensesSplineChart({
 
       <CardContent>
         <div className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={chartData}
-              margin={{
-                top: 8,
-                right: 12,
-                left: 0,
-                bottom: 0,
-              }}
-            >
-              <defs>
-                <linearGradient
-                  id="dailyExpensesFill"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop
-                    offset="5%"
-                    stopColor="currentColor"
-                    stopOpacity={0.28}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor="currentColor"
-                    stopOpacity={0.02}
-                  />
-                </linearGradient>
-              </defs>
-
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-
-              <XAxis
-                dataKey="label"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                className="text-xs"
-              />
-
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                width={72}
-                className="text-xs"
-                tickFormatter={(value) =>
-                  formatCurrency(Number(value), locale, currency)
-                }
-              />
-
-              <Tooltip
-                cursor={{
-                  strokeDasharray: "3 3",
-                }}
-                formatter={(value) => [
-                  formatCurrency(Number(value), locale, currency),
-                  "Spent",
-                ]}
-                labelFormatter={(label) => `Day ${label}`}
-                contentStyle={{
-                  borderRadius: "0.75rem",
-                  border: "1px solid hsl(var(--border))",
-                  background: "hsl(var(--card))",
-                  color: "hsl(var(--card-foreground))",
-                }}
-              />
-
-              <Area
-                type="monotone"
-                dataKey="amount"
-                stroke="currentColor"
-                strokeWidth={2.5}
-                fill="url(#dailyExpensesFill)"
-                dot={false}
-                activeDot={{
-                  r: 5,
-                }}
-                className="text-primary"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          <DailyExpensesAreaChart
+            chartData={chartData}
+            currency={currency}
+            locale={locale}
+          />
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-          <div className="rounded-lg border border-border bg-muted/30 p-3">
-            <p className="text-xs text-muted-foreground">Spent so far</p>
-            <p className="font-semibold">
-              {formatCurrency(totalSpent, locale, currency)}
-            </p>
-          </div>
-
-          <div className="rounded-lg border border-border bg-muted/30 p-3">
-            <p className="text-xs text-muted-foreground">Days shown</p>
-            <p className="font-semibold">{endDay}</p>
-          </div>
-        </div>
+        <DailyExpensesSummaryFooter
+          currency={currency}
+          endDay={endDay}
+          locale={locale}
+          totalSpent={totalSpent}
+        />
       </CardContent>
     </Card>
   );

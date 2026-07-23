@@ -2,7 +2,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTypeScript from "eslint-config-next/typescript";
 import sonarjs from "eslint-plugin-sonarjs";
-import * as cleanCode from "eslint-plugin-clean-code"
+import * as cleanCode from "eslint-plugin-clean-code";
 
 export default defineConfig([
   ...nextVitals,
@@ -21,16 +21,18 @@ export default defineConfig([
       ],
       "max-params": ["warn", { max: 3 }],
       "max-statements": ["warn", { max: 15 }],
-      "no-unused-vars": "warn",
       "sonarjs/cognitive-complexity": ["warn", 15],
-      "clean-code/feature-envy": "warn",
-      "clean-code/exception-handling": "warn",
+      "clean-code/feature-envy": "off",
+      "clean-code/exception-handling": "off",
     },
   },
   {
     files: ["tests/**", "e2e/**", "**/*.test.ts", "**/*.test.tsx"],
     rules: {
       "sonarjs/no-hardcoded-passwords": "off",
+      "max-lines-per-function": "off",
+      "max-statements": "off",
+      "max-params": "off",
     },
   },
   globalIgnores([

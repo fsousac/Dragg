@@ -10,18 +10,20 @@ import { useI18n } from "@/lib/i18n";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 type BudgetSplitChartProps = {
-  budgetSplitData: BudgetSplitItem[];
+  readonly budgetSplitData: BudgetSplitItem[];
+};
+
+type NamedBudgetSplitItem = BudgetSplitItem & {
+  name: string;
 };
 
 type BudgetSplitTooltipProps = {
-  active?: boolean;
-  formatCurrency: (value: number) => string;
-  payload?: Array<{
-    payload: BudgetSplitItem & {
-      name: string;
-    };
+  readonly active?: boolean;
+  readonly formatCurrency: (value: number) => string;
+  readonly payload?: Array<{
+    payload: NamedBudgetSplitItem;
   }>;
-  t: (key: string) => string;
+  readonly t: (key: string) => string;
 };
 
 export function BudgetSplitTooltip({
@@ -45,6 +47,179 @@ export function BudgetSplitTooltip({
       <p className="text-xs text-muted-foreground">
         {t("dashboard.budgetSplit.plannedSpend")}:{" "}
         {formatCurrency(data.plannedSpentAmount)}
+      </p>
+    </div>
+  );
+}
+
+type BudgetSplitPieSectionProps = {
+  readonly chartData: NamedBudgetSplitItem[];
+  readonly formatCurrency: (value: number) => string;
+  readonly t: (key: string) => string;
+  readonly totalPlanned: number;
+  readonly totalPlannedSpent: number;
+};
+
+function BudgetSplitPieChart({
+  chartData,
+  formatCurrency,
+  t,
+}: Pick<BudgetSplitPieSectionProps, "chartData" | "formatCurrency" | "t">) {
+  return (
+    <div className="h-42.5 min-h-0 min-w-0">
+      <ResponsiveContainer
+        width="100%"
+        height="100%"
+        minWidth={0}
+        minHeight={0}
+        initialDimension={{ width: 1, height: 170 }}
+      >
+        <PieChart>
+          <Pie
+            data={chartData}
+            cx="50%"
+            cy="50%"
+            dataKey="value"
+            innerRadius={44}
+            outerRadius={72}
+            paddingAngle={4}
+            isAnimationActive
+            animationBegin={100}
+            animationDuration={900}
+            animationEasing="ease-out"
+          >
+            {chartData.map((entry) => (
+              <Cell
+                key={entry.nameKey}
+                className="stroke-card stroke-2"
+                fill={entry.color}
+              />
+            ))}
+          </Pie>
+          <Tooltip
+            content={
+              <BudgetSplitTooltip formatCurrency={formatCurrency} t={t} />
+            }
+          />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function BudgetSplitSummaryRow({
+  formatCurrency,
+  t,
+  totalPlanned,
+  totalPlannedSpent,
+}: Pick<
+  BudgetSplitPieSectionProps,
+  "formatCurrency" | "t" | "totalPlanned" | "totalPlannedSpent"
+>) {
+  return (
+    <div className="grid grid-cols-1 gap-3 rounded-md border border-border/70 bg-muted/20 p-3 sm:grid-cols-2">
+      <div>
+        <p className="text-xs text-muted-foreground">
+          {t("dashboard.budgetSplit.incomeBase")}
+        </p>
+        <p className="text-sm font-semibold text-foreground">
+          {formatCurrency(totalPlanned)}
+        </p>
+      </div>
+      <div className="sm:text-right">
+        <p className="text-xs text-muted-foreground">
+          {t("dashboard.budgetSplit.plannedSpend")}
+        </p>
+        <p className="text-sm font-semibold text-foreground">
+          {formatCurrency(totalPlannedSpent)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function BudgetSplitPieSection(props: BudgetSplitPieSectionProps) {
+  return (
+    <div className="grid grid-cols-1 gap-4">
+      <BudgetSplitPieChart {...props} />
+      <BudgetSplitSummaryRow {...props} />
+    </div>
+  );
+}
+
+type BudgetSplitRowProps = {
+  readonly formatCurrency: (value: number) => string;
+  readonly item: NamedBudgetSplitItem;
+  readonly t: (key: string) => string;
+};
+
+function BudgetSplitRowHeader({
+  formatCurrency,
+  item,
+  t,
+  usage,
+}: BudgetSplitRowProps & {
+  usage: ReturnType<typeof calculateBudgetUsage>;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <div
+            className="size-3 rounded-full"
+            style={{ backgroundColor: item.color }}
+          />
+          <p className="truncate text-sm font-semibold text-foreground">
+            {item.name} ({item.value}%)
+          </p>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {t("common.available")}: {formatCurrency(item.maxAmount)}
+        </p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="text-sm font-semibold text-foreground">
+          {formatCurrency(item.plannedSpentAmount)}
+        </p>
+        <p
+          className={
+            usage.isOverBudget
+              ? "text-xs font-medium text-destructive"
+              : "text-xs text-muted-foreground"
+          }
+        >
+          {usage.isOverBudget
+            ? `${formatCurrency(usage.exceededAmount)} ${t("common.overBudget")}`
+            : `${formatCurrency(usage.remainingAmount)} ${t("common.left").toLowerCase()}`}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function BudgetSplitRow({ formatCurrency, item, t }: BudgetSplitRowProps) {
+  const usage = calculateBudgetUsage(item.plannedSpentAmount, item.maxAmount);
+
+  return (
+    <div className="space-y-2.5">
+      <BudgetSplitRowHeader
+        formatCurrency={formatCurrency}
+        item={item}
+        t={t}
+        usage={usage}
+      />
+      <Progress
+        value={usage.progressValue}
+        className="h-2.5 bg-accent"
+        style={{
+          // @ts-expect-error CSS variable
+          "--progress-foreground": usage.isOverBudget
+            ? "var(--destructive)"
+            : item.color,
+        }}
+      />
+      <p className="text-right text-xs text-muted-foreground">
+        {usage.usagePercentage}% {t("common.used")}
       </p>
     </div>
   );
@@ -76,122 +251,23 @@ export function BudgetSplitChart({ budgetSplitData }: BudgetSplitChartProps) {
         </p>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="grid grid-cols-1 gap-4">
-          <div className="h-42.5 min-h-0 min-w-0">
-            <ResponsiveContainer
-              width="100%"
-              height="100%"
-              minWidth={0}
-              minHeight={0}
-              initialDimension={{ width: 1, height: 170 }}
-            >
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  cx="50%"
-                  cy="50%"
-                  dataKey="value"
-                  innerRadius={44}
-                  outerRadius={72}
-                  paddingAngle={4}
-                  isAnimationActive
-                  animationBegin={100}
-                  animationDuration={900}
-                  animationEasing="ease-out"
-                >
-                  {chartData.map((entry) => (
-                    <Cell
-                      key={entry.nameKey}
-                      className="stroke-card stroke-2"
-                      fill={entry.color}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip
-                  content={
-                    <BudgetSplitTooltip formatCurrency={formatCurrency} t={t} />
-                  }
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="grid grid-cols-1 gap-3 rounded-md border border-border/70 bg-muted/20 p-3 sm:grid-cols-2">
-            <div>
-              <p className="text-xs text-muted-foreground">
-                {t("dashboard.budgetSplit.incomeBase")}
-              </p>
-              <p className="text-sm font-semibold text-foreground">
-                {formatCurrency(totalPlanned)}
-              </p>
-            </div>
-            <div className="sm:text-right">
-              <p className="text-xs text-muted-foreground">
-                {t("dashboard.budgetSplit.plannedSpend")}
-              </p>
-              <p className="text-sm font-semibold text-foreground">
-                {formatCurrency(totalPlannedSpent)}
-              </p>
-            </div>
-          </div>
-        </div>
+        <BudgetSplitPieSection
+          chartData={chartData}
+          formatCurrency={formatCurrency}
+          t={t}
+          totalPlanned={totalPlanned}
+          totalPlannedSpent={totalPlannedSpent}
+        />
 
         <div className="space-y-5">
-          {chartData.map((item) => {
-            const usage = calculateBudgetUsage(
-              item.plannedSpentAmount,
-              item.maxAmount,
-            );
-
-            return (
-              <div key={item.nameKey} className="space-y-2.5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="size-3 rounded-full"
-                        style={{ backgroundColor: item.color }}
-                      />
-                      <p className="truncate text-sm font-semibold text-foreground">
-                        {item.name} ({item.value}%)
-                      </p>
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {t("common.available")}: {formatCurrency(item.maxAmount)}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-semibold text-foreground">
-                      {formatCurrency(item.plannedSpentAmount)}
-                    </p>
-                    <p
-                      className={
-                        usage.isOverBudget
-                          ? "text-xs font-medium text-destructive"
-                          : "text-xs text-muted-foreground"
-                      }
-                    >
-                      {usage.isOverBudget
-                        ? `${formatCurrency(usage.exceededAmount)} ${t("common.overBudget")}`
-                        : `${formatCurrency(usage.remainingAmount)} ${t("common.left").toLowerCase()}`}
-                    </p>
-                  </div>
-                </div>
-                <Progress
-                  value={usage.progressValue}
-                  className="h-2.5 bg-accent"
-                  style={{
-                    // @ts-expect-error CSS variable
-                    "--progress-foreground": usage.isOverBudget
-                      ? "var(--destructive)"
-                      : item.color,
-                  }}
-                />
-                <p className="text-right text-xs text-muted-foreground">
-                  {usage.usagePercentage}% {t("common.used")}
-                </p>
-              </div>
-            );
-          })}
+          {chartData.map((item) => (
+            <BudgetSplitRow
+              key={item.nameKey}
+              formatCurrency={formatCurrency}
+              item={item}
+              t={t}
+            />
+          ))}
         </div>
       </CardContent>
     </Card>

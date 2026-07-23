@@ -32,6 +32,8 @@ const SIDEBAR_WIDTH_MOBILE = '18rem'
 const SIDEBAR_WIDTH_ICON = '3rem'
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b'
 
+type SidebarVariant = 'sidebar' | 'floating' | 'inset'
+
 type SidebarContextProps = {
   state: 'expanded' | 'collapsed'
   open: boolean
@@ -53,24 +55,13 @@ function useSidebar() {
   return context
 }
 
-function SidebarProvider({
-  defaultOpen = true,
-  open: openProp,
-  onOpenChange: setOpenProp,
-  className,
-  style,
-  children,
-  ...props
-}: React.ComponentProps<'div'> & {
-  defaultOpen?: boolean
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
-}) {
-  const isMobile = useIsMobile()
-  const [openMobile, setOpenMobile] = React.useState(false)
-
-  // This is the internal state of the sidebar.
-  // We use openProp and setOpenProp for control from outside the component.
+// This is the internal open state of the sidebar, with cookie persistence.
+// We use openProp and setOpenProp for control from outside the component.
+function useSidebarOpenState(
+  defaultOpen: boolean,
+  openProp: boolean | undefined,
+  setOpenProp: ((open: boolean) => void) | undefined,
+) {
   const [_open, _setOpen] = React.useState(defaultOpen)
   const open = openProp ?? _open
   const setOpen = React.useCallback(
@@ -88,12 +79,11 @@ function SidebarProvider({
     [setOpenProp, open],
   )
 
-  // Helper to toggle the sidebar.
-  const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
-  }, [isMobile, setOpen, setOpenMobile])
+  return [open, setOpen] as const
+}
 
-  // Adds a keyboard shortcut to toggle the sidebar.
+// Adds a keyboard shortcut to toggle the sidebar.
+function useSidebarKeyboardShortcut(toggleSidebar: () => void) {
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
@@ -108,6 +98,60 @@ function SidebarProvider({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [toggleSidebar])
+}
+
+function SidebarProviderWrapper({
+  className,
+  style,
+  children,
+  ...props
+}: React.ComponentProps<'div'>) {
+  return (
+    <TooltipProvider delayDuration={0}>
+      <div
+        data-slot="sidebar-wrapper"
+        style={
+          {
+            '--sidebar-width': SIDEBAR_WIDTH,
+            '--sidebar-width-icon': SIDEBAR_WIDTH_ICON,
+            ...style,
+          } as React.CSSProperties
+        }
+        className={cn(
+          'group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full',
+          className,
+        )}
+        {...props}
+      >
+        {children}
+      </div>
+    </TooltipProvider>
+  )
+}
+
+function SidebarProvider({
+  defaultOpen = true,
+  open: openProp,
+  onOpenChange: setOpenProp,
+  className,
+  style,
+  children,
+  ...props
+}: React.ComponentProps<'div'> & {
+  defaultOpen?: boolean
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}) {
+  const isMobile = useIsMobile()
+  const [openMobile, setOpenMobile] = React.useState(false)
+  const [open, setOpen] = useSidebarOpenState(defaultOpen, openProp, setOpenProp)
+
+  // Helper to toggle the sidebar.
+  const toggleSidebar = React.useCallback(() => {
+    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
+  }, [isMobile, setOpen, setOpenMobile])
+
+  useSidebarKeyboardShortcut(toggleSidebar)
 
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.
@@ -128,83 +172,101 @@ function SidebarProvider({
 
   return (
     <SidebarContext.Provider value={contextValue}>
-      <TooltipProvider delayDuration={0}>
-        <div
-          data-slot="sidebar-wrapper"
-          style={
-            {
-              '--sidebar-width': SIDEBAR_WIDTH,
-              '--sidebar-width-icon': SIDEBAR_WIDTH_ICON,
-              ...style,
-            } as React.CSSProperties
-          }
-          className={cn(
-            'group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full',
-            className,
-          )}
-          {...props}
-        >
-          {children}
-        </div>
-      </TooltipProvider>
+      <SidebarProviderWrapper className={className} style={style} {...props}>
+        {children}
+      </SidebarProviderWrapper>
     </SidebarContext.Provider>
   )
 }
 
-function Sidebar({
-  side = 'left',
-  variant = 'sidebar',
-  collapsible = 'offcanvas',
+function SidebarStatic({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot="sidebar"
+      className={cn(
+        'bg-sidebar text-sidebar-foreground flex h-full w-(--sidebar-width) flex-col',
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+
+function SidebarMobile({
+  side,
+  openMobile,
+  setOpenMobile,
+  children,
+  ...props
+}: React.ComponentProps<'div'> & {
+  side: 'left' | 'right'
+  openMobile: boolean
+  setOpenMobile: (open: boolean) => void
+}) {
+  return (
+    <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+      <SheetContent
+        data-sidebar="sidebar"
+        data-slot="sidebar"
+        data-mobile="true"
+        className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
+        style={
+          {
+            '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
+          } as React.CSSProperties
+        }
+        side={side}
+      >
+        <SheetHeader className="sr-only">
+          <SheetTitle>Sidebar</SheetTitle>
+          <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+        </SheetHeader>
+        <div className="flex h-full w-full flex-col">{children}</div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+function SidebarDesktopGap({
+  variant,
+}: {
+  variant: SidebarVariant
+}) {
+  return (
+    <div
+      data-slot="sidebar-gap"
+      className={cn(
+        'relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear',
+        'group-data-[collapsible=offcanvas]:w-0',
+        'group-data-[side=right]:rotate-180',
+        variant === 'floating' || variant === 'inset'
+          ? 'group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]'
+          : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
+      )}
+    />
+  )
+}
+
+function SidebarDesktop({
+  side,
+  variant,
+  collapsible,
+  state,
   className,
   children,
   ...props
 }: React.ComponentProps<'div'> & {
-  side?: 'left' | 'right'
-  variant?: 'sidebar' | 'floating' | 'inset'
-  collapsible?: 'offcanvas' | 'icon' | 'none'
+  side: 'left' | 'right'
+  variant: SidebarVariant
+  collapsible: 'offcanvas' | 'icon' | 'none'
+  state: 'expanded' | 'collapsed'
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
-
-  if (collapsible === 'none') {
-    return (
-      <div
-        data-slot="sidebar"
-        className={cn(
-          'bg-sidebar text-sidebar-foreground flex h-full w-(--sidebar-width) flex-col',
-          className,
-        )}
-        {...props}
-      >
-        {children}
-      </div>
-    )
-  }
-
-  if (isMobile) {
-    return (
-      <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-        <SheetContent
-          data-sidebar="sidebar"
-          data-slot="sidebar"
-          data-mobile="true"
-          className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
-          style={
-            {
-              '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
-            } as React.CSSProperties
-          }
-          side={side}
-        >
-          <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Displays the mobile sidebar.</SheetDescription>
-          </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
-        </SheetContent>
-      </Sheet>
-    )
-  }
-
   return (
     <div
       className="group peer text-sidebar-foreground hidden md:block"
@@ -214,18 +276,7 @@ function Sidebar({
       data-side={side}
       data-slot="sidebar"
     >
-      {/* This is what handles the sidebar gap on desktop */}
-      <div
-        data-slot="sidebar-gap"
-        className={cn(
-          'relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear',
-          'group-data-[collapsible=offcanvas]:w-0',
-          'group-data-[side=right]:rotate-180',
-          variant === 'floating' || variant === 'inset'
-            ? 'group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]'
-            : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
-        )}
-      />
+      <SidebarDesktopGap variant={variant} />
       <div
         data-slot="sidebar-container"
         className={cn(
@@ -250,6 +301,55 @@ function Sidebar({
         </div>
       </div>
     </div>
+  )
+}
+
+function Sidebar({
+  side = 'left',
+  variant = 'sidebar',
+  collapsible = 'offcanvas',
+  className,
+  children,
+  ...props
+}: React.ComponentProps<'div'> & {
+  side?: 'left' | 'right'
+  variant?: SidebarVariant
+  collapsible?: 'offcanvas' | 'icon' | 'none'
+}) {
+  const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+
+  if (collapsible === 'none') {
+    return (
+      <SidebarStatic className={className} {...props}>
+        {children}
+      </SidebarStatic>
+    )
+  }
+
+  if (isMobile) {
+    return (
+      <SidebarMobile
+        side={side}
+        openMobile={openMobile}
+        setOpenMobile={setOpenMobile}
+        {...props}
+      >
+        {children}
+      </SidebarMobile>
+    )
+  }
+
+  return (
+    <SidebarDesktop
+      side={side}
+      variant={variant}
+      collapsible={collapsible}
+      state={state}
+      className={className}
+      {...props}
+    >
+      {children}
+    </SidebarDesktop>
   )
 }
 

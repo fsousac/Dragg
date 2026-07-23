@@ -45,28 +45,109 @@ interface DragState {
   moved: boolean;
 }
 
-interface WheelProps {
-  items: (string | number)[];
-  index: number;
-  align: "left" | "right";
-  onCommit: (i: number) => void;
+function resolveTapIndex(
+  e: ReactPointerEvent<HTMLDivElement>,
+  el: HTMLDivElement,
+  clamp: (i: number) => number,
+) {
+  const contentY = e.clientY - el.getBoundingClientRect().top + el.scrollTop;
+  return clamp(Math.floor((contentY - PAD) / ITEM_H));
 }
 
-function Wheel({ items, index, align, onCommit }: WheelProps) {
+function runInertia({
+  el,
+  initialVelocity,
+  max,
+  clamp,
+  setCenter,
+  onSettle,
+}: {
+  el: HTMLDivElement;
+  initialVelocity: number;
+  max: number;
+  clamp: (i: number) => number;
+  setCenter: (i: number) => void;
+  onSettle: () => void;
+}) {
+  let velocity = initialVelocity;
+
+  function frame() {
+    if (Math.abs(velocity) < 0.6) {
+      onSettle();
+      return;
+    }
+    let top = el.scrollTop + velocity;
+    top = Math.max(0, Math.min(max, top));
+    el.scrollTop = top;
+    setCenter(clamp(Math.round(top / ITEM_H)));
+    velocity *= 0.92;
+    requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
+}
+
+interface WheelItemListProps {
+  readonly items: (string | number)[];
+  readonly center: number;
+  readonly align: "left" | "right";
+  readonly onItemClick: (i: number) => void;
+}
+
+function WheelItemList({
+  items,
+  center,
+  align,
+  onItemClick,
+}: WheelItemListProps) {
+  return (
+    <>
+      <div style={{ height: PAD }} />
+      {items.map((item, i) => {
+        const dist = Math.abs(i - center);
+        const opacity = opacityForDistance(dist);
+        return (
+          <button
+            key={item}
+            type="button"
+            onClick={() => onItemClick(i)}
+            className="flex items-center cursor-pointer whitespace-nowrap appearance-none border-0 bg-transparent text-left"
+            style={{
+              height: ITEM_H,
+              scrollSnapAlign: "center",
+              justifyContent: align === "right" ? "flex-end" : "flex-start",
+              paddingLeft: align === "right" ? 0 : 20,
+              paddingRight: align === "right" ? 20 : 0,
+              fontSize: dist === 0 ? 18 : 16,
+              fontWeight: dist === 0 ? 700 : 500,
+              opacity,
+              transition: "opacity 0.12s, font-size 0.12s",
+              color: "inherit",
+            }}
+          >
+            {item}
+          </button>
+        );
+      })}
+      <div style={{ height: PAD }} />
+    </>
+  );
+}
+
+interface WheelProps {
+  readonly items: (string | number)[];
+  readonly index: number;
+  readonly align: "left" | "right";
+  readonly onCommit: (i: number) => void;
+}
+
+function useWheelState({ items, index }: Pick<WheelProps, "items" | "index">) {
   const ref = useRef<HTMLDivElement>(null);
   const toRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const [center, setCenter] = useState(index);
 
   const clamp = (i: number) => Math.max(0, Math.min(items.length - 1, i));
-
-  const snap = useCallback(() => {
-    if (!ref.current) return;
-    const idx = clamp(Math.round(ref.current.scrollTop / ITEM_H));
-    ref.current.scrollTo({ top: idx * ITEM_H, behavior: "smooth" });
-    onCommit(idx);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.length, onCommit]);
 
   // Init scroll position once
   useEffect(() => {
@@ -87,15 +168,14 @@ function Wheel({ items, index, align, onCommit }: WheelProps) {
     }
   }, [index]);
 
-  function handleScroll() {
-    if (!ref.current) return;
-    const idx = clamp(Math.round(ref.current.scrollTop / ITEM_H));
-    setCenter(idx);
-    if (dragRef.current) return;
-    if (toRef.current) clearTimeout(toRef.current);
-    toRef.current = setTimeout(snap, 160);
-  }
+  return { ref, toRef, dragRef, center, setCenter, clamp };
+}
 
+function useWheelDragCapture({
+  ref,
+  dragRef,
+  toRef,
+}: Pick<ReturnType<typeof useWheelState>, "ref" | "dragRef" | "toRef">) {
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     if (!ref.current) return;
     if (toRef.current) clearTimeout(toRef.current);
@@ -124,6 +204,59 @@ function Wheel({ items, index, align, onCommit }: WheelProps) {
     d.lastT = now;
   }
 
+  return { onPointerDown, onPointerMove };
+}
+
+function useWheelSnapAndClick({
+  state,
+  items,
+  onCommit,
+}: {
+  state: ReturnType<typeof useWheelState>;
+  items: WheelProps["items"];
+  onCommit: WheelProps["onCommit"];
+}) {
+  const { ref, toRef, dragRef, clamp, setCenter } = state;
+
+  const snap = useCallback(() => {
+    if (!ref.current) return;
+    const idx = clamp(Math.round(ref.current.scrollTop / ITEM_H));
+    ref.current.scrollTo({ top: idx * ITEM_H, behavior: "smooth" });
+    onCommit(idx);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length, onCommit]);
+
+  function handleScroll() {
+    if (!ref.current) return;
+    const idx = clamp(Math.round(ref.current.scrollTop / ITEM_H));
+    setCenter(idx);
+    if (dragRef.current) return;
+    if (toRef.current) clearTimeout(toRef.current);
+    toRef.current = setTimeout(snap, 160);
+  }
+
+  function handleClick(i: number) {
+    ref.current?.scrollTo({ top: i * ITEM_H, behavior: "smooth" });
+    setCenter(i);
+    onCommit(i);
+  }
+
+  return { snap, handleScroll, handleClick };
+}
+
+function useWheelPointerUp({
+  state,
+  items,
+  snap,
+  handleClick,
+}: {
+  state: ReturnType<typeof useWheelState>;
+  items: WheelProps["items"];
+  snap: () => void;
+  handleClick: (i: number) => void;
+}) {
+  const { ref, dragRef, clamp, setCenter } = state;
+
   function onPointerUp(e: ReactPointerEvent<HTMLDivElement>) {
     const d = dragRef.current;
     if (!d || !ref.current) return;
@@ -134,47 +267,37 @@ function Wheel({ items, index, align, onCommit }: WheelProps) {
     // browsers don't dispatch to the original target once the container has
     // pointer capture.
     if (!d.moved) {
-      const contentY = e.clientY - el.getBoundingClientRect().top + el.scrollTop;
-      const idx = clamp(Math.floor((contentY - PAD) / ITEM_H));
+      const idx = resolveTapIndex(e, el, clamp);
       dragRef.current = null;
       el.style.scrollSnapType = "y mandatory";
       handleClick(idx);
       return;
     }
 
-    let velocity = -d.v * 14;
+    const velocity = -d.v * 14;
     const max = (items.length - 1) * ITEM_H;
-
-    function frame() {
-      if (!el) return;
-      if (Math.abs(velocity) < 0.6) {
-        dragRef.current = null;
-        el.style.scrollSnapType = "y mandatory";
-        snap();
-        return;
-      }
-      let top = el.scrollTop + velocity;
-      top = Math.max(0, Math.min(max, top));
-      el.scrollTop = top;
-      setCenter(clamp(Math.round(top / ITEM_H)));
-      velocity *= 0.92;
-      requestAnimationFrame(frame);
-    }
-
-    if (Math.abs(velocity) < 0.6) {
+    const settle = () => {
       dragRef.current = null;
       el.style.scrollSnapType = "y mandatory";
       snap();
+    };
+
+    if (Math.abs(velocity) < 0.6) {
+      settle();
     } else {
-      requestAnimationFrame(frame);
+      runInertia({ el, initialVelocity: velocity, max, clamp, setCenter, onSettle: settle });
     }
   }
 
-  function handleClick(i: number) {
-    ref.current?.scrollTo({ top: i * ITEM_H, behavior: "smooth" });
-    setCenter(i);
-    onCommit(i);
-  }
+  return { onPointerUp };
+}
+
+function Wheel({ items, index, align, onCommit }: WheelProps) {
+  const state = useWheelState({ items, index });
+  const { ref, center } = state;
+  const { onPointerDown, onPointerMove } = useWheelDragCapture(state);
+  const { snap, handleScroll, handleClick } = useWheelSnapAndClick({ state, items, onCommit });
+  const { onPointerUp } = useWheelPointerUp({ state, items, snap, handleClick });
 
   return (
     <div
@@ -194,41 +317,101 @@ function Wheel({ items, index, align, onCommit }: WheelProps) {
           "linear-gradient(180deg, transparent, #000 28%, #000 72%, transparent)",
       }}
     >
-      <div style={{ height: PAD }} />
-      {items.map((item, i) => {
-        const dist = Math.abs(i - center);
-        const opacity = opacityForDistance(dist);
-        return (
-          <div
-            key={i}
-            onClick={() => handleClick(i)}
-            className="flex items-center cursor-pointer whitespace-nowrap"
-            style={{
-              height: ITEM_H,
-              scrollSnapAlign: "center",
-              justifyContent: align === "right" ? "flex-end" : "flex-start",
-              paddingLeft: align === "right" ? 0 : 20,
-              paddingRight: align === "right" ? 20 : 0,
-              fontSize: dist === 0 ? 18 : 16,
-              fontWeight: dist === 0 ? 700 : 500,
-              opacity,
-              transition: "opacity 0.12s, font-size 0.12s",
-            }}
-          >
-            {item}
-          </div>
-        );
-      })}
-      <div style={{ height: PAD }} />
+      <WheelItemList
+        items={items}
+        center={center}
+        align={align}
+        onItemClick={handleClick}
+      />
+    </div>
+  );
+}
+
+interface PickerHeaderProps {
+  readonly title: string;
+  readonly onClose: () => void;
+}
+
+function PickerHeader({ title, onClose }: PickerHeaderProps) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+        {title}
+      </span>
+      <button
+        onClick={onClose}
+        className="flex size-7 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <X className="size-3.5" />
+      </button>
+    </div>
+  );
+}
+
+interface PickerWheelsProps {
+  readonly months: string[];
+  readonly localMonth: number;
+  readonly onMonthCommit: (i: number) => void;
+  readonly years: number[];
+  readonly localYearIdx: number;
+  readonly onYearCommit: (i: number) => void;
+}
+
+function PickerWheels({
+  months,
+  localMonth,
+  onMonthCommit,
+  years,
+  localYearIdx,
+  onYearCommit,
+}: PickerWheelsProps) {
+  return (
+    <div className="relative flex gap-1">
+      {/* Selection band */}
+      <div
+        className="pointer-events-none absolute left-0 right-0 rounded-xl border border-border bg-muted/60"
+        style={{ top: PAD, height: ITEM_H }}
+      />
+      <Wheel
+        items={months}
+        index={localMonth}
+        align="left"
+        onCommit={onMonthCommit}
+      />
+      <Wheel
+        items={years}
+        index={localYearIdx}
+        align="right"
+        onCommit={onYearCommit}
+      />
     </div>
   );
 }
 
 interface MonthWheelPickerProps {
-  month: number; // 0-based
-  year: number;
-  onChange: (month: number, year: number) => void;
-  onClose: () => void;
+  readonly month: number; // 0-based
+  readonly year: number;
+  readonly onChange: (month: number, year: number) => void;
+  readonly onClose: () => void;
+}
+
+function useMonthWheelPickerState({
+  month,
+  year,
+}: Pick<MonthWheelPickerProps, "month" | "year">) {
+  const years = buildYears(year);
+  const yearIdx = years.indexOf(year);
+
+  const [localMonth, setLocalMonth] = useState(month);
+  const [localYear, setLocalYear] = useState(year);
+  const [localYearIdx, setLocalYearIdx] = useState(Math.max(0, yearIdx));
+
+  function handleYearCommit(i: number) {
+    setLocalYearIdx(i);
+    setLocalYear(years[i]);
+  }
+
+  return { years, localMonth, setLocalMonth, localYear, localYearIdx, handleYearCommit };
 }
 
 export function MonthWheelPicker({
@@ -239,12 +422,8 @@ export function MonthWheelPicker({
 }: MonthWheelPickerProps) {
   const { locale, t } = useI18n();
   const months = monthNames(locale);
-  const years = buildYears(year);
-  const yearIdx = years.indexOf(year);
-
-  const [localMonth, setLocalMonth] = useState(month);
-  const [localYear, setLocalYear] = useState(year);
-  const [localYearIdx, setLocalYearIdx] = useState(Math.max(0, yearIdx));
+  const { years, localMonth, setLocalMonth, localYear, localYearIdx, handleYearCommit } =
+    useMonthWheelPickerState({ month, year });
 
   function handleConfirm() {
     onChange(localMonth, localYear);
@@ -257,44 +436,17 @@ export function MonthWheelPicker({
       <div
         className="absolute right-0 top-[calc(100%+10px)] z-50 w-75 rounded-2xl border border-border bg-card shadow-lg p-4"
         style={{ animation: "month-picker-in 0.22s cubic-bezier(.22,1,.36,1)" }}
-        onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-            {t("common.selectMonth")}
-          </span>
-          <button
-            onClick={onClose}
-            className="flex size-7 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="size-3.5" />
-          </button>
-        </div>
+        <PickerHeader title={t("common.selectMonth")} onClose={onClose} />
 
-        {/* Wheels */}
-        <div className="relative flex gap-1">
-          {/* Selection band */}
-          <div
-            className="pointer-events-none absolute left-0 right-0 rounded-xl border border-border bg-muted/60"
-            style={{ top: PAD, height: ITEM_H }}
-          />
-          <Wheel
-            items={months}
-            index={localMonth}
-            align="left"
-            onCommit={(i) => setLocalMonth(i)}
-          />
-          <Wheel
-            items={years}
-            index={localYearIdx}
-            align="right"
-            onCommit={(i) => {
-              setLocalYearIdx(i);
-              setLocalYear(years[i]);
-            }}
-          />
-        </div>
+        <PickerWheels
+          months={months}
+          localMonth={localMonth}
+          onMonthCommit={setLocalMonth}
+          years={years}
+          localYearIdx={localYearIdx}
+          onYearCommit={handleYearCommit}
+        />
 
         {/* Confirm button */}
         <button

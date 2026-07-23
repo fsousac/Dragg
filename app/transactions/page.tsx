@@ -33,20 +33,31 @@ function getNextMonthValue(month: string) {
   return `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export default async function TransactionsPage({
-  searchParams,
-}: TransactionsPageProps) {
-  const resolvedSearchParams = await searchParams;
-  const selectedMonth = Array.isArray(resolvedSearchParams?.month)
-    ? resolvedSearchParams.month[0]
-    : (resolvedSearchParams?.month ?? new Date().toISOString().slice(0, 7));
-  const showPrevious = Array.isArray(resolvedSearchParams?.history)
-    ? resolvedSearchParams.history[0] === "1"
-    : resolvedSearchParams?.history === "1";
-  const showNextInvoice = Array.isArray(resolvedSearchParams?.nextInvoice)
-    ? resolvedSearchParams.nextInvoice[0] === "1"
-    : resolvedSearchParams?.nextInvoice === "1";
-  const userContext = await getUserContext();
+function resolveMonthParam(value: string | string[] | undefined): string {
+  return Array.isArray(value)
+    ? value[0]
+    : (value ?? new Date().toISOString().slice(0, 7));
+}
+
+function resolveFlagParam(value: string | string[] | undefined): boolean {
+  return Array.isArray(value) ? value[0] === "1" : value === "1";
+}
+
+function resolveTransactionsPageParams(
+  resolvedSearchParams: Awaited<TransactionsPageProps["searchParams"]>,
+) {
+  return {
+    selectedMonth: resolveMonthParam(resolvedSearchParams?.month),
+    showPrevious: resolveFlagParam(resolvedSearchParams?.history),
+    showNextInvoice: resolveFlagParam(resolvedSearchParams?.nextInvoice),
+  };
+}
+
+async function getTransactionsPageData(
+  selectedMonth: string,
+  showPrevious: boolean,
+  userContext: Awaited<ReturnType<typeof getUserContext>>,
+) {
   const nextMonth = getNextMonthValue(selectedMonth);
   const [
     transactions,
@@ -76,6 +87,28 @@ export default async function TransactionsPage({
   const nextInvoiceTransactions = nextMonthTransactions.filter(
     (transaction) => transaction.isCreditCardInvoice,
   );
+
+  return {
+    transactions,
+    transactionFormOptions,
+    nextInvoiceTransactions,
+    monthlySummary,
+  };
+}
+
+export default async function TransactionsPage({
+  searchParams,
+}: TransactionsPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const { selectedMonth, showPrevious, showNextInvoice } =
+    resolveTransactionsPageParams(resolvedSearchParams);
+  const userContext = await getUserContext();
+  const {
+    transactions,
+    transactionFormOptions,
+    nextInvoiceTransactions,
+    monthlySummary,
+  } = await getTransactionsPageData(selectedMonth, showPrevious, userContext);
 
   return (
     <AppShell>

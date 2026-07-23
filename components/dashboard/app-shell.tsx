@@ -141,6 +141,43 @@ async function getShellUser(userContext?: AuthenticatedUserContext) {
   };
 }
 
+type ShellUserResult = Awaited<ReturnType<typeof getShellUser>>;
+
+function resolveUserName(
+  user: NonNullable<ShellUserResult["user"]>,
+  userEmail: string,
+) {
+  return (
+    user.user_metadata?.full_name ??
+    user.user_metadata?.name ??
+    getDisplayName(userEmail)
+  );
+}
+
+function resolveIdentityMetadata(user: NonNullable<ShellUserResult["user"]>) {
+  return user.identities
+    ?.map((identity) => identity.identity_data as Record<string, unknown>)
+    .filter(Boolean);
+}
+
+function resolveDisplayIdentity(
+  user: NonNullable<ShellUserResult["user"]>,
+  claims: NonNullable<ShellUserResult["claims"]>,
+) {
+  const userEmail = user.email ?? claims.email ?? "";
+  const userName = resolveUserName(user, userEmail);
+  const initials = getInitials(userName);
+  const identityMetadata = resolveIdentityMetadata(user);
+  const avatarUrl = getAvatarUrl([
+    user.user_metadata ?? {},
+    user.app_metadata ?? {},
+    claims as Record<string, unknown>,
+    ...(identityMetadata ?? []),
+  ]);
+
+  return { userEmail, userName, initials, avatarUrl };
+}
+
 async function signOut() {
   "use server";
 
@@ -161,21 +198,10 @@ export async function AppShell({
 
   await requireAcceptedTerms(supabase, user.id);
 
-  const userEmail = user.email ?? claims.email ?? "";
-  const userName =
-    user.user_metadata?.full_name ??
-    user.user_metadata?.name ??
-    getDisplayName(userEmail);
-  const initials = getInitials(userName);
-  const identityMetadata = user.identities
-    ?.map((identity) => identity.identity_data as Record<string, unknown>)
-    .filter(Boolean);
-  const avatarUrl = getAvatarUrl([
-    user.user_metadata ?? {},
-    user.app_metadata ?? {},
-    claims as Record<string, unknown>,
-    ...(identityMetadata ?? []),
-  ]);
+  const { userEmail, userName, initials, avatarUrl } = resolveDisplayIdentity(
+    user,
+    claims,
+  );
 
   return (
     <div className="flex min-h-screen bg-background">
