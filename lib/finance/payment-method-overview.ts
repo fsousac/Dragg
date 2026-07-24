@@ -2,6 +2,8 @@ import { type Transaction } from "@/lib/data";
 import {
   extractInstallmentLabel,
   getCreditCardInvoiceCycle,
+  getCreditCardInvoiceId,
+  getInvoicePaidAmount,
 } from "@/lib/finance/credit-card-invoices";
 
 type PaymentMethodSpentSource = {
@@ -44,10 +46,6 @@ function getCreditCardPurchaseDueDate(
   transaction: Transaction,
   paymentMethod: PaymentMethodSpentSource,
 ) {
-  if (paymentMethod.dueDay == null) {
-    return null;
-  }
-
   const transactionMonth = transaction.date.slice(0, 7);
   const candidateMonths = [0, 1, 2].map((offset) =>
     getMonthOffsetValue(transactionMonth, offset),
@@ -92,7 +90,43 @@ function isUnpaidTransaction(options: {
 
   const dueDate = getCreditCardPurchaseDueDate(transaction, paymentMethod);
 
-  return dueDate == null || dueDate >= today;
+  return dueDate >= today;
+}
+
+function getInvoicePaidAdjustment(options: {
+  detailTransactions: PaymentMethodDetailTransaction[];
+  paymentMethod: PaymentMethodSpentSource;
+  transactions: Transaction[];
+}) {
+  const { detailTransactions, paymentMethod, transactions } = options;
+
+  if (paymentMethod.type !== "credit") {
+    return 0;
+  }
+
+  const totalsByInvoiceMonth = new Map<string, number>();
+
+  for (const transaction of detailTransactions) {
+    // Credit-type detail transactions always carry an invoiceDueDate (set
+    // above by toPaymentMethodDetailTransaction for this same payment method).
+    const invoiceMonth = transaction.invoiceDueDate!.slice(0, 7);
+
+    totalsByInvoiceMonth.set(
+      invoiceMonth,
+      (totalsByInvoiceMonth.get(invoiceMonth) ?? 0) + transaction.amount,
+    );
+  }
+
+  let paidAdjustment = 0;
+
+  for (const [invoiceMonth, invoiceTotal] of totalsByInvoiceMonth) {
+    const invoiceId = getCreditCardInvoiceId(paymentMethod.id, invoiceMonth);
+    const paidAmount = getInvoicePaidAmount(transactions, invoiceId);
+
+    paidAdjustment += Math.min(paidAmount, invoiceTotal);
+  }
+
+  return paidAdjustment;
 }
 
 function toPaymentMethodDetailTransaction(
@@ -136,10 +170,16 @@ export function getPaymentMethodDetail(options: {
       toPaymentMethodDetailTransaction(transaction, paymentMethod),
     )
     .sort((left, right) => left.date.localeCompare(right.date));
-  const totalAmount = detailTransactions.reduce(
+  const rawTotalAmount = detailTransactions.reduce(
     (sum, transaction) => sum + transaction.amount,
     0,
   );
+  const paidAdjustment = getInvoicePaidAdjustment({
+    detailTransactions,
+    paymentMethod,
+    transactions,
+  });
+  const totalAmount = Math.max(rawTotalAmount - paidAdjustment, 0);
 
   return {
     paymentMethodId: paymentMethod.id,

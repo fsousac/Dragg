@@ -19,7 +19,7 @@ import {
 } from "@/lib/finance/transactions";
 
 type PaymentsPageProps = {
-  searchParams?: Promise<{
+  readonly searchParams?: Promise<{
     month?: string | string[];
   }>;
 };

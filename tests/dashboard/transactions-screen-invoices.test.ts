@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import React from "react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -50,7 +51,8 @@ const translations: Record<string, string> = {
   "screen.transactions.hideNextInvoice": "Hide next invoice",
   "screen.transactions.hidePrevious": "Hide previous",
   "screen.transactions.nextInvoice": "Next invoice",
-  "screen.transactions.nextInvoiceDescription": "Purchases already on next month's invoice",
+  "screen.transactions.nextInvoiceDescription":
+    "Purchases already on next month's invoice",
   "screen.transactions.planned": "Planned",
   "screen.transactions.plannedInvoice": "Planned invoice",
   "screen.transactions.showNextInvoice": "Show next invoice",
@@ -127,7 +129,9 @@ function makeTransaction(
   };
 }
 
-function baseProps(overrides: Partial<Parameters<typeof TransactionsScreen>[0]> = {}) {
+function baseProps(
+  overrides: Partial<Parameters<typeof TransactionsScreen>[0]> = {},
+) {
   return {
     advanceInstallmentsAction: vi.fn().mockResolvedValue(undefined),
     categories,
@@ -151,7 +155,10 @@ function baseProps(overrides: Partial<Parameters<typeof TransactionsScreen>[0]> 
 describe("NextInvoiceSection", () => {
   it("renders nothing when there are no next-invoice transactions", () => {
     const { container } = render(
-      React.createElement(TransactionsScreen, baseProps({ nextInvoiceTransactions: [] })),
+      React.createElement(
+        TransactionsScreen,
+        baseProps({ nextInvoiceTransactions: [] }),
+      ),
     );
 
     expect(screen.queryByText("Next invoice")).not.toBeInTheDocument();
@@ -200,7 +207,10 @@ describe("NextInvoiceSection", () => {
     ];
 
     render(
-      React.createElement(TransactionsScreen, baseProps({ nextInvoiceTransactions })),
+      React.createElement(
+        TransactionsScreen,
+        baseProps({ nextInvoiceTransactions }),
+      ),
     );
 
     const openButton = screen.getByText("Streaming service").closest("button")!;
@@ -229,7 +239,10 @@ describe("NextInvoiceSection", () => {
     ];
 
     render(
-      React.createElement(TransactionsScreen, baseProps({ nextInvoiceTransactions })),
+      React.createElement(
+        TransactionsScreen,
+        baseProps({ nextInvoiceTransactions }),
+      ),
     );
 
     expect(
@@ -248,12 +261,28 @@ describe("NextInvoiceSection", () => {
     ];
 
     render(
-      React.createElement(TransactionsScreen, baseProps({ nextInvoiceTransactions })),
+      React.createElement(
+        TransactionsScreen,
+        baseProps({ nextInvoiceTransactions }),
+      ),
     );
 
     expect(screen.getByText("Credit card invoice")).toBeInTheDocument();
   });
 });
+
+async function clickAdvanceMenuItem(user: ReturnType<typeof userEvent.setup>) {
+  const dialog = screen.getByRole("dialog");
+  const moreButton = dialog.querySelector(
+    '[data-slot="dropdown-menu-trigger"]',
+  ) as HTMLElement;
+  await user.click(moreButton);
+  const menu = await screen.findByRole("menu");
+  const advanceItem = menu
+    .querySelector("svg.lucide-calendar-arrow-down")
+    ?.closest('[role="menuitem"]') as HTMLElement;
+  await user.click(advanceItem);
+}
 
 describe("advance-payment preview and confirm flow", () => {
   function invoiceTransaction(): Transaction {
@@ -295,6 +324,7 @@ describe("advance-payment preview and confirm flow", () => {
   }
 
   it("previews and confirms advancing the remaining installments", async () => {
+    const user = userEvent.setup();
     const preview: InstallmentPrepaymentPreview = {
       count: 2,
       installments: [
@@ -322,12 +352,7 @@ describe("advance-payment preview and confirm flow", () => {
     );
 
     fireEvent.click(screen.getByText("Invoice for data.paymentMethod.card"));
-
-    const advanceButton = document.querySelector(
-      "button svg.lucide-calendar-arrow-down",
-    )?.closest("button");
-    expect(advanceButton).toBeTruthy();
-    fireEvent.click(advanceButton!);
+    await clickAdvanceMenuItem(user);
 
     await screen.findByText("Advance installments");
     expect(previewInstallmentPrepaymentAction).toHaveBeenCalledWith({
@@ -337,7 +362,9 @@ describe("advance-payment preview and confirm flow", () => {
     });
 
     const dialog = screen.getByRole("alertdialog");
-    expect(within(dialog).getByText(/Advance 2 installments/)).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/Advance 2 installments/),
+    ).toBeInTheDocument();
 
     const countInput = within(dialog).getByLabelText(
       "Installments to advance",
@@ -358,11 +385,14 @@ describe("advance-payment preview and confirm flow", () => {
     });
 
     await vi.waitFor(() => {
-      expect(screen.queryByText("Advance installments")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Advance installments"),
+      ).not.toBeInTheDocument();
     });
   });
 
   it("shows an error toast and does not open the confirm dialog when there are no installments left", async () => {
+    const user = userEvent.setup();
     const previewInstallmentPrepaymentAction = vi.fn().mockResolvedValue({
       count: 0,
       installments: [],
@@ -382,10 +412,7 @@ describe("advance-payment preview and confirm flow", () => {
     );
 
     fireEvent.click(screen.getByText("Invoice for data.paymentMethod.card"));
-    const advanceButton = document.querySelector(
-      "button svg.lucide-calendar-arrow-down",
-    )?.closest("button");
-    fireEvent.click(advanceButton!);
+    await clickAdvanceMenuItem(user);
 
     await vi.waitFor(() => {
       expect(previewInstallmentPrepaymentAction).toHaveBeenCalled();
@@ -394,6 +421,7 @@ describe("advance-payment preview and confirm flow", () => {
   });
 
   it("shows an error toast when the preview action rejects", async () => {
+    const user = userEvent.setup();
     const previewInstallmentPrepaymentAction = vi
       .fn()
       .mockRejectedValue(new Error("boom"));
@@ -413,10 +441,7 @@ describe("advance-payment preview and confirm flow", () => {
     );
 
     fireEvent.click(screen.getByText("Invoice for data.paymentMethod.card"));
-    const advanceButton = document.querySelector(
-      "button svg.lucide-calendar-arrow-down",
-    )?.closest("button");
-    fireEvent.click(advanceButton!);
+    await clickAdvanceMenuItem(user);
 
     await vi.waitFor(() => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -430,6 +455,7 @@ describe("advance-payment preview and confirm flow", () => {
   });
 
   it("shows an error toast when confirming the advance rejects", async () => {
+    const user = userEvent.setup();
     const preview: InstallmentPrepaymentPreview = {
       count: 1,
       installments: [{ amount: 100, date: "2026-08-20", id: "installment-2" }],
@@ -459,10 +485,7 @@ describe("advance-payment preview and confirm flow", () => {
     );
 
     fireEvent.click(screen.getByText("Invoice for data.paymentMethod.card"));
-    const advanceButton = document.querySelector(
-      "button svg.lucide-calendar-arrow-down",
-    )?.closest("button");
-    fireEvent.click(advanceButton!);
+    await clickAdvanceMenuItem(user);
 
     const dialog = await screen.findByRole("alertdialog");
     await vi.waitFor(() => {
@@ -481,6 +504,7 @@ describe("advance-payment preview and confirm flow", () => {
   });
 
   it("ignores non-finite advance-count input and clamps out-of-range values", async () => {
+    const user = userEvent.setup();
     const preview: InstallmentPrepaymentPreview = {
       count: 3,
       installments: [
@@ -507,10 +531,7 @@ describe("advance-payment preview and confirm flow", () => {
     );
 
     fireEvent.click(screen.getByText("Invoice for data.paymentMethod.card"));
-    const advanceButton = document.querySelector(
-      "button svg.lucide-calendar-arrow-down",
-    )?.closest("button");
-    fireEvent.click(advanceButton!);
+    await clickAdvanceMenuItem(user);
 
     const dialog = await screen.findByRole("alertdialog");
     const countInput = within(dialog).getByLabelText(

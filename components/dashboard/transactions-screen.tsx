@@ -825,7 +825,10 @@ type TransactionRowState = ReturnType<typeof getTransactionRowState>;
 
 type TransactionRowMainButtonProps = {
   readonly transaction: Transaction;
-  readonly rowState: Pick<TransactionRowState, "isCreditCardInvoice" | "shouldPresentAsPlanned" | "transactionTitle">;
+  readonly rowState: Pick<
+    TransactionRowState,
+    "isCreditCardInvoice" | "shouldPresentAsPlanned" | "transactionTitle"
+  >;
   readonly t: Translate;
   readonly formatCurrency: FormatCurrency;
   readonly onOpen: (transaction: Transaction) => void;
@@ -927,7 +930,10 @@ function TransactionRowMainButton({
 
 type TransactionRowMenuProps = {
   readonly transaction: Transaction;
-  readonly rowState: Pick<TransactionRowState, "isInstallment" | "isSubscription" | "isRowActionPending">;
+  readonly rowState: Pick<
+    TransactionRowState,
+    "isInstallment" | "isSubscription" | "isRowActionPending"
+  >;
   readonly t: Translate;
   readonly onOpen: (transaction: Transaction) => void;
   readonly onDeleteInstallments: (
@@ -1016,8 +1022,17 @@ function TransactionRow({
   onDeleteSubscriptionOccurrences,
   onDeleteTransaction,
 }: TransactionRowProps) {
-  const rowState = getTransactionRowState({ transaction, today, isPending, pendingTransactionId, t });
-  const rowClassName = getTransactionRowClassName(isLast, rowState.shouldPresentAsPlanned);
+  const rowState = getTransactionRowState({
+    transaction,
+    today,
+    isPending,
+    pendingTransactionId,
+    t,
+  });
+  const rowClassName = getTransactionRowClassName(
+    isLast,
+    rowState.shouldPresentAsPlanned,
+  );
   const rowStyle = getTransactionRowAnimationStyle(rowIdx);
 
   return (
@@ -1056,6 +1071,15 @@ type InvoicePurchaseRowProps = {
     installmentTransaction: Transaction,
   ) => void;
   readonly onAdvanceInstallments: (transactionId: string) => void;
+  readonly onDeleteInstallments: (
+    transaction: Transaction,
+    scope: InstallmentDeleteScope,
+  ) => void;
+  readonly onDeleteSubscriptionOccurrences: (
+    transaction: Transaction,
+    scope: DeleteSubscriptionOccurrencesInput["scope"],
+  ) => void;
+  readonly onDeleteTransaction: (transaction: Transaction) => void;
 };
 
 function canAdvancePurchaseInstallment(purchase: CreditCardInvoicePurchase) {
@@ -1082,45 +1106,97 @@ type InvoicePurchaseRowActionsProps = {
     installmentTransaction: Transaction,
   ) => void;
   readonly onAdvanceInstallments: (transactionId: string) => void;
+  readonly onDeleteInstallments: (
+    transaction: Transaction,
+    scope: InstallmentDeleteScope,
+  ) => void;
+  readonly onDeleteSubscriptionOccurrences: (
+    transaction: Transaction,
+    scope: DeleteSubscriptionOccurrencesInput["scope"],
+  ) => void;
+  readonly onDeleteTransaction: (transaction: Transaction) => void;
 };
 
-function InvoicePurchaseRowActions({
+function InvoicePurchaseRowMenuItems({
   purchase,
   installmentTransaction,
   canAdvanceInstallment,
-  isPending,
-  pendingTransactionId,
+  isRowActionPending,
   t,
   onOpenInstallmentFromInvoice,
   onAdvanceInstallments,
-}: InvoicePurchaseRowActionsProps) {
+  onDeleteInstallments,
+  onDeleteSubscriptionOccurrences,
+  onDeleteTransaction,
+}: InvoicePurchaseRowActionsProps & { readonly isRowActionPending: boolean }) {
   return (
     <>
       {installmentTransaction ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-9 shrink-0 text-muted-foreground"
-          aria-label={t("common.edit")}
+        <DropdownMenuItem
           onClick={() => onOpenInstallmentFromInvoice(installmentTransaction)}
         >
           <Pencil className="size-4" />
-        </Button>
+          {t("common.edit")}
+        </DropdownMenuItem>
       ) : null}
       {canAdvanceInstallment ? (
+        <DropdownMenuItem
+          disabled={isRowActionPending}
+          onClick={() => onAdvanceInstallments(purchase.id)}
+        >
+          <CalendarArrowDown className="size-4" />
+          {t("transactions.installments.advanceRemaining")}
+        </DropdownMenuItem>
+      ) : null}
+      {installmentTransaction ? (
+        <TransactionRowDeleteMenuItems
+          transaction={installmentTransaction}
+          isInstallment={isInstallmentTransaction(installmentTransaction)}
+          isSubscription={isSubscriptionTransaction(installmentTransaction)}
+          isRowActionPending={isRowActionPending}
+          t={t}
+          onDeleteInstallments={onDeleteInstallments}
+          onDeleteSubscriptionOccurrences={onDeleteSubscriptionOccurrences}
+          onDeleteTransaction={onDeleteTransaction}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function InvoicePurchaseRowActions(props: InvoicePurchaseRowActionsProps) {
+  const {
+    purchase,
+    installmentTransaction,
+    canAdvanceInstallment,
+    isPending,
+    pendingTransactionId,
+  } = props;
+  const isRowActionPending = isPending && pendingTransactionId === purchase.id;
+
+  if (!installmentTransaction && !canAdvanceInstallment) {
+    return null;
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <Button
           type="button"
           variant="ghost"
           size="icon"
           className="size-9 shrink-0 text-muted-foreground"
-          disabled={isPending && pendingTransactionId === purchase.id}
-          onClick={() => onAdvanceInstallments(purchase.id)}
         >
-          <CalendarArrowDown className="size-4" />
+          <MoreHorizontal className="size-4" />
         </Button>
-      ) : null}
-    </>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <InvoicePurchaseRowMenuItems
+          {...props}
+          isRowActionPending={isRowActionPending}
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -1134,6 +1210,9 @@ function InvoicePurchaseRow({
   formatDate,
   onOpenInstallmentFromInvoice,
   onAdvanceInstallments,
+  onDeleteInstallments,
+  onDeleteSubscriptionOccurrences,
+  onDeleteTransaction,
 }: InvoicePurchaseRowProps) {
   return (
     <div className="flex items-center gap-3 px-4 py-3">
@@ -1163,6 +1242,9 @@ function InvoicePurchaseRow({
           t={t}
           onOpenInstallmentFromInvoice={onOpenInstallmentFromInvoice}
           onAdvanceInstallments={onAdvanceInstallments}
+          onDeleteInstallments={onDeleteInstallments}
+          onDeleteSubscriptionOccurrences={onDeleteSubscriptionOccurrences}
+          onDeleteTransaction={onDeleteTransaction}
         />
       </div>
     </div>
@@ -1181,6 +1263,15 @@ type InvoiceDetailsSectionProps = {
     installmentTransaction: Transaction,
   ) => void;
   readonly onAdvanceInstallments: (transactionId: string) => void;
+  readonly onDeleteInstallments: (
+    transaction: Transaction,
+    scope: InstallmentDeleteScope,
+  ) => void;
+  readonly onDeleteSubscriptionOccurrences: (
+    transaction: Transaction,
+    scope: DeleteSubscriptionOccurrencesInput["scope"],
+  ) => void;
+  readonly onDeleteTransaction: (transaction: Transaction) => void;
 };
 
 type InvoiceCycleInfoProps = {
@@ -1221,49 +1312,64 @@ function InvoiceCycleInfo({ invoice, t, formatDate }: InvoiceCycleInfoProps) {
   );
 }
 
+type InvoicePurchasesListProps = Omit<
+  InvoiceDetailsSectionProps,
+  "transaction"
+> & {
+  readonly purchases: CreditCardInvoicePurchase[];
+};
+
+function InvoicePurchasesList({
+  purchases,
+  transactions,
+  ...rowProps
+}: InvoicePurchasesListProps) {
+  return (
+    <div className="divide-y divide-border">
+      {purchases.map((purchase) => (
+        <InvoicePurchaseRow
+          key={purchase.id}
+          purchase={purchase}
+          installmentTransaction={transactions.find(
+            (candidate) => candidate.id === purchase.id,
+          )}
+          {...rowProps}
+        />
+      ))}
+    </div>
+  );
+}
+
 function InvoiceDetailsSection({
   transaction,
-  transactions,
-  isPending,
-  pendingTransactionId,
-  t,
   formatCurrency,
   formatDate,
-  onOpenInstallmentFromInvoice,
-  onAdvanceInstallments,
+  ...rowProps
 }: InvoiceDetailsSectionProps) {
   const invoice = transaction.invoice;
   if (!invoice) return null;
 
   return (
     <div className="grid gap-4">
-      <InvoiceCycleInfo invoice={invoice} t={t} formatDate={formatDate} />
+      <InvoiceCycleInfo
+        invoice={invoice}
+        t={rowProps.t}
+        formatDate={formatDate}
+      />
 
       <div className="overflow-hidden rounded-lg border border-border">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-border bg-muted/30 px-4 py-3 text-sm font-medium">
-          <span>{t("transaction.invoicePurchases")}</span>
+          <span>{rowProps.t("transaction.invoicePurchases")}</span>
           <span className="tabular-nums">
             {formatCurrency(Math.abs(transaction.amount))}
           </span>
         </div>
-        <div className="divide-y divide-border">
-          {invoice.purchases.map((purchase) => (
-            <InvoicePurchaseRow
-              key={purchase.id}
-              purchase={purchase}
-              installmentTransaction={transactions.find(
-                (candidate) => candidate.id === purchase.id,
-              )}
-              isPending={isPending}
-              pendingTransactionId={pendingTransactionId}
-              t={t}
-              formatCurrency={formatCurrency}
-              formatDate={formatDate}
-              onOpenInstallmentFromInvoice={onOpenInstallmentFromInvoice}
-              onAdvanceInstallments={onAdvanceInstallments}
-            />
-          ))}
-        </div>
+        <InvoicePurchasesList
+          purchases={invoice.purchases}
+          formatCurrency={formatCurrency}
+          formatDate={formatDate}
+          {...rowProps}
+        />
       </div>
     </div>
   );
@@ -1776,6 +1882,9 @@ type TransactionDetailsDialogMainContentProps = Pick<
   | "formatDate"
   | "onAdvanceInstallments"
   | "onOpenInstallmentFromInvoice"
+  | "onDeleteInstallments"
+  | "onDeleteSubscriptionOccurrences"
+  | "onDeleteTransaction"
   | "resolveCategoryForType"
 >;
 
@@ -1783,18 +1892,12 @@ function TransactionDetailsDialogMainContent({
   selectedTransaction,
   formData,
   setFormData,
-  transactions,
   categoryOptions,
   incomeCategoryOption,
   paymentMethodOptions,
-  isPending,
-  pendingTransactionId,
   t,
-  formatCurrency,
-  formatDate,
-  onAdvanceInstallments,
-  onOpenInstallmentFromInvoice,
   resolveCategoryForType,
+  ...invoiceProps
 }: TransactionDetailsDialogMainContentProps) {
   return (
     <>
@@ -1802,14 +1905,8 @@ function TransactionDetailsDialogMainContent({
         selectedTransaction.invoice && (
           <InvoiceDetailsSection
             transaction={selectedTransaction}
-            transactions={transactions}
-            isPending={isPending}
-            pendingTransactionId={pendingTransactionId}
             t={t}
-            formatCurrency={formatCurrency}
-            formatDate={formatDate}
-            onOpenInstallmentFromInvoice={onOpenInstallmentFromInvoice}
-            onAdvanceInstallments={onAdvanceInstallments}
+            {...invoiceProps}
           />
         )}
 
@@ -2380,7 +2477,13 @@ function buildDateGroups(
 
 function computeFilteredTransactions(
   transactions: Transaction[],
-  { selectedMonth, groupFilter, normalizedQuery, sortOption, t }: {
+  {
+    selectedMonth,
+    groupFilter,
+    normalizedQuery,
+    sortOption,
+    t,
+  }: {
     selectedMonth: string;
     groupFilter: Transaction["group"] | "all";
     normalizedQuery: string;
@@ -2391,9 +2494,34 @@ function computeFilteredTransactions(
   const filtered = transactions.filter(
     (transaction) =>
       isVisibleInSelectedMonth(transaction, selectedMonth) &&
-      matchesTransactionFilters(transaction, { groupFilter, normalizedQuery, t }),
+      matchesTransactionFilters(transaction, {
+        groupFilter,
+        normalizedQuery,
+        t,
+      }),
   );
-  return [...filtered].sort((left, right) => compareTransactionsBySortOption(left, right, sortOption));
+  return [...filtered].sort((left, right) =>
+    compareTransactionsBySortOption(left, right, sortOption),
+  );
+}
+
+function useTransactionFilterState() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [groupFilter, setGroupFilter] = useState<Transaction["group"] | "all">(
+    "all",
+  );
+  const [sortOption, setSortOption] = useState<SortOption>("date-desc");
+  const normalizedQuery = normalizeSearchValue(searchQuery.trim());
+
+  return {
+    searchQuery,
+    setSearchQuery,
+    groupFilter,
+    setGroupFilter,
+    sortOption,
+    setSortOption,
+    normalizedQuery,
+  };
 }
 
 function useFilteredTransactions({
@@ -2407,13 +2535,18 @@ function useFilteredTransactions({
   selectedMonth: string;
   t: Translate;
 }) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [groupFilter, setGroupFilter] = useState<Transaction["group"] | "all">("all");
-  const [sortOption, setSortOption] = useState<SortOption>("date-desc");
-  const normalizedQuery = normalizeSearchValue(searchQuery.trim());
+  const filterState = useTransactionFilterState();
+  const { groupFilter, normalizedQuery, sortOption } = filterState;
 
   const filteredTransactions = useMemo(
-    () => computeFilteredTransactions(transactions, { selectedMonth, groupFilter, normalizedQuery, sortOption, t }),
+    () =>
+      computeFilteredTransactions(transactions, {
+        selectedMonth,
+        groupFilter,
+        normalizedQuery,
+        sortOption,
+        t,
+      }),
     [groupFilter, normalizedQuery, selectedMonth, sortOption, t, transactions],
   );
 
@@ -2435,12 +2568,7 @@ function useFilteredTransactions({
   );
 
   return {
-    searchQuery,
-    setSearchQuery,
-    groupFilter,
-    setGroupFilter,
-    sortOption,
-    setSortOption,
+    ...filterState,
     filteredTransactions,
     filteredNextInvoiceTransactions,
     dateGroups,
@@ -2468,14 +2596,19 @@ type TransactionsFiltersToolbarProps = {
   readonly sortOption: SortOption;
   readonly setSortOption: (value: SortOption) => void;
   readonly isNextInvoiceVisible: boolean;
-  readonly setIsNextInvoiceVisible: (updater: (current: boolean) => boolean) => void;
+  readonly setIsNextInvoiceVisible: (
+    updater: (current: boolean) => boolean,
+  ) => void;
 };
 
 function TransactionsSearchInput({
   t,
   searchQuery,
   setSearchQuery,
-}: Pick<TransactionsFiltersToolbarProps, "t" | "searchQuery" | "setSearchQuery">) {
+}: Pick<
+  TransactionsFiltersToolbarProps,
+  "t" | "searchQuery" | "setSearchQuery"
+>) {
   return (
     <div className="flex h-9 flex-1 items-center gap-2 rounded-xl border border-border bg-background px-3 lg:min-w-48">
       <Search className="size-3.5 shrink-0 text-muted-foreground" />
@@ -2501,11 +2634,16 @@ function TransactionsGroupFilterSelect({
   groupFilter,
   setGroupFilter,
   groupOptions,
-}: Pick<TransactionsFiltersToolbarProps, "groupFilter" | "setGroupFilter" | "groupOptions">) {
+}: Pick<
+  TransactionsFiltersToolbarProps,
+  "groupFilter" | "setGroupFilter" | "groupOptions"
+>) {
   return (
     <Select
       value={groupFilter}
-      onValueChange={(value) => setGroupFilter(value as Transaction["group"] | "all")}
+      onValueChange={(value) =>
+        setGroupFilter(value as Transaction["group"] | "all")
+      }
     >
       <SelectTrigger className="h-9 w-auto min-w-32 rounded-xl border-border bg-background text-sm font-medium">
         <SelectValue />
@@ -2525,7 +2663,10 @@ function TransactionsSortToggleGroup({
   t,
   sortOption,
   setSortOption,
-}: Pick<TransactionsFiltersToolbarProps, "t" | "sortOption" | "setSortOption">) {
+}: Pick<
+  TransactionsFiltersToolbarProps,
+  "t" | "sortOption" | "setSortOption"
+>) {
   return (
     <div className="flex items-center gap-1 rounded-xl border border-border bg-background px-1 py-1">
       <SortToggleButton
@@ -2534,7 +2675,9 @@ function TransactionsSortToggleGroup({
         sortOption={sortOption}
         descValue="date-desc"
         ascValue="date-asc"
-        onToggle={() => setSortOption(sortOption === "date-desc" ? "date-asc" : "date-desc")}
+        onToggle={() =>
+          setSortOption(sortOption === "date-desc" ? "date-asc" : "date-desc")
+        }
       />
       <SortToggleButton
         label={t("common.amount")}
@@ -2542,7 +2685,11 @@ function TransactionsSortToggleGroup({
         sortOption={sortOption}
         descValue="amount-desc"
         ascValue="amount-asc"
-        onToggle={() => setSortOption(sortOption === "amount-desc" ? "amount-asc" : "amount-desc")}
+        onToggle={() =>
+          setSortOption(
+            sortOption === "amount-desc" ? "amount-asc" : "amount-desc",
+          )
+        }
       />
     </div>
   );
@@ -2558,7 +2705,13 @@ function TransactionsFiltersExtraActions({
   setIsNextInvoiceVisible,
 }: Pick<
   TransactionsFiltersToolbarProps,
-  "t" | "searchQuery" | "setSearchQuery" | "groupFilter" | "setGroupFilter" | "isNextInvoiceVisible" | "setIsNextInvoiceVisible"
+  | "t"
+  | "searchQuery"
+  | "setSearchQuery"
+  | "groupFilter"
+  | "setGroupFilter"
+  | "isNextInvoiceVisible"
+  | "setIsNextInvoiceVisible"
 >) {
   return (
     <>
@@ -2591,8 +2744,7 @@ function TransactionsFiltersExtraActions({
   );
 }
 
-function TransactionsFiltersToolbar({
-  transactionCount,
+function TransactionsFiltersToolbarControls({
   t,
   searchQuery,
   setSearchQuery,
@@ -2603,7 +2755,40 @@ function TransactionsFiltersToolbar({
   setSortOption,
   isNextInvoiceVisible,
   setIsNextInvoiceVisible,
-}: TransactionsFiltersToolbarProps) {
+}: Omit<TransactionsFiltersToolbarProps, "transactionCount">) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <TransactionsSearchInput
+        t={t}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+      />
+      <TransactionsGroupFilterSelect
+        groupFilter={groupFilter}
+        setGroupFilter={setGroupFilter}
+        groupOptions={groupOptions}
+      />
+      <TransactionsSortToggleGroup
+        t={t}
+        sortOption={sortOption}
+        setSortOption={setSortOption}
+      />
+      <TransactionsFiltersExtraActions
+        t={t}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        groupFilter={groupFilter}
+        setGroupFilter={setGroupFilter}
+        isNextInvoiceVisible={isNextInvoiceVisible}
+        setIsNextInvoiceVisible={setIsNextInvoiceVisible}
+      />
+    </div>
+  );
+}
+
+function TransactionsFiltersToolbar(props: TransactionsFiltersToolbarProps) {
+  const { transactionCount, t } = props;
+
   return (
     <Card
       className="border-border bg-card card-shadow py-5 my-3"
@@ -2616,24 +2801,7 @@ function TransactionsFiltersToolbar({
               {transactionCount} {t("screen.transactions.count")}
             </CardTitle>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <TransactionsSearchInput t={t} searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
-            <TransactionsGroupFilterSelect
-              groupFilter={groupFilter}
-              setGroupFilter={setGroupFilter}
-              groupOptions={groupOptions}
-            />
-            <TransactionsSortToggleGroup t={t} sortOption={sortOption} setSortOption={setSortOption} />
-            <TransactionsFiltersExtraActions
-              t={t}
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-              groupFilter={groupFilter}
-              setGroupFilter={setGroupFilter}
-              isNextInvoiceVisible={isNextInvoiceVisible}
-              setIsNextInvoiceVisible={setIsNextInvoiceVisible}
-            />
-          </div>
+          <TransactionsFiltersToolbarControls {...props} />
         </div>
       </CardHeader>
     </Card>
@@ -2649,7 +2817,9 @@ type TransactionsScreenMutationDialogsProps = {
   readonly t: Translate;
   readonly formatCurrency: FormatCurrency;
   readonly formatDate: FormatDate;
-  readonly setInstallmentDeleteRequest: (request: InstallmentDeleteRequest | null) => void;
+  readonly setInstallmentDeleteRequest: (
+    request: InstallmentDeleteRequest | null,
+  ) => void;
   readonly setConfirmRequest: (request: ConfirmRequest | null) => void;
   readonly confirmDeleteInstallments: () => void;
   readonly confirmAction: () => void;
@@ -2745,8 +2915,12 @@ function TransactionsTimelineList({
       ))}
       <div className="flex justify-center">
         <Button asChild size="sm" variant="outline">
-          <Link href={showPrevious ? transactionsHref : previousTransactionsHref}>
-            {showPrevious ? t("screen.transactions.hidePrevious") : t("screen.transactions.showPrevious")}
+          <Link
+            href={showPrevious ? transactionsHref : previousTransactionsHref}
+          >
+            {showPrevious
+              ? t("screen.transactions.hidePrevious")
+              : t("screen.transactions.showPrevious")}
           </Link>
         </Button>
       </div>
@@ -2763,7 +2937,8 @@ function useTransactionsScreenNavigation({
   t: Translate;
   formatDate: FormatDate;
 }) {
-  const selectedMonth = searchParams.get("month") ?? new Date().toISOString().slice(0, 7);
+  const selectedMonth =
+    searchParams.get("month") ?? new Date().toISOString().slice(0, 7);
   const today = new Date().toISOString().slice(0, 10);
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
 
@@ -2786,7 +2961,13 @@ function useTransactionsScreenNavigation({
     return formatDate(date, { day: "numeric", month: "short" });
   };
 
-  return { selectedMonth, transactionsHref, previousTransactionsHref, getDateGroupLabel, today };
+  return {
+    selectedMonth,
+    transactionsHref,
+    previousTransactionsHref,
+    getDateGroupLabel,
+    today,
+  };
 }
 
 function useTransactionDialogsState(showNextInvoice: boolean) {
@@ -2837,7 +3018,10 @@ type TransactionDialogsState = ReturnType<typeof useTransactionDialogsState>;
 function resolveCategoryForType(
   type: TransactionType,
   currentCategory: string,
-  { incomeCategoryId, categoryOptions }: { incomeCategoryId: string; categoryOptions: CategoryOption[] },
+  {
+    incomeCategoryId,
+    categoryOptions,
+  }: { incomeCategoryId: string; categoryOptions: CategoryOption[] },
 ) {
   if (type === "income") return incomeCategoryId;
 
@@ -2845,7 +3029,37 @@ function resolveCategoryForType(
     (category) => category.value === currentCategory,
   );
 
-  return isCurrentCategoryStillValid ? currentCategory : (categoryOptions[0]?.value ?? "none");
+  return isCurrentCategoryStillValid
+    ? currentCategory
+    : (categoryOptions[0]?.value ?? "none");
+}
+
+function closeTransactionDialogState(options: {
+  isPending: boolean;
+  invoiceOrigin: Transaction | null;
+  setSelectedTransaction: (transaction: Transaction | null) => void;
+  setFormData: (
+    formData: ReturnType<typeof getInitialFormState> | null,
+  ) => void;
+  setInvoiceOrigin: (transaction: Transaction | null) => void;
+}) {
+  const {
+    isPending,
+    invoiceOrigin,
+    setSelectedTransaction,
+    setFormData,
+    setInvoiceOrigin,
+  } = options;
+
+  if (isPending) return;
+  if (invoiceOrigin) {
+    setSelectedTransaction(invoiceOrigin);
+    setFormData(null);
+    setInvoiceOrigin(null);
+    return;
+  }
+  setSelectedTransaction(null);
+  setFormData(null);
 }
 
 function useTransactionDialogNavigation({
@@ -2875,17 +3089,14 @@ function useTransactionDialogNavigation({
     );
   };
 
-  const closeTransactionDialog = () => {
-    if (isPending) return;
-    if (invoiceOrigin) {
-      setSelectedTransaction(invoiceOrigin);
-      setFormData(null);
-      setInvoiceOrigin(null);
-      return;
-    }
-    setSelectedTransaction(null);
-    setFormData(null);
-  };
+  const closeTransactionDialog = () =>
+    closeTransactionDialogState({
+      isPending,
+      invoiceOrigin,
+      setSelectedTransaction,
+      setFormData,
+      setInvoiceOrigin,
+    });
 
   const openInstallmentFromInvoice = (installmentTransaction: Transaction) => {
     /* c8 ignore next */
@@ -2894,11 +3105,12 @@ function useTransactionDialogNavigation({
     openTransactionDialog(installmentTransaction);
   };
 
-  const resolveCategory = (type: TransactionType, currentCategory: string) =>
-    resolveCategoryForType(type, currentCategory, { incomeCategoryId, categoryOptions });
-
   return {
-    resolveCategoryForType: resolveCategory,
+    resolveCategoryForType: (type: TransactionType, currentCategory: string) =>
+      resolveCategoryForType(type, currentCategory, {
+        incomeCategoryId,
+        categoryOptions,
+      }),
     openTransactionDialog,
     closeTransactionDialog,
     openInstallmentFromInvoice,
@@ -3042,7 +3254,9 @@ function useConfirmInstallmentDeletion({
 
 type ConfirmActionMutationActions = Pick<
   TransactionsScreenProps,
-  "advanceInstallmentsAction" | "deleteSubscriptionOccurrencesAction" | "deleteTransactionAction"
+  | "advanceInstallmentsAction"
+  | "deleteSubscriptionOccurrencesAction"
+  | "deleteTransactionAction"
 >;
 
 function useConfirmActionHandler({
@@ -3138,7 +3352,9 @@ function useTransactionConfirmHandlers({
   return { confirmDeleteInstallments, confirmAction };
 }
 
-function buildNewTransactionInput(data: TransactionFormData): NewTransactionInput {
+function buildNewTransactionInput(
+  data: TransactionFormData,
+): NewTransactionInput {
   return {
     amount: data.amount,
     category: data.category === "none" ? "" : data.category,
@@ -3200,7 +3416,10 @@ function useTransactionSubmitHandlers({
     setPendingTransactionId(selectedTransaction.id);
     startTransition(() =>
       runTransactionMutation(
-        () => updateTransactionAction(buildUpdateTransactionInput(selectedTransaction, formData)),
+        () =>
+          updateTransactionAction(
+            buildUpdateTransactionInput(selectedTransaction, formData),
+          ),
         {
           successMessage: t("transaction.updateSuccess"),
           errorLogLabel: "Error updating transaction:",
@@ -3285,12 +3504,19 @@ function useTransactionsScreenBaseState({
   paymentMethods,
   monthlySummary: monthlySummaryTotals,
   showNextInvoice,
-}: Pick<TransactionsScreenProps, "categories" | "paymentMethods" | "monthlySummary" | "showNextInvoice">) {
+}: Pick<
+  TransactionsScreenProps,
+  "categories" | "paymentMethods" | "monthlySummary" | "showNextInvoice"
+>) {
   const { formatCurrency, formatDate, t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const dialogsState = useTransactionDialogsState(showNextInvoice);
-  const navigation = useTransactionsScreenNavigation({ searchParams, t, formatDate });
+  const navigation = useTransactionsScreenNavigation({
+    searchParams,
+    t,
+    formatDate,
+  });
 
   const monthlySummary = useMemo(() => {
     const income = monthlySummaryTotals.totalIncome;
@@ -3314,7 +3540,9 @@ function useTransactionsScreenBaseState({
   };
 }
 
-type TransactionsScreenBaseState = ReturnType<typeof useTransactionsScreenBaseState>;
+type TransactionsScreenBaseState = ReturnType<
+  typeof useTransactionsScreenBaseState
+>;
 
 function useTransactionMutationOnlyHandlers({
   base,
@@ -3326,7 +3554,8 @@ function useTransactionMutationOnlyHandlers({
   closeTransactionDialog: () => void;
 }) {
   const { handleAdvanceInstallmentsById } = useAdvanceInstallmentsHandler({
-    previewInstallmentPrepaymentAction: props.previewInstallmentPrepaymentAction,
+    previewInstallmentPrepaymentAction:
+      props.previewInstallmentPrepaymentAction,
     selectedMonth: base.selectedMonth,
     t: base.t,
     dialogsState: base.dialogsState,
@@ -3336,7 +3565,8 @@ function useTransactionMutationOnlyHandlers({
     deleteInstallmentsAction: props.deleteInstallmentsAction,
     actions: {
       advanceInstallmentsAction: props.advanceInstallmentsAction,
-      deleteSubscriptionOccurrencesAction: props.deleteSubscriptionOccurrencesAction,
+      deleteSubscriptionOccurrencesAction:
+        props.deleteSubscriptionOccurrencesAction,
       deleteTransactionAction: props.deleteTransactionAction,
     },
     dialogsState: base.dialogsState,
@@ -3355,7 +3585,11 @@ function useTransactionMutationOnlyHandlers({
     t: base.t,
   });
 
-  return { handleAdvanceInstallmentsById, ...confirmHandlers, ...submitHandlers };
+  return {
+    handleAdvanceInstallmentsById,
+    ...confirmHandlers,
+    ...submitHandlers,
+  };
 }
 
 function useTransactionsScreenHandlers({
@@ -3365,15 +3599,25 @@ function useTransactionsScreenHandlers({
   base: TransactionsScreenBaseState;
   props: TransactionsScreenProps;
 }) {
-  const { resolveCategoryForType, openTransactionDialog, closeTransactionDialog, openInstallmentFromInvoice } =
-    useTransactionDialogNavigation({
-      dialogsState: base.dialogsState,
-      incomeCategoryId: base.incomeCategoryId,
-      categoryOptions: base.categoryOptions,
-    });
+  const {
+    resolveCategoryForType,
+    openTransactionDialog,
+    closeTransactionDialog,
+    openInstallmentFromInvoice,
+  } = useTransactionDialogNavigation({
+    dialogsState: base.dialogsState,
+    incomeCategoryId: base.incomeCategoryId,
+    categoryOptions: base.categoryOptions,
+  });
 
-  const deleteRequestHandlers = useTransactionDeleteRequestHandlers(base.dialogsState);
-  const mutationHandlers = useTransactionMutationOnlyHandlers({ base, props, closeTransactionDialog });
+  const deleteRequestHandlers = useTransactionDeleteRequestHandlers(
+    base.dialogsState,
+  );
+  const mutationHandlers = useTransactionMutationOnlyHandlers({
+    base,
+    props,
+    closeTransactionDialog,
+  });
 
   return {
     resolveCategoryForType,
@@ -3399,7 +3643,10 @@ function useTransactionsScreenState(props: TransactionsScreenProps) {
 
 type TransactionsScreenState = ReturnType<typeof useTransactionsScreenState>;
 
-type TransactionsScreenMainSectionProps = Pick<TransactionsScreenProps, "showPrevious"> &
+type TransactionsScreenMainSectionProps = Pick<
+  TransactionsScreenProps,
+  "showPrevious"
+> &
   Pick<
     TransactionsScreenState,
     | "t"
@@ -3440,7 +3687,10 @@ function TransactionsScreenPageHeader({
       title={t("screen.transactions.title")}
       description={t("screen.transactions.description")}
       actions={
-        <Button className="gap-2 text-background" onClick={() => setIsNewTransactionOpen(true)}>
+        <Button
+          className="gap-2 text-background"
+          onClick={() => setIsNewTransactionOpen(true)}
+        >
           <Plus className="size-4" />
           {t("screen.transactions.add")}
         </Button>
@@ -3521,13 +3771,28 @@ function TransactionsScreenListSection({
   );
 }
 
-function TransactionsScreenMainSection(props: TransactionsScreenMainSectionProps) {
-  const { t, formatCurrency, setIsNewTransactionOpen, monthlySummary, filteredTransactions } = props;
+function TransactionsScreenMainSection(
+  props: TransactionsScreenMainSectionProps,
+) {
+  const {
+    t,
+    formatCurrency,
+    setIsNewTransactionOpen,
+    monthlySummary,
+    filteredTransactions,
+  } = props;
   return (
     <>
-      <TransactionsScreenPageHeader t={t} setIsNewTransactionOpen={setIsNewTransactionOpen} />
+      <TransactionsScreenPageHeader
+        t={t}
+        setIsNewTransactionOpen={setIsNewTransactionOpen}
+      />
 
-      <SummaryChips monthlySummary={monthlySummary} t={t} formatCurrency={formatCurrency} />
+      <SummaryChips
+        monthlySummary={monthlySummary}
+        t={t}
+        formatCurrency={formatCurrency}
+      />
 
       <TransactionsFiltersToolbar
         transactionCount={filteredTransactions.length}
@@ -3550,7 +3815,11 @@ function TransactionsScreenMainSection(props: TransactionsScreenMainSectionProps
 
 type TransactionsScreenDialogsSectionProps = Pick<
   TransactionsScreenProps,
-  "categories" | "paymentMethods" | "createCategoryAction" | "createPaymentMethodAction" | "transactions"
+  | "categories"
+  | "paymentMethods"
+  | "createCategoryAction"
+  | "createPaymentMethodAction"
+  | "transactions"
 > &
   Pick<
     TransactionsScreenState,
@@ -3613,22 +3882,13 @@ function TransactionsScreenDetailsDialog(
 ) {
   return (
     <TransactionDetailsDialog
-      selectedTransaction={props.selectedTransaction}
-      formData={props.formData}
-      setFormData={props.setFormData}
-      transactions={props.transactions}
-      categoryOptions={props.categoryOptions}
-      incomeCategoryOption={props.incomeCategoryOption}
-      paymentMethodOptions={props.paymentMethodOptions}
-      isPending={props.isPending}
-      pendingTransactionId={props.pendingTransactionId}
-      t={props.t}
-      formatCurrency={props.formatCurrency}
-      formatDate={props.formatDate}
+      {...props}
       onClose={props.closeTransactionDialog}
       onUpdate={props.handleUpdateTransaction}
       onDeleteInstallments={props.handleDeleteInstallments}
-      onDeleteSubscriptionOccurrences={props.handleDeleteSubscriptionOccurrences}
+      onDeleteSubscriptionOccurrences={
+        props.handleDeleteSubscriptionOccurrences
+      }
       onDeleteTransaction={props.handleDeleteTransaction}
       onAdvanceInstallments={props.handleAdvanceInstallmentsById}
       onOpenInstallmentFromInvoice={props.openInstallmentFromInvoice}
@@ -3637,7 +3897,9 @@ function TransactionsScreenDetailsDialog(
   );
 }
 
-function TransactionsScreenDialogsSection(props: TransactionsScreenDialogsSectionProps) {
+function TransactionsScreenDialogsSection(
+  props: TransactionsScreenDialogsSectionProps,
+) {
   return (
     <>
       <TransactionsScreenDetailsDialog {...props} />
@@ -3674,7 +3936,10 @@ export function TransactionsScreen(props: TransactionsScreenProps) {
   const state = useTransactionsScreenState(props);
   return (
     <>
-      <TransactionsScreenMainSection showPrevious={props.showPrevious} {...state} />
+      <TransactionsScreenMainSection
+        showPrevious={props.showPrevious}
+        {...state}
+      />
       <TransactionsScreenDialogsSection
         categories={props.categories}
         paymentMethods={props.paymentMethods}

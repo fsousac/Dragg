@@ -28,7 +28,11 @@ const { mockPush, mockReplace, mockRefresh } = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush, replace: mockReplace, refresh: mockRefresh }),
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+    refresh: mockRefresh,
+  }),
   useSearchParams: () => new URLSearchParams("month=2026-07"),
 }));
 
@@ -83,12 +87,16 @@ const translations: Record<string, string> = {
   "transaction.updateError": "Could not update the transaction.",
   "transaction.updateSuccess": "Transaction updated.",
   "transactions.installments.deleteAll": "Delete all",
-  "transactions.installments.deleteAllConfirm": "All installments will be removed.",
+  "transactions.installments.deleteAllConfirm":
+    "All installments will be removed.",
   "transactions.installments.deleteAllTitle": "Delete all installments?",
   "transactions.installments.deleteOnlyThis": "Delete only this",
-  "transactions.installments.deleteOnlyThisConfirm": "Only this installment will be removed.",
-  "transactions.installments.deleteOnlyThisTitle": "Delete only this installment?",
-  "transactions.installments.deleteThisAndFollowing": "Delete this and following",
+  "transactions.installments.deleteOnlyThisConfirm":
+    "Only this installment will be removed.",
+  "transactions.installments.deleteOnlyThisTitle":
+    "Delete only this installment?",
+  "transactions.installments.deleteThisAndFollowing":
+    "Delete this and following",
   "transactions.installments.deleteThisAndFollowingConfirm":
     "This and following installments will be removed.",
   "transactions.installments.deleteThisAndFollowingTitle":
@@ -96,7 +104,8 @@ const translations: Record<string, string> = {
   "transactions.subscriptions.deleteOnlyThis": "Delete only this occurrence",
   "transactions.subscriptions.deleteOnlyThisConfirm":
     "Only this occurrence will be removed.",
-  "transactions.subscriptions.deleteOnlyThisTitle": "Delete only this occurrence?",
+  "transactions.subscriptions.deleteOnlyThisTitle":
+    "Delete only this occurrence?",
   "transactions.subscriptions.deleteThisAndFollowingUnpaid":
     "Delete this and following unpaid",
   "transactions.subscriptions.deleteThisAndFollowingUnpaidConfirm":
@@ -219,10 +228,14 @@ function getRowOpenButton(descriptionText: string) {
 
 /** Returns the row's "more actions" trigger button, or null if the row has none (invoice rows). */
 function getRowMoreButton(descriptionText: string) {
-  return getRowOpenButton(descriptionText).nextElementSibling as HTMLElement | null;
+  return getRowOpenButton(descriptionText)
+    .nextElementSibling as HTMLElement | null;
 }
 
-async function openRowMenu(user: ReturnType<typeof userEvent.setup>, descriptionText: string) {
+async function openRowMenu(
+  user: ReturnType<typeof userEvent.setup>,
+  descriptionText: string,
+) {
   const moreButton = getRowMoreButton(descriptionText)!;
   await user.click(moreButton);
   return screen.findByRole("menu");
@@ -249,7 +262,9 @@ describe("getInstallmentDeleteTitleKey / getInstallmentDeleteDescriptionKey via 
     await user.click(within(menu).getByText("Delete only this"));
 
     const dialog = screen.getByRole("alertdialog");
-    expect(within(dialog).getByText("Delete only this installment?")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("Delete only this installment?"),
+    ).toBeInTheDocument();
     expect(
       within(dialog).getByText("Only this installment will be removed."),
     ).toBeInTheDocument();
@@ -267,7 +282,9 @@ describe("getInstallmentDeleteTitleKey / getInstallmentDeleteDescriptionKey via 
       within(dialog).getByText("Delete this and following installments?"),
     ).toBeInTheDocument();
     expect(
-      within(dialog).getByText("This and following installments will be removed."),
+      within(dialog).getByText(
+        "This and following installments will be removed.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -279,8 +296,12 @@ describe("getInstallmentDeleteTitleKey / getInstallmentDeleteDescriptionKey via 
     await user.click(within(menu).getByText("Delete all"));
 
     const dialog = screen.getByRole("alertdialog");
-    expect(within(dialog).getByText("Delete all installments?")).toBeInTheDocument();
-    expect(within(dialog).getByText("All installments will be removed.")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("Delete all installments?"),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("All installments will be removed."),
+    ).toBeInTheDocument();
   });
 });
 
@@ -319,8 +340,12 @@ describe("TransactionRowDeleteMenuItems - installment branch full confirm flow",
 
   it("logs and toasts an error when deleting installments rejects", async () => {
     const user = userEvent.setup();
-    const deleteInstallmentsAction = vi.fn().mockRejectedValue(new Error("boom"));
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const deleteInstallmentsAction = vi
+      .fn()
+      .mockRejectedValue(new Error("boom"));
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     renderScreen({ transactions: [installmentTx], deleteInstallmentsAction });
 
     const menu = await openRowMenu(user, "Laptop");
@@ -374,7 +399,9 @@ describe("TransactionRowDeleteMenuItems - subscription branch", () => {
 
   it("shows the subscription title/description for the single scope and confirms it", async () => {
     const user = userEvent.setup();
-    const deleteSubscriptionOccurrencesAction = vi.fn().mockResolvedValue(undefined);
+    const deleteSubscriptionOccurrencesAction = vi
+      .fn()
+      .mockResolvedValue(undefined);
     renderScreen({
       transactions: [subscriptionTx],
       deleteSubscriptionOccurrencesAction,
@@ -384,7 +411,9 @@ describe("TransactionRowDeleteMenuItems - subscription branch", () => {
     await user.click(within(menu).getByText("Delete only this occurrence"));
 
     const dialog = screen.getByRole("alertdialog");
-    expect(within(dialog).getByText("Delete only this occurrence?")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("Delete only this occurrence?"),
+    ).toBeInTheDocument();
     expect(
       within(dialog).getByText("Only this occurrence will be removed."),
     ).toBeInTheDocument();
@@ -408,14 +437,18 @@ describe("TransactionRowDeleteMenuItems - subscription branch", () => {
     renderScreen({ transactions: [subscriptionTx] });
 
     const menu = await openRowMenu(user, "Streaming");
-    await user.click(within(menu).getByText("Delete this and following unpaid"));
+    await user.click(
+      within(menu).getByText("Delete this and following unpaid"),
+    );
 
     const dialog = screen.getByRole("alertdialog");
     expect(
       within(dialog).getByText("Delete this and following unpaid occurrences?"),
     ).toBeInTheDocument();
     expect(
-      within(dialog).getByText("This and following unpaid occurrences will be removed."),
+      within(dialog).getByText(
+        "This and following unpaid occurrences will be removed.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -424,7 +457,9 @@ describe("TransactionRowDeleteMenuItems - subscription branch", () => {
     const deleteSubscriptionOccurrencesAction = vi
       .fn()
       .mockRejectedValue(new Error("boom"));
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     renderScreen({
       transactions: [subscriptionTx],
       deleteSubscriptionOccurrencesAction,
@@ -464,7 +499,9 @@ describe("TransactionRowDeleteMenuItems - default (plain transaction) branch", (
 
     const dialog = screen.getByRole("alertdialog");
     expect(within(dialog).getByText("Delete transaction?")).toBeInTheDocument();
-    expect(within(dialog).getByText("This cannot be undone.")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("This cannot be undone."),
+    ).toBeInTheDocument();
 
     await user.click(within(dialog).getByText("Delete"));
 
@@ -479,8 +516,12 @@ describe("TransactionRowDeleteMenuItems - default (plain transaction) branch", (
 
   it("logs and toasts an error when deleting the transaction rejects", async () => {
     const user = userEvent.setup();
-    const deleteTransactionAction = vi.fn().mockRejectedValue(new Error("boom"));
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const deleteTransactionAction = vi
+      .fn()
+      .mockRejectedValue(new Error("boom"));
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     renderScreen({ transactions: [plainTx], deleteTransactionAction });
 
     const menu = await openRowMenu(user, "Groceries");
@@ -802,10 +843,14 @@ describe("Transaction details dialog - invoice view", () => {
     });
 
     await user.click(screen.getByText("Invoice for data.paymentMethod.card"));
-    expect(await screen.findByText("Purchases")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    expect(await within(dialog).findByText("Purchases")).toBeInTheDocument();
 
-    const editButton = screen.getByLabelText("Edit");
-    await user.click(editButton);
+    const purchaseRow = within(dialog)
+      .getByText("Matched installment")
+      .closest(".px-4.py-3") as HTMLElement;
+    await user.click(within(purchaseRow).getByRole("button"));
+    await user.click(await screen.findByText("Edit"));
 
     // Now viewing/editing the matched installment transaction directly.
     expect(screen.getByDisplayValue("Matched installment")).toBeInTheDocument();
@@ -827,22 +872,33 @@ describe("Transaction details dialog - invoice view", () => {
     await user.click(screen.getByText("Invoice for data.paymentMethod.card"));
     await screen.findByText("Purchases");
 
-    // No local transaction matches any purchase id, so no pencil/edit buttons.
-    expect(screen.queryByLabelText("Edit")).not.toBeInTheDocument();
-
     // Advancing is gated on the "N/M" installment label alone (not on a
-    // local match), so the "1/3" purchase still offers it...
-    const matchedRow = screen.getByText("Matched installment").closest(".px-4.py-3");
-    expect(matchedRow?.querySelector("svg.lucide-calendar-arrow-down")).toBeInTheDocument();
+    // local match), so the "1/3" purchase still offers a menu with Advance,
+    // but no Edit/Delete items since no local transaction matches it.
+    const matchedRow = screen
+      .getByText("Matched installment")
+      .closest(".px-4.py-3") as HTMLElement;
+    await user.click(within(matchedRow).getByRole("button"));
+    const matchedMenu = await screen.findByRole("menu");
+    expect(within(matchedMenu).queryByText("Edit")).not.toBeInTheDocument();
+    expect(
+      matchedMenu.querySelector("svg.lucide-calendar-arrow-down"),
+    ).toBeInTheDocument();
+    await user.keyboard("{Escape}");
 
-    // ...but "3/3" (fully paid) and the label-less purchase must not.
-    const paidRow = screen.getByText("Fully paid installment").closest(".px-4.py-3");
-    expect(paidRow?.querySelector("svg.lucide-calendar-arrow-down")).not.toBeInTheDocument();
-    const noLabelRow = screen.getByText("One-off purchase").closest(".px-4.py-3");
-    expect(noLabelRow?.querySelector("svg.lucide-calendar-arrow-down")).not.toBeInTheDocument();
+    // ...but "3/3" (fully paid) and the label-less purchase get no menu at
+    // all: no local match to edit/delete, and not eligible to advance.
+    const paidRow = screen
+      .getByText("Fully paid installment")
+      .closest(".px-4.py-3") as HTMLElement;
+    expect(within(paidRow).queryByRole("button")).not.toBeInTheDocument();
+    const noLabelRow = screen
+      .getByText("One-off purchase")
+      .closest(".px-4.py-3") as HTMLElement;
+    expect(within(noLabelRow).queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("disables the advance button for the clicked purchase while its preview is pending", async () => {
+  it("opens the advance confirm dialog once the pending preview resolves", async () => {
     const user = userEvent.setup();
     const deferred = createDeferred<{
       count: number;
@@ -850,7 +906,9 @@ describe("Transaction details dialog - invoice view", () => {
       targetMonth: string;
       totalAmount: number;
     }>();
-    const previewInstallmentPrepaymentAction = vi.fn().mockReturnValue(deferred.promise);
+    const previewInstallmentPrepaymentAction = vi
+      .fn()
+      .mockReturnValue(deferred.promise);
     renderScreen({
       transactions: [matchedInstallmentTransaction()],
       nextInvoiceTransactions: [buildInvoiceTransaction()],
@@ -859,14 +917,21 @@ describe("Transaction details dialog - invoice view", () => {
     });
 
     await user.click(screen.getByText("Invoice for data.paymentMethod.card"));
-    await screen.findByText("Purchases");
+    const dialog = screen.getByRole("dialog");
+    await within(dialog).findByText("Purchases");
 
-    const advanceButton = document
+    const purchaseRow = within(dialog)
+      .getByText("Matched installment")
+      .closest(".px-4.py-3") as HTMLElement;
+    await user.click(within(purchaseRow).getByRole("button"));
+    const menu = await screen.findByRole("menu");
+    const advanceItem = menu
       .querySelector("svg.lucide-calendar-arrow-down")
-      ?.closest("button") as HTMLElement;
-    await user.click(advanceButton);
+      ?.closest("[role='menuitem']") as HTMLElement;
+    await user.click(advanceItem);
 
-    await vi.waitFor(() => expect(advanceButton).toBeDisabled());
+    expect(previewInstallmentPrepaymentAction).toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
 
     deferred.resolve({
       count: 1,
@@ -875,7 +940,7 @@ describe("Transaction details dialog - invoice view", () => {
       totalAmount: 100,
     });
 
-    await vi.waitFor(() => expect(advanceButton).not.toBeDisabled());
+    expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
   });
 
   it("ignores a non-finite value typed into the advance-count input", async () => {
@@ -898,12 +963,18 @@ describe("Transaction details dialog - invoice view", () => {
     });
 
     await user.click(screen.getByText("Invoice for data.paymentMethod.card"));
-    await screen.findByText("Purchases");
+    const dialog = screen.getByRole("dialog");
+    await within(dialog).findByText("Purchases");
 
-    const advanceButton = document
+    const purchaseRow = within(dialog)
+      .getByText("Matched installment")
+      .closest(".px-4.py-3") as HTMLElement;
+    await user.click(within(purchaseRow).getByRole("button"));
+    const menu = await screen.findByRole("menu");
+    const advanceItem = menu
       .querySelector("svg.lucide-calendar-arrow-down")
-      ?.closest("button") as HTMLElement;
-    await user.click(advanceButton);
+      ?.closest("[role='menuitem']") as HTMLElement;
+    await user.click(advanceItem);
 
     const countInput = await screen.findByRole("spinbutton");
     expect(countInput).toHaveValue(3);
@@ -1033,8 +1104,12 @@ describe("Transaction details dialog - edit mode", () => {
       date: "2026-07-01",
       descriptionKey: "Error me",
     });
-    const updateTransactionAction = vi.fn().mockRejectedValue(new Error("boom"));
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const updateTransactionAction = vi
+      .fn()
+      .mockRejectedValue(new Error("boom"));
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     renderScreen({ transactions: [plainTx], updateTransactionAction });
 
     await user.click(getRowOpenButton("Error me"));
@@ -1101,7 +1176,9 @@ describe("Transaction details dialog - edit mode", () => {
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByText("Save changes"));
 
-    await vi.waitFor(() => expect(within(dialog).getByText("Saving...")).toBeInTheDocument());
+    await vi.waitFor(() =>
+      expect(within(dialog).getByText("Saving...")).toBeInTheDocument(),
+    );
 
     await user.click(screen.getByRole("button", { name: "Close" }));
     // Still pending: closeTransactionDialog's isPending guard keeps it open.
@@ -1162,7 +1239,10 @@ describe("Transaction details dialog - edit mode", () => {
       type: "income",
       categoryId: "cat-income",
     });
-    renderScreen({ transactions: [incomeTx], categories: incomeOnlyCategories });
+    renderScreen({
+      transactions: [incomeTx],
+      categories: incomeOnlyCategories,
+    });
 
     await user.click(getRowOpenButton("Income only"));
     const dialog = await screen.findByRole("dialog");
@@ -1194,7 +1274,9 @@ describe("Transaction details dialog - delete button variants in the footer", ()
     await user.click(within(dialog).getByText("Delete"));
 
     const alertDialog = screen.getByRole("alertdialog");
-    expect(within(alertDialog).getByText("Delete only this installment?")).toBeInTheDocument();
+    expect(
+      within(alertDialog).getByText("Delete only this installment?"),
+    ).toBeInTheDocument();
   });
 
   it("opens the footer split-dropdown and selects this-and-following / all", async () => {
@@ -1211,7 +1293,9 @@ describe("Transaction details dialog - delete button variants in the footer", ()
 
     await user.click(getRowOpenButton("Footer installment 2"));
     const dialog = await screen.findByRole("dialog");
-    const splitTrigger = dialog.querySelector("button.rounded-l-none") as HTMLElement;
+    const splitTrigger = dialog.querySelector(
+      "button.rounded-l-none",
+    ) as HTMLElement;
     await user.click(splitTrigger);
 
     const menu = await screen.findByRole("menu");
@@ -1221,13 +1305,17 @@ describe("Transaction details dialog - delete button variants in the footer", ()
         "Delete this and following installments?",
       ),
     ).toBeInTheDocument();
-    await user.click(within(screen.getByRole("alertdialog")).getByText("Cancel"));
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByText("Cancel"),
+    );
 
     await user.click(splitTrigger);
     const menu2 = await screen.findByRole("menu");
     await user.click(within(menu2).getByText("Delete all"));
     expect(
-      within(screen.getByRole("alertdialog")).getByText("Delete all installments?"),
+      within(screen.getByRole("alertdialog")).getByText(
+        "Delete all installments?",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -1246,7 +1334,9 @@ describe("Transaction details dialog - delete button variants in the footer", ()
     await user.click(within(dialog).getByText("Delete"));
 
     const alertDialog = screen.getByRole("alertdialog");
-    expect(within(alertDialog).getByText("Delete only this occurrence?")).toBeInTheDocument();
+    expect(
+      within(alertDialog).getByText("Delete only this occurrence?"),
+    ).toBeInTheDocument();
   });
 
   it("calls onDeleteTransaction for a plain transaction via the footer delete button", async () => {
@@ -1263,7 +1353,9 @@ describe("Transaction details dialog - delete button variants in the footer", ()
     await user.click(within(dialog).getByText("Delete"));
 
     const alertDialog = screen.getByRole("alertdialog");
-    expect(within(alertDialog).getByText("Delete transaction?")).toBeInTheDocument();
+    expect(
+      within(alertDialog).getByText("Delete transaction?"),
+    ).toBeInTheDocument();
   });
 });
 
@@ -1332,7 +1424,10 @@ describe("Add transaction flow (handleNewTransactionSubmit)", () => {
     await user.click(screen.getByText("Add Transaction"));
     const dialog = await screen.findByRole("dialog");
 
-    await user.type(within(dialog).getByLabelText("Description"), "New expense");
+    await user.type(
+      within(dialog).getByLabelText("Description"),
+      "New expense",
+    );
     const amountInput = within(dialog).getByLabelText("Transaction amount");
     fireChange(amountInput, "5000");
 
@@ -1358,7 +1453,10 @@ describe("Add transaction flow (handleNewTransactionSubmit)", () => {
     await user.click(screen.getByText("Add Transaction"));
     const dialog = await screen.findByRole("dialog");
 
-    await user.type(within(dialog).getByLabelText("Description"), "New savings");
+    await user.type(
+      within(dialog).getByLabelText("Description"),
+      "New savings",
+    );
     const amountInput = within(dialog).getByLabelText("Transaction amount");
     fireChange(amountInput, "2500");
     await user.click(within(dialog).getByText("Entertainment"));

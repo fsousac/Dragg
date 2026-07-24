@@ -160,7 +160,7 @@ function getInvoicePurchases(options: {
     .sort((left, right) => left.date.localeCompare(right.date));
 }
 
-function getInvoicePaidAmount(
+export function getInvoicePaidAmount(
   transactions: Transaction[],
   invoiceId: string,
 ): number {

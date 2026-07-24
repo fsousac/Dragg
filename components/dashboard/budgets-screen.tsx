@@ -24,13 +24,14 @@ import {
   type CategoryOverviewItem,
 } from "@/lib/finance/transactions";
 import { calculateBudgetUsage } from "@/lib/finance/budget";
+import { GROUP_COLORS } from "@/lib/finance/group-colors";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 type BudgetsScreenProps = {
-  budgetData: BudgetData;
-  budgetSplitData: BudgetSplitItem[];
-  categories: CategoryOverviewItem[];
+  readonly budgetData: BudgetData;
+  readonly budgetSplitData: BudgetSplitItem[];
+  readonly categories: CategoryOverviewItem[];
 };
 
 export function csvEscape(value: string | number | null) {
@@ -54,17 +55,14 @@ function buildBudgetTotals(budgetData: BudgetData) {
   return { totalBudget, totalSpent, totalPlannedSpent, totalUsage };
 }
 
-function buildBudgetGroups(
-  budgetData: BudgetData,
-  t: (key: string) => string,
-) {
+function buildBudgetGroups(budgetData: BudgetData, t: (key: string) => string) {
   return [
     {
       description: t("data.category.needs"),
       icon: "🏠",
       key: "needs" as const,
       name: t("data.group.needs"),
-      color: "var(--needs)",
+      color: GROUP_COLORS.needs,
       ...budgetData.needs,
     },
     {
@@ -72,7 +70,7 @@ function buildBudgetGroups(
       icon: "🎉",
       key: "wants" as const,
       name: t("data.group.wants"),
-      color: "var(--wants)",
+      color: GROUP_COLORS.wants,
       ...budgetData.wants,
     },
     {
@@ -80,7 +78,7 @@ function buildBudgetGroups(
       icon: "💰",
       key: "savings" as const,
       name: t("data.group.savings"),
-      color: "var(--savings)",
+      color: GROUP_COLORS.savings,
       ...budgetData.savings,
     },
   ];
@@ -213,9 +211,13 @@ function buildBudgetsSummaryCards({
           : null,
     },
     {
-      label: totalUsage.isOverBudget ? t("common.overBudget") : t("common.left"),
+      label: totalUsage.isOverBudget
+        ? t("common.overBudget")
+        : t("common.left"),
       value: formatCurrency(
-        totalUsage.isOverBudget ? totalUsage.exceededAmount : totalUsage.remainingAmount,
+        totalUsage.isOverBudget
+          ? totalUsage.exceededAmount
+          : totalUsage.remainingAmount,
       ),
       note: totalUsage.isOverBudget
         ? t("common.overBudget")
@@ -226,12 +228,12 @@ function buildBudgetsSummaryCards({
 }
 
 function BudgetsSummaryCards(props: {
-  totalBudget: number;
-  totalSpent: number;
-  totalPlannedSpent: number;
-  totalUsage: ReturnType<typeof calculateBudgetUsage>;
-  formatCurrency: (value: number) => string;
-  t: (key: string) => string;
+  readonly totalBudget: number;
+  readonly totalSpent: number;
+  readonly totalPlannedSpent: number;
+  readonly totalUsage: ReturnType<typeof calculateBudgetUsage>;
+  readonly formatCurrency: (value: number) => string;
+  readonly t: (key: string) => string;
 }) {
   const cards = buildBudgetsSummaryCards(props);
 
@@ -241,7 +243,9 @@ function BudgetsSummaryCards(props: {
         <Card key={card.label} className="border-border bg-card card-shadow">
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">{card.label}</p>
-            <p className="mt-1 text-2xl font-bold text-foreground">{card.value}</p>
+            <p className="mt-1 text-2xl font-bold text-foreground">
+              {card.value}
+            </p>
             <p className="mt-1 text-xs text-muted-foreground">{card.note}</p>
             {card.sub ? (
               <p className="mt-1 text-xs text-muted-foreground">{card.sub}</p>
@@ -259,10 +263,10 @@ function BudgetsToolbar({
   downloadCsv,
   t,
 }: {
-  includePlanned: boolean;
-  setIncludePlanned: (value: boolean) => void;
-  downloadCsv: () => void;
-  t: (key: string) => string;
+  readonly includePlanned: boolean;
+  readonly setIncludePlanned: (value: boolean) => void;
+  readonly downloadCsv: () => void;
+  readonly t: (key: string) => string;
 }) {
   return (
     <div className="mb-4 flex items-center justify-end gap-4">
@@ -272,11 +276,19 @@ function BudgetsToolbar({
           checked={includePlanned}
           onCheckedChange={setIncludePlanned}
         />
-        <Label htmlFor="include-planned" className="text-sm text-muted-foreground cursor-pointer">
+        <Label
+          htmlFor="include-planned"
+          className="text-sm text-muted-foreground cursor-pointer"
+        >
           {t("screen.budgets.includePlanned")}
         </Label>
       </div>
-      <Button variant="outline" size="sm" onClick={downloadCsv} className="gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={downloadCsv}
+        className="gap-2"
+      >
         <Download className="size-4" />
         {t("screen.budgets.exportCsv")}
       </Button>
@@ -289,9 +301,9 @@ function BudgetsPieCard({
   pieTooltipFormatter,
   t,
 }: {
-  chartData: (BudgetSplitItem & { name: string })[];
-  pieTooltipFormatter: (value: unknown) => [string, string];
-  t: (key: string) => string;
+  readonly chartData: (BudgetSplitItem & { name: string })[];
+  readonly pieTooltipFormatter: (value: unknown) => [string, string];
+  readonly t: (key: string) => string;
 }) {
   return (
     <Card className="border-border bg-card card-shadow">
@@ -317,9 +329,9 @@ function BudgetsPieCard({
                 paddingAngle={4}
                 dataKey="value"
               >
-                {chartData.map((entry, index) => (
+                {chartData.map((entry) => (
                   <Cell
-                    key={`cell-${index}`}
+                    key={entry.nameKey}
                     fill={entry.color}
                     className="stroke-card stroke-2"
                   />
@@ -348,9 +360,9 @@ function BudgetGroupHeader({
   displaySpent,
   formatCurrency,
 }: {
-  group: BudgetGroupItem;
-  displaySpent: number;
-  formatCurrency: (value: number) => string;
+  readonly group: BudgetGroupItem;
+  readonly displaySpent: number;
+  readonly formatCurrency: (value: number) => string;
 }) {
   return (
     <div className="mb-2 flex items-center justify-between gap-3">
@@ -379,10 +391,10 @@ function BudgetGroupStatus({
   formatCurrency,
   t,
 }: {
-  usage: ReturnType<typeof calculateBudgetUsage>;
-  trend: ReturnType<typeof getBudgetGroupTrend>;
-  formatCurrency: (value: number) => string;
-  t: (key: string) => string;
+  readonly usage: ReturnType<typeof calculateBudgetUsage>;
+  readonly trend: ReturnType<typeof getBudgetGroupTrend>;
+  readonly formatCurrency: (value: number) => string;
+  readonly t: (key: string) => string;
 }) {
   return (
     <div className="mt-1 flex items-center justify-between">
@@ -400,7 +412,9 @@ function BudgetGroupStatus({
       <span
         className={cn(
           "text-xs",
-          usage.isOverBudget ? "font-medium text-destructive" : "text-muted-foreground",
+          usage.isOverBudget
+            ? "font-medium text-destructive"
+            : "text-muted-foreground",
         )}
       >
         {usage.isOverBudget
@@ -417,10 +431,10 @@ function BudgetGroupRow({
   formatCurrency,
   t,
 }: {
-  group: BudgetGroupItem;
-  includePlanned: boolean;
-  formatCurrency: (value: number) => string;
-  t: (key: string) => string;
+  readonly group: BudgetGroupItem;
+  readonly includePlanned: boolean;
+  readonly formatCurrency: (value: number) => string;
+  readonly t: (key: string) => string;
 }) {
   /* c8 ignore next */
   const displaySpent = includePlanned ? group.plannedSpent : group.spent;
@@ -429,7 +443,11 @@ function BudgetGroupRow({
 
   return (
     <div>
-      <BudgetGroupHeader group={group} displaySpent={displaySpent} formatCurrency={formatCurrency} />
+      <BudgetGroupHeader
+        group={group}
+        displaySpent={displaySpent}
+        formatCurrency={formatCurrency}
+      />
       <div
         className="overflow-hidden rounded-full bg-secondary"
         style={{
@@ -439,7 +457,12 @@ function BudgetGroupRow({
       >
         <Progress value={usage.progressValue} className="h-3" />
       </div>
-      <BudgetGroupStatus usage={usage} trend={trend} formatCurrency={formatCurrency} t={t} />
+      <BudgetGroupStatus
+        usage={usage}
+        trend={trend}
+        formatCurrency={formatCurrency}
+        t={t}
+      />
     </div>
   );
 }
@@ -450,10 +473,10 @@ function BudgetGroupsCard({
   formatCurrency,
   t,
 }: {
-  budgetGroups: BudgetGroupItem[];
-  includePlanned: boolean;
-  formatCurrency: (value: number) => string;
-  t: (key: string) => string;
+  readonly budgetGroups: BudgetGroupItem[];
+  readonly includePlanned: boolean;
+  readonly formatCurrency: (value: number) => string;
+  readonly t: (key: string) => string;
 }) {
   return (
     <Card className="border-border bg-card card-shadow">
@@ -480,9 +503,9 @@ function CategoryBudgetItem({
   formatCurrency,
   t,
 }: {
-  category: CategoryOverviewItem;
-  formatCurrency: (value: number) => string;
-  t: (key: string) => string;
+  readonly category: CategoryOverviewItem;
+  readonly formatCurrency: (value: number) => string;
+  readonly t: (key: string) => string;
 }) {
   const percentage = Math.round((category.spent / category.monthlyLimit) * 100);
   const isOverBudget = percentage > 100;
@@ -492,22 +515,29 @@ function CategoryBudgetItem({
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span>{category.icon}</span>
-          <span className="font-medium text-foreground">{t(category.label)}</span>
+          <span className="font-medium text-foreground">
+            {t(category.label)}
+          </span>
         </div>
         <span
           className={cn(
             "text-sm",
-            isOverBudget ? "font-medium text-destructive" : "text-muted-foreground",
+            isOverBudget
+              ? "font-medium text-destructive"
+              : "text-muted-foreground",
           )}
         >
-          {formatCurrency(category.spent)} / {formatCurrency(category.monthlyLimit)}
+          {formatCurrency(category.spent)} /{" "}
+          {formatCurrency(category.monthlyLimit)}
         </span>
       </div>
       <div
         className="overflow-hidden rounded-full bg-secondary"
         style={{
           // @ts-expect-error CSS variable
-          "--progress-foreground": isOverBudget ? "var(--destructive)" : category.color,
+          "--progress-foreground": isOverBudget
+            ? "var(--destructive)"
+            : category.color,
         }}
       >
         <Progress value={Math.min(percentage, 100)} className="h-2" />
@@ -521,9 +551,9 @@ function CategoryBudgetsCard({
   formatCurrency,
   t,
 }: {
-  categories: CategoryOverviewItem[];
-  formatCurrency: (value: number) => string;
-  t: (key: string) => string;
+  readonly categories: CategoryOverviewItem[];
+  readonly formatCurrency: (value: number) => string;
+  readonly t: (key: string) => string;
 }) {
   return (
     <Card className="border-border bg-card card-shadow">
@@ -573,7 +603,11 @@ export function BudgetsScreen({
         <BudgetGroupsCard {...state} formatCurrency={formatCurrency} t={t} />
       </div>
 
-      <CategoryBudgetsCard categories={categories} formatCurrency={formatCurrency} t={t} />
+      <CategoryBudgetsCard
+        categories={categories}
+        formatCurrency={formatCurrency}
+        t={t}
+      />
     </>
   );
 }

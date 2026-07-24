@@ -19,7 +19,7 @@ import {
 } from "@/app/transactions/actions";
 
 type TransactionsPageProps = {
-  searchParams?: Promise<{
+  readonly searchParams?: Promise<{
     history?: string | string[];
     month?: string | string[];
     nextInvoice?: string | string[];
@@ -71,6 +71,7 @@ async function getTransactionsPageData(
       includeFuture: true,
       month: selectedMonth,
       preserveCreditCardInvoicePurchases: true,
+      useFinancialMonth: false,
       userContext,
     }),
     getTransactionFormOptions({ userContext }),
@@ -79,6 +80,7 @@ async function getTransactionsPageData(
       includeFuture: true,
       month: nextMonth,
       preserveCreditCardInvoicePurchases: true,
+      useFinancialMonth: false,
       userContext,
     }),
     getMonthlySummary(selectedMonth, userContext),
