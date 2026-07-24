@@ -19,20 +19,11 @@ export function easeOutExpo(t: number): number {
   return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
 }
 
-export function NumberCounter({
-  value,
-  duration = DURATION.counter,
-  format,
-  prefix = "",
-  suffix = "",
-  muted,
-  className,
-  mutedClassName,
-  startOnView = true,
-}: NumberCounterProps) {
-  const [current, setCurrent] = useState(0);
+function useStartOnView(
+  startOnView: boolean,
+  ref: React.RefObject<HTMLSpanElement | null>,
+) {
   const [started, setStarted] = useState(!startOnView);
-  const ref = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     if (!startOnView) return;
@@ -48,7 +39,13 @@ export function NumberCounter({
     );
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
-  }, [startOnView]);
+  }, [startOnView, ref]);
+
+  return started;
+}
+
+function useAnimatedNumber(started: boolean, value: number, duration: number) {
+  const [current, setCurrent] = useState(0);
 
   useEffect(() => {
     if (!started) return;
@@ -66,6 +63,24 @@ export function NumberCounter({
 
     requestAnimationFrame(tick);
   }, [started, value, duration]);
+
+  return current;
+}
+
+export function NumberCounter({
+  value,
+  duration = DURATION.counter,
+  format,
+  prefix = "",
+  suffix = "",
+  muted,
+  className,
+  mutedClassName,
+  startOnView = true,
+}: NumberCounterProps) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const started = useStartOnView(startOnView, ref);
+  const current = useAnimatedNumber(started, value, duration);
 
   const formatted = format
     ? format(current)

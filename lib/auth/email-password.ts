@@ -4,6 +4,7 @@ export const authNameMaxLength = 80;
 export type EmailPasswordAuthMode = "reset" | "signIn" | "signUp";
 
 export type EmailPasswordAuthValidationInput = {
+  acceptedTerms?: boolean;
   confirmPassword?: string;
   email?: string;
   firstName?: string;
@@ -14,6 +15,7 @@ export type EmailPasswordAuthValidationInput = {
 
 export type EmailPasswordAuthValidationResult = {
   errors: {
+    acceptedTerms?: string;
     confirmPassword?: string;
     email?: string;
     firstName?: string;
@@ -26,22 +28,21 @@ export type EmailPasswordAuthValidationResult = {
 export function buildSignUpUserMetadata(firstName: string, lastName: string) {
   const trimmedFirstName = firstName.trim();
   const trimmedLastName = lastName.trim();
-  const fullName = [trimmedFirstName, trimmedLastName].filter(Boolean).join(" ");
+  const fullName = [trimmedFirstName, trimmedLastName]
+    .filter(Boolean)
+    .join(" ");
 
   return {
     first_name: trimmedFirstName,
     full_name: fullName,
     last_name: trimmedLastName,
     name: fullName,
+    terms_accepted: true,
   };
 }
 
 export type PasswordRequirementKey =
-  | "lowercase"
-  | "minLength"
-  | "number"
-  | "symbol"
-  | "uppercase";
+  "lowercase" | "minLength" | "number" | "symbol" | "uppercase";
 
 export type PasswordRequirementChecks = Record<PasswordRequirementKey, boolean>;
 
@@ -61,7 +62,48 @@ export function meetsPasswordComplexityRules(password: string) {
   return Object.values(getPasswordRequirementChecks(password)).every(Boolean);
 }
 
+function trimmed(value?: string) {
+  return value?.trim() ?? "";
+}
+
+function validateAuthEmail(email: string) {
+  if (!email) {
+    return "auth.emailRequired";
+  }
+
+  if (!isValidEmail(email)) {
+    return "auth.invalidEmail";
+  }
+
+  return undefined;
+}
+
+function validateAuthPassword(mode: EmailPasswordAuthMode, password: string) {
+  if (mode === "reset") {
+    return undefined;
+  }
+
+  if (!password) {
+    return "auth.passwordRequired";
+  }
+
+  if (mode !== "signUp") {
+    return undefined;
+  }
+
+  if (password.length < authPasswordMinLength) {
+    return "auth.passwordMinLength";
+  }
+
+  if (!meetsPasswordComplexityRules(password)) {
+    return "auth.passwordRequirements";
+  }
+
+  return undefined;
+}
+
 export function validateEmailPasswordAuth({
+  acceptedTerms,
   confirmPassword,
   email,
   firstName,
@@ -70,49 +112,33 @@ export function validateEmailPasswordAuth({
   password,
 }: EmailPasswordAuthValidationInput): EmailPasswordAuthValidationResult {
   const errors: EmailPasswordAuthValidationResult["errors"] = {};
-  const normalizedEmail = email?.trim() ?? "";
+  const normalizedEmail = trimmed(email);
   const normalizedPassword = password ?? "";
   const normalizedConfirmPassword = confirmPassword ?? "";
-  const normalizedFirstName = firstName?.trim() ?? "";
-  const normalizedLastName = lastName?.trim() ?? "";
+  const normalizedFirstName = trimmed(firstName);
+  const normalizedLastName = trimmed(lastName);
 
-  if (!normalizedEmail) {
-    errors.email = "auth.emailRequired";
-  } else if (!isValidEmail(normalizedEmail)) {
-    errors.email = "auth.invalidEmail";
+  const emailError = validateAuthEmail(normalizedEmail);
+  if (emailError) {
+    errors.email = emailError;
   }
 
-  if (mode !== "reset") {
-    if (!normalizedPassword) {
-      errors.password = "auth.passwordRequired";
-    } else if (mode === "signUp") {
-      if (normalizedPassword.length < authPasswordMinLength) {
-        errors.password = "auth.passwordMinLength";
-      } else if (!meetsPasswordComplexityRules(normalizedPassword)) {
-        errors.password = "auth.passwordRequirements";
-      }
-    }
+  const passwordError = validateAuthPassword(mode, normalizedPassword);
+  if (passwordError) {
+    errors.password = passwordError;
   }
 
   if (mode === "signUp") {
-    if (!normalizedFirstName) {
-      errors.firstName = "auth.firstNameRequired";
-    } else if (normalizedFirstName.length > authNameMaxLength) {
-      errors.firstName = "auth.nameTooLong";
-    }
-
-    if (normalizedLastName.length > authNameMaxLength) {
-      errors.lastName = "auth.nameTooLong";
-    }
-
-    const confirmPasswordError = validatePasswordConfirmation(
-      normalizedPassword,
-      normalizedConfirmPassword,
+    Object.assign(
+      errors,
+      validateSignUpFields({
+        acceptedTerms,
+        firstName: normalizedFirstName,
+        lastName: normalizedLastName,
+        password: normalizedPassword,
+        confirmPassword: normalizedConfirmPassword,
+      }),
     );
-
-    if (confirmPasswordError) {
-      errors.confirmPassword = confirmPasswordError;
-    }
   }
 
   return {
@@ -121,36 +147,72 @@ export function validateEmailPasswordAuth({
   };
 }
 
-export function validatePasswordConfirmation(
-  password?: string,
-  confirmPassword?: string,
-) {
-  const normalizedPassword = password ?? "";
-  const normalizedConfirmPassword = confirmPassword ?? "";
+function validateSignUpFields({
+  acceptedTerms,
+  confirmPassword,
+  firstName,
+  lastName,
+  password,
+}: {
+  acceptedTerms?: boolean;
+  confirmPassword: string;
+  firstName: string;
+  lastName: string;
+  password: string;
+}): EmailPasswordAuthValidationResult["errors"] {
+  const errors: EmailPasswordAuthValidationResult["errors"] = {};
 
-  if (!normalizedConfirmPassword) {
+  if (!firstName) {
+    errors.firstName = "auth.firstNameRequired";
+  } else if (firstName.length > authNameMaxLength) {
+    errors.firstName = "auth.nameTooLong";
+  }
+
+  if (lastName.length > authNameMaxLength) {
+    errors.lastName = "auth.nameTooLong";
+  }
+
+  const confirmPasswordError = validatePasswordConfirmation(
+    password,
+    confirmPassword,
+  );
+
+  if (confirmPasswordError) {
+    errors.confirmPassword = confirmPasswordError;
+  }
+
+  if (!acceptedTerms) {
+    errors.acceptedTerms = "auth.acceptTermsRequired";
+  }
+
+  return errors;
+}
+
+export function validatePasswordConfirmation(
+  password = "",
+  confirmPassword = "",
+) {
+  if (!confirmPassword) {
     return "auth.confirmPasswordRequired";
   }
 
-  if (normalizedConfirmPassword !== normalizedPassword) {
+  if (confirmPassword !== password) {
     return "auth.passwordMismatch";
   }
 
   return undefined;
 }
 
-export function validateNewPassword(password?: string) {
-  const normalizedPassword = password ?? "";
-
-  if (!normalizedPassword) {
+export function validateNewPassword(password = "") {
+  if (!password) {
     return "auth.passwordRequired";
   }
 
-  if (normalizedPassword.length < authPasswordMinLength) {
+  if (password.length < authPasswordMinLength) {
     return "auth.passwordMinLength";
   }
 
-  if (!meetsPasswordComplexityRules(normalizedPassword)) {
+  if (!meetsPasswordComplexityRules(password)) {
     return "auth.passwordRequirements";
   }
 
@@ -158,5 +220,5 @@ export function validateNewPassword(password?: string) {
 }
 
 function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  return /^[^\s@]+@[^\s@]+$/.test(email) && email.includes(".");
 }

@@ -91,42 +91,51 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
+const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("dragg-theme");var d=t==="dark"||t==="light"?t==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.classList.toggle("dark",d);document.documentElement.style.colorScheme=d?"dark":"light";}catch(e){}})();`;
+
+const STRUCTURED_DATA = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Dragg",
+  alternateName: "Dragg Finance",
+  applicationCategory: "FinanceApplication",
+  operatingSystem: "Web",
+  description:
+    "Free and open-source personal finance app. Track income, expenses, budgets, goals, and reports. Self-hostable.",
+  inLanguage: "en",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "BRL",
+  },
+  url: "https://dragg-finance.vercel.app",
+  sameAs: ["https://github.com/fsousac/Dragg"],
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${satoshi.variable} bg-background font-sans antialiased`}
       >
         <script
+          dangerouslySetInnerHTML={{
+            __html: THEME_INIT_SCRIPT,
+          }}
+        />
+        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "SoftwareApplication",
-              name: "Dragg",
-              alternateName: "Dragg Finance",
-              applicationCategory: "FinanceApplication",
-              operatingSystem: "Web",
-              description:
-                "Free and open-source personal finance app. Track income, expenses, budgets, goals, and reports. Self-hostable.",
-              inLanguage: "en",
-              offers: {
-                "@type": "Offer",
-                price: "0",
-                priceCurrency: "BRL",
-              },
-              url: "https://dragg-finance.vercel.app",
-              sameAs: ["https://github.com/fsousac/Dragg"],
-            }),
+            __html: JSON.stringify(STRUCTURED_DATA),
           }}
         />
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark"
+          defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >

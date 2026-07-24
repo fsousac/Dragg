@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/lib/i18n";
 
-type PasswordFieldProps = {
+type PasswordFieldProps = Readonly<{
   autoComplete?: string;
   disabled?: boolean;
   error?: string;
@@ -17,7 +17,36 @@ type PasswordFieldProps = {
   label: string;
   onChange: (value: string) => void;
   value: string;
-};
+}>;
+
+type PasswordVisibilityToggleProps = Readonly<{
+  disabled: boolean;
+  isVisible: boolean;
+  onToggle: () => void;
+}>;
+
+function PasswordVisibilityToggle({
+  disabled,
+  isVisible,
+  onToggle,
+}: PasswordVisibilityToggleProps) {
+  const { t } = useI18n();
+  return (
+    <button
+      aria-label={isVisible ? t("auth.hidePassword") : t("auth.showPassword")}
+      className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1.5 text-zinc-400 hover:text-white"
+      disabled={disabled}
+      onClick={onToggle}
+      type="button"
+    >
+      {isVisible ? (
+        <EyeOff className="size-4" aria-hidden="true" />
+      ) : (
+        <Eye className="size-4" aria-hidden="true" />
+      )}
+    </button>
+  );
+}
 
 export function PasswordField({
   autoComplete,
@@ -29,7 +58,6 @@ export function PasswordField({
   onChange,
   value,
 }: PasswordFieldProps) {
-  const { t } = useI18n();
   const [isVisible, setIsVisible] = useState(false);
 
   return (
@@ -48,19 +76,11 @@ export function PasswordField({
           type={isVisible ? "text" : "password"}
           value={value}
         />
-        <button
-          aria-label={isVisible ? t("auth.hidePassword") : t("auth.showPassword")}
-          className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1.5 text-zinc-400 hover:text-white"
+        <PasswordVisibilityToggle
           disabled={disabled}
-          onClick={() => setIsVisible((current) => !current)}
-          type="button"
-        >
-          {isVisible ? (
-            <EyeOff className="size-4" aria-hidden="true" />
-          ) : (
-            <Eye className="size-4" aria-hidden="true" />
-          )}
-        </button>
+          isVisible={isVisible}
+          onToggle={() => setIsVisible((current) => !current)}
+        />
       </div>
       {hint ? (
         <p className="text-xs leading-5 text-zinc-400">{hint}</p>

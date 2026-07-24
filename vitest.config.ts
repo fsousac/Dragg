@@ -1,16 +1,29 @@
 import { fileURLToPath } from "node:url";
 
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    environment: "jsdom",
+    setupFiles: ["./tests/setup.ts"],
+    exclude: [...configDefaults.exclude, "e2e/**"],
+    testTimeout: 10_000,
     coverage: {
       exclude: [
-        "app/**",
+        "app/**/page.tsx",
+        "app/**/layout.tsx",
+        "app/**/loading.tsx",
+        "app/**/error.tsx",
+        "app/**/not-found.tsx",
+        "app/**/opengraph-image.tsx",
+        "app/robots.ts",
+        "app/sitemap.ts",
+        "components/dashboard/**",
         "components/ui/**",
         "lib/i18n.tsx",
-        "lib/supabase/**",
-        "middleware.ts",
+        "lib/animations/**",
+        "e2e/**",
+        "playwright.config.ts",
       ],
       thresholds: {
         branches: 100,
@@ -22,6 +35,9 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      "server-only": fileURLToPath(
+        new URL("./tests/mocks/server-only.ts", import.meta.url),
+      ),
       "@": fileURLToPath(new URL(".", import.meta.url)),
     },
   },

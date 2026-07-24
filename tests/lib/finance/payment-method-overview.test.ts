@@ -264,7 +264,7 @@ describe("payment method overview spending", () => {
     ).toBe(90);
   });
 
-  it("keeps registered card purchases when no due day is configured", () => {
+  it("excludes past-cycle purchases when no due day is configured, falling back to an end-of-month cycle", () => {
     expect(
       calculatePaymentMethodSpent({
         paymentMethod: {
@@ -277,11 +277,89 @@ describe("payment method overview spending", () => {
           makeTransaction({
             amount: -100,
             date: "2026-04-13",
-            id: "registered-purchase",
+            id: "already-paid-previous-cycle",
+          }),
+        ],
+      }),
+    ).toBe(0);
+  });
+
+  it("still counts the open cycle's purchases when no due day is configured", () => {
+    expect(
+      calculatePaymentMethodSpent({
+        paymentMethod: {
+          dueDay: null,
+          id: "card-1",
+          type: "credit",
+        },
+        today: "2026-05-12",
+        transactions: [
+          makeTransaction({
+            amount: -100,
+            date: "2026-05-05",
+            id: "open-cycle-purchase",
           }),
         ],
       }),
     ).toBe(100);
+  });
+
+  it("does not deduct advance-paid invoice amounts from the card's remaining limit usage", () => {
+    expect(
+      calculatePaymentMethodSpent({
+        paymentMethod: {
+          closingDay: 7,
+          dueDay: 14,
+          id: "card-1",
+          type: "credit",
+        },
+        today: "2026-05-12",
+        transactions: [
+          makeTransaction({
+            amount: -150,
+            date: "2026-05-05",
+            id: "current-open-invoice-purchase",
+          }),
+          makeTransaction({
+            amount: -150,
+            date: "2026-05-06",
+            id: "invoice-advance-payment",
+            notes: "invoice_advance:credit-card-invoice:card-1:2026-05",
+            paymentMethodId: "checking-1",
+            paymentMethodType: "bank",
+          }),
+        ],
+      }),
+    ).toBe(0);
+  });
+
+  it("clamps the advance-paid adjustment so it never makes the total negative", () => {
+    expect(
+      calculatePaymentMethodSpent({
+        paymentMethod: {
+          closingDay: 7,
+          dueDay: 14,
+          id: "card-1",
+          type: "credit",
+        },
+        today: "2026-05-12",
+        transactions: [
+          makeTransaction({
+            amount: -50,
+            date: "2026-05-05",
+            id: "current-open-invoice-purchase",
+          }),
+          makeTransaction({
+            amount: -150,
+            date: "2026-05-06",
+            id: "invoice-advance-payment",
+            notes: "invoice_advance:credit-card-invoice:card-1:2026-05",
+            paymentMethodId: "checking-1",
+            paymentMethodType: "bank",
+          }),
+        ],
+      }),
+    ).toBe(0);
   });
 
   it("falls back to the following invoice month when a card purchase cannot be matched to a cycle", () => {

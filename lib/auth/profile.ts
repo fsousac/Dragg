@@ -42,19 +42,39 @@ function getMetadataValue(
   return "";
 }
 
-function getAvatarUrl(
+function looksLikeAvatarKey(key: string) {
+  const lowerKey = key.toLowerCase();
+  return (
+    lowerKey.includes("avatar") ||
+    lowerKey.includes("picture") ||
+    lowerKey.includes("photo")
+  );
+}
+
+function looksLikeAvatarUrl(value: string) {
+  return (
+    /^https?:\/\//.test(value) &&
+    /(googleusercontent|gravatar|avatar|photo|picture|image)/i.test(value)
+  );
+}
+
+function findAvatarInObject(value: Record<string, unknown>, queue: unknown[]) {
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (typeof nestedValue === "string") {
+      if (looksLikeAvatarKey(key) || looksLikeAvatarUrl(nestedValue)) {
+        return nestedValue;
+      }
+    } else if (nestedValue && typeof nestedValue === "object") {
+      queue.push(nestedValue);
+    }
+  }
+
+  return "";
+}
+
+function searchAvatarUrl(
   metadata: Array<Record<string, unknown> | undefined | null>,
 ) {
-  const directValue = getMetadataValue(metadata, [
-    "avatar_url",
-    "avatarUrl",
-    "picture",
-    "photo_url",
-    "photoUrl",
-  ]);
-
-  if (directValue) return directValue;
-
   const queue: unknown[] = [...metadata];
 
   while (queue.length) {
@@ -69,29 +89,56 @@ function getAvatarUrl(
       continue;
     }
 
-    for (const [key, nestedValue] of Object.entries(value)) {
-      if (typeof nestedValue === "string") {
-        const lowerKey = key.toLowerCase();
-        const looksLikeAvatarKey =
-          lowerKey.includes("avatar") ||
-          lowerKey.includes("picture") ||
-          lowerKey.includes("photo");
-        const looksLikeImageUrl =
-          /^https?:\/\//.test(nestedValue) &&
-          /(googleusercontent|gravatar|avatar|photo|picture|image)/i.test(
-            nestedValue,
-          );
-
-        if (looksLikeAvatarKey || looksLikeImageUrl) {
-          return nestedValue;
-        }
-      } else if (nestedValue && typeof nestedValue === "object") {
-        queue.push(nestedValue);
-      }
-    }
+    const found = findAvatarInObject(value as Record<string, unknown>, queue);
+    if (found) return found;
   }
 
   return "";
+}
+
+function getAvatarUrl(
+  metadata: Array<Record<string, unknown> | undefined | null>,
+) {
+  const directValue = getMetadataValue(metadata, [
+    "avatar_url",
+    "avatarUrl",
+    "picture",
+    "photo_url",
+    "photoUrl",
+  ]);
+
+  return directValue || searchAvatarUrl(metadata);
+}
+
+function buildProfileMetadata(
+  user: {
+    app_metadata?: object;
+    identities?: Array<{ identity_data?: object }>;
+    user_metadata?: object;
+  },
+  claims: Record<string, unknown>,
+) {
+  const identityMetadata = user.identities
+    ?.map((identity) => identity.identity_data as Record<string, unknown>)
+    .filter(Boolean);
+
+  return [
+    (user.user_metadata as Record<string, unknown>) ?? {},
+    (user.app_metadata as Record<string, unknown>) ?? {},
+    claims,
+    ...(identityMetadata ?? []),
+  ];
+}
+
+function resolveFullName(
+  metadata: Array<Record<string, unknown> | undefined | null>,
+  email?: string,
+) {
+  return (
+    getMetadataValue(metadata, ["full_name", "name", "display_name"]) ||
+    email?.split("@")[0] ||
+    "Dragg"
+  );
 }
 
 export async function getOAuthProfile(): Promise<OAuthProfile> {
@@ -108,19 +155,11 @@ export async function getOAuthProfile(): Promise<OAuthProfile> {
     redirect("/");
   }
 
-  const identityMetadata = user.identities
-    ?.map((identity) => identity.identity_data as Record<string, unknown>)
-    .filter(Boolean);
-  const metadata = [
-    user.user_metadata ?? {},
-    user.app_metadata ?? {},
+  const metadata = buildProfileMetadata(
+    user,
     claims as Record<string, unknown>,
-    ...(identityMetadata ?? []),
-  ];
-  const fullName =
-    getMetadataValue(metadata, ["full_name", "name", "display_name"]) ||
-    user.email?.split("@")[0] ||
-    "Dragg";
+  );
+  const fullName = resolveFullName(metadata, user.email);
   const { firstName, lastName } = splitName(fullName);
 
   return {

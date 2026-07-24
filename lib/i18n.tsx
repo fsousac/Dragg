@@ -17,11 +17,20 @@ const messages = {
     "app.description":
       "A modern personal finance dashboard to track your income, expenses, and savings with beautiful visualizations.",
     "auth.kicker": "Personal finance clarity",
+    "auth.termsOfUse": "Terms of Use",
     "auth.title": "Simple money tracking for everyday decisions.",
     "auth.description":
       "Track your money, budgets, and goals with a simple open-source finance dashboard.",
     "auth.footer":
       "Open source. Free to run. Built for personal finance clarity.",
+    "auth.acceptTermsAnd": "and",
+    "auth.acceptTermsDescription":
+      "Before you continue, please confirm you accept the Terms of Use and Privacy Policy.",
+    "auth.acceptTermsPrefix": "I have read and agree to the",
+    "auth.acceptTermsRequired":
+      "You must accept the Terms of Use and Privacy Policy to create an account.",
+    "auth.acceptTermsSubmit": "Continue",
+    "auth.acceptTermsTitle": "Accept our Terms",
     "auth.alreadyHaveAccount": "Already have an account? Sign in",
     "auth.backToSignIn": "Back to sign in",
     "auth.checkYourEmail": "Check your email to finish signing in.",
@@ -60,6 +69,7 @@ const messages = {
     "auth.passwordRequirementUppercase": "One uppercase letter",
     "auth.passwordRequired": "Enter your password.",
     "auth.passwordUpdated": "Password updated successfully.",
+    "auth.privacyPolicy": "Privacy Policy",
     "auth.rateLimitError": "Too many attempts. Wait a moment and try again.",
     "auth.redirectNotAllowed":
       "This app URL is not allowed in Supabase. Add it under Authentication → URL Configuration.",
@@ -113,6 +123,7 @@ const messages = {
     "common.expense": "Expense",
     "common.left": "Left",
     "common.month": "month",
+    "common.name": "Name",
     "common.noDataForPeriod": "No data for this period yet.",
     "common.next": "Next",
     "common.onTrack": "On track",
@@ -290,6 +301,29 @@ const messages = {
     "goals.updateError": "Failed to update goal.",
     "goals.updateSuccess": "Goal updated successfully.",
     "goals.validationError": "Enter a name and a target amount.",
+    "landing.description": "Personal finance, open source and free.",
+    "landing.feature.control.description":
+      "Supabase RLS: only you can access your data.",
+    "landing.feature.control.title": "Your data, your control",
+    "landing.feature.free.description":
+      "Self-hostable. No paid plans, no tracking.",
+    "landing.feature.free.title": "Free & open source",
+    "landing.feature.goals.description":
+      "Set objectives and track your progress.",
+    "landing.feature.goals.title": "Financial goals",
+    "landing.feature.income.description":
+      "Log earnings, spending, and installments.",
+    "landing.feature.income.title": "Income & expenses",
+    "landing.feature.reports.description":
+      "Visualize the 50/30/20 balance and net worth.",
+    "landing.feature.reports.title": "Monthly reports",
+    "landing.feature.smartCategories.description":
+      "Needs, wants, and savings — neatly organized.",
+    "landing.feature.smartCategories.title": "Smart categories",
+    "landing.featuresLabel": "Features",
+    "landing.heading": "Dragg – Personal Finance Dashboard",
+    "landing.license": "MIT License",
+    "landing.openSource": "Open source",
     "nav.budgets": "Budgets",
     "nav.categories": "Categories",
     "nav.goals": "Goals",
@@ -349,9 +383,20 @@ const messages = {
     "screen.payments.description": "Manage your recurring payments",
     "screen.payments.monthlyAverage": "month avg",
     "screen.payments.monthlySubscriptions": "Monthly Subscriptions",
+    "screen.payments.newPayment": "New Payment Method",
     "screen.payments.pausedSubscriptions": "Paused Subscriptions",
     "screen.payments.title": "Payments & Subscriptions",
     "screen.payments.yearlySubscriptions": "Yearly Subscriptions",
+    "paymentMethod.create": "Add payment method",
+    "paymentMethod.createDescription":
+      "Create a payment method to track absolute limits and spending.",
+    "paymentMethod.createError": "Failed to create payment method.",
+    "paymentMethod.createSuccess": "Payment method created successfully.",
+    "paymentMethod.createValidationError": "Enter a payment method name.",
+    "paymentMethod.creditLimit": "Credit limit",
+    "paymentMethod.namePlaceholder": "E.g., Nubank, Itaú...",
+    "paymentMethod.saving": "Saving...",
+    "paymentMethod.type": "Type",
     "payments.deleteMethod": "Delete payment method?",
     "payments.deleteMethodDescription":
       "This payment method will be removed from your account.",
@@ -537,6 +582,10 @@ const messages = {
     "transaction.paymentMethods.boleto": "Bill",
     "transaction.paymentMethods.transfer": "Transfer",
     "transaction.paymentMethods.pix": "PIX",
+    "transaction.paymentMethods.credit": "Credit Card",
+    "transaction.paymentMethods.debit": "Debit Card",
+    "transaction.paymentMethods.bank": "Bank Transfer",
+    "transaction.paymentMethods.other": "Other",
     "transaction.description": "Description",
     "transaction.descriptionPlaceholder": "E.g., grocery store, fuel...",
     "transaction.installmentFrequency": "Installment",
@@ -618,11 +667,20 @@ const messages = {
     "app.description":
       "Um painel moderno de finanças pessoais para acompanhar sua renda, seus gastos e suas economias com visualizações bonitas.",
     "auth.kicker": "Clareza para suas finanças",
+    "auth.termsOfUse": "Termos de Uso",
     "auth.title": "Controle simples do dinheiro para decisões do dia a dia.",
     "auth.description":
       "Acompanhe seu dinheiro, orçamentos e metas com um painel financeiro simples e open-source.",
     "auth.footer":
       "Open source. Gratuito para usar. Feito para dar clareza às suas finanças.",
+    "auth.acceptTermsAnd": "e a",
+    "auth.acceptTermsDescription":
+      "Antes de continuar, confirme que você aceita os Termos de Uso e a Política de Privacidade.",
+    "auth.acceptTermsPrefix": "Li e concordo com os",
+    "auth.acceptTermsRequired":
+      "Você deve aceitar os Termos de Uso e a Política de Privacidade para criar uma conta.",
+    "auth.acceptTermsSubmit": "Continuar",
+    "auth.acceptTermsTitle": "Aceite nossos Termos",
     "auth.alreadyHaveAccount": "Já tem uma conta? Entrar",
     "auth.backToSignIn": "Voltar para entrar",
     "auth.checkYourEmail": "Confira seu email para concluir o acesso.",
@@ -661,6 +719,7 @@ const messages = {
     "auth.passwordRequirementUppercase": "Uma letra maiúscula",
     "auth.passwordRequired": "Informe sua senha.",
     "auth.passwordUpdated": "Senha atualizada com sucesso.",
+    "auth.privacyPolicy": "Política de Privacidade",
     "auth.rateLimitError":
       "Muitas tentativas. Aguarde um momento e tente novamente.",
     "auth.redirectNotAllowed":
@@ -715,6 +774,7 @@ const messages = {
     "common.expense": "Gasto",
     "common.left": "a menos",
     "common.month": "mês",
+    "common.name": "Nome",
     "common.noDataForPeriod": "Ainda não há dados para este período.",
     "common.next": "Próximo",
     "common.onTrack": "No prazo",
@@ -892,6 +952,29 @@ const messages = {
     "goals.updateError": "Não foi possível atualizar a meta.",
     "goals.updateSuccess": "Meta atualizada com sucesso.",
     "goals.validationError": "Informe o nome e o valor alvo.",
+    "landing.description": "Finanças pessoais, open source e gratuito.",
+    "landing.feature.control.description":
+      "Supabase RLS: só você acessa seus dados.",
+    "landing.feature.control.title": "Seus dados, seu controle",
+    "landing.feature.free.description":
+      "Auto-hospedável. Sem planos pagos, sem rastreamento.",
+    "landing.feature.free.title": "Gratuito e open source",
+    "landing.feature.goals.description":
+      "Defina objetivos e acompanhe seu progresso.",
+    "landing.feature.goals.title": "Metas financeiras",
+    "landing.feature.income.description":
+      "Registre ganhos, gastos e parcelamentos.",
+    "landing.feature.income.title": "Receitas e despesas",
+    "landing.feature.reports.description":
+      "Visualize o equilíbrio 50/30/20 e o patrimônio líquido.",
+    "landing.feature.reports.title": "Relatórios mensais",
+    "landing.feature.smartCategories.description":
+      "Necessidades, desejos e poupança — organizados.",
+    "landing.feature.smartCategories.title": "Categorias inteligentes",
+    "landing.featuresLabel": "Funcionalidades",
+    "landing.heading": "Dragg – Painel de Finanças Pessoais",
+    "landing.license": "Licença MIT",
+    "landing.openSource": "Open source",
     "nav.budgets": "Orçamentos",
     "nav.categories": "Categorias",
     "nav.goals": "Metas",
@@ -953,9 +1036,21 @@ const messages = {
     "screen.payments.description": "Gerencie seus pagamentos recorrentes",
     "screen.payments.monthlyAverage": "média mensal",
     "screen.payments.monthlySubscriptions": "Assinaturas mensais",
+    "screen.payments.newPayment": "Nova forma de pagamento",
     "screen.payments.pausedSubscriptions": "Assinaturas pausadas",
     "screen.payments.title": "Pagamentos e assinaturas",
     "screen.payments.yearlySubscriptions": "Assinaturas anuais",
+    "paymentMethod.create": "Adicionar forma de pagamento",
+    "paymentMethod.createDescription":
+      "Crie uma forma de pagamento para acompanhar limites absolutos e gastos.",
+    "paymentMethod.createError": "Não foi possível criar a forma de pagamento.",
+    "paymentMethod.createSuccess": "Forma de pagamento criada com sucesso.",
+    "paymentMethod.createValidationError":
+      "Informe um nome para a forma de pagamento.",
+    "paymentMethod.creditLimit": "Limite de crédito",
+    "paymentMethod.namePlaceholder": "Ex.: Nubank, Itaú...",
+    "paymentMethod.saving": "Salvando...",
+    "paymentMethod.type": "Tipo",
     "payments.deleteMethod": "Excluir forma de pagamento?",
     "payments.deleteMethodDescription":
       "Esta forma de pagamento será removida da sua conta.",
@@ -1151,6 +1246,10 @@ const messages = {
     "transaction.paymentMethods.boleto": "Boleto",
     "transaction.paymentMethods.transfer": "Transferência",
     "transaction.paymentMethods.pix": "PIX",
+    "transaction.paymentMethods.credit": "Cartão de crédito",
+    "transaction.paymentMethods.debit": "Cartão de débito",
+    "transaction.paymentMethods.bank": "Transferência bancária",
+    "transaction.paymentMethods.other": "Outro",
     "transaction.description": "Descrição",
     "transaction.descriptionPlaceholder": "Ex.: mercado, combustível...",
     "transaction.installmentFrequency": "Parcelamento",
@@ -1187,7 +1286,8 @@ const messages = {
     "transactions.subscriptions.deleteOnlyThis": "Excluir esta ocorrência",
     "transactions.subscriptions.deleteOnlyThisConfirm":
       "Isso excluirá somente a ocorrência selecionada da assinatura.",
-    "transactions.subscriptions.deleteOnlyThisTitle": "Excluir esta ocorrência?",
+    "transactions.subscriptions.deleteOnlyThisTitle":
+      "Excluir esta ocorrência?",
     "transactions.subscriptions.deleteThisAndFollowingUnpaid":
       "Excluir esta e as próximas ocorrências não pagas",
     "transactions.subscriptions.deleteThisAndFollowingUnpaidConfirm":
@@ -1250,25 +1350,59 @@ function resolveLocale(value?: string | null): Locale {
   return value?.toLowerCase().startsWith("pt") ? "pt-BR" : "en";
 }
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
+function resolveCurrency(
+  candidate: string | null | undefined,
+  locale: Locale,
+): Currency {
+  if (isSupportedCurrency(candidate)) return candidate;
+  return locale === "pt-BR" ? "BRL" : "USD";
+}
+
+function readStoredLocalePreferences(): { currency: Currency; locale: Locale } {
+  const storedLocale = window.localStorage.getItem(localeStorageKey);
+  const locale = storedLocale
+    ? resolveLocale(storedLocale)
+    : resolveLocale(window.navigator.language);
+  const storedCurrency = window.localStorage.getItem(currencyStorageKey);
+
+  return { currency: resolveCurrency(storedCurrency, locale), locale };
+}
+
+function translateMessage(locale: Locale, key: string): string {
+  return (
+    messages[locale][key as keyof Messages] ??
+    messages[locale][`data.category.${key}` as keyof Messages] ??
+    messages[locale][`data.group.${key}` as keyof Messages] ??
+    messages[locale][`common.${key}` as keyof Messages] ??
+    key
+  );
+}
+
+function formatLocalizedDate(
+  locale: Locale,
+  date: string | Date,
+  options?: Intl.DateTimeFormatOptions,
+): string {
+  const value =
+    typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
+      ? new Date(`${date}T00:00:00`)
+      : new Date(date);
+
+  return new Intl.DateTimeFormat(locale, options).format(value);
+}
+
+export function LanguageProvider({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   const [locale, setLocaleState] = React.useState<Locale>("en");
   const [currency, setCurrencyState] = React.useState<Currency>("USD");
 
   React.useEffect(() => {
-    const storedLocale = window.localStorage.getItem(localeStorageKey);
-    const nextLocale = storedLocale
-      ? resolveLocale(storedLocale)
-      : resolveLocale(window.navigator.language);
-    const storedCurrency = window.localStorage.getItem(currencyStorageKey);
+    const { currency: nextCurrency, locale: nextLocale } =
+      readStoredLocalePreferences();
 
     setLocaleState(nextLocale);
-    setCurrencyState(
-      isSupportedCurrency(storedCurrency)
-        ? storedCurrency
-        : nextLocale === "pt-BR"
-          ? "BRL"
-          : "USD",
-    );
+    setCurrencyState(nextCurrency);
   }, []);
 
   React.useEffect(() => {
@@ -1287,37 +1421,20 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         return formatCurrency(value, locale, currency);
       },
       formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions) {
-        const value =
-          typeof date === "string" && date.match(/^\d{4}-\d{2}-\d{2}$/)
-            ? new Date(`${date}T00:00:00`)
-            : new Date(date);
-
-        return new Intl.DateTimeFormat(locale, options).format(value);
+        return formatLocalizedDate(locale, date, options);
       },
       formatNumber(value: number, options?: Intl.NumberFormatOptions) {
         return new Intl.NumberFormat(locale, options).format(value);
       },
       locale,
       setCurrency(nextCurrency: Currency) {
-        setCurrencyState(
-          isSupportedCurrency(nextCurrency)
-            ? nextCurrency
-            : locale === "pt-BR"
-              ? "BRL"
-              : "USD",
-        );
+        setCurrencyState(resolveCurrency(nextCurrency, locale));
       },
       setLocale(nextLocale: Locale) {
         setLocaleState(nextLocale);
       },
       t(key: string) {
-        return (
-          messages[locale][key as keyof Messages] ??
-          messages[locale][`data.category.${key}` as keyof Messages] ??
-          messages[locale][`data.group.${key}` as keyof Messages] ??
-          messages[locale][`common.${key}` as keyof Messages] ??
-          key
-        );
+        return translateMessage(locale, key);
       },
     }),
     [currency, locale],

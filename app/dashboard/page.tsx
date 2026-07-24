@@ -43,29 +43,17 @@ function DashboardContentFallback() {
   );
 }
 
-async function DashboardContent({
-  selectedMonth,
-  userContext,
-}: {
-  selectedMonth?: string;
-  userContext: Awaited<ReturnType<typeof getUserContext>>;
-}) {
-  const dashboardData = await getDashboardData(selectedMonth, userContext);
+type DashboardData = Awaited<ReturnType<typeof getDashboardData>>;
 
+function DashboardCharts({
+  dashboardData,
+  selectedMonth,
+}: {
+  dashboardData: DashboardData;
+  selectedMonth?: string;
+}) {
   return (
     <>
-      <AnimatedCard index={0} className="mb-6 lg:mb-8">
-        <section aria-label="Financial summary">
-          <SummarySection
-            summaryData={dashboardData.summaryData}
-            categories={dashboardData.categories}
-            paymentMethods={dashboardData.paymentMethods}
-            createCategoryAction={createCategoryAction}
-            onSubmit={createTransactionAction}
-          />
-        </section>
-      </AnimatedCard>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 mt-4 lg:mt-6">
         <AnimatedCard index={2}>
           <BudgetSplitChart budgetSplitData={dashboardData.budgetSplitData} />
@@ -99,6 +87,37 @@ async function DashboardContent({
           <QuickActions />
         </AnimatedCard>
       </div>
+    </>
+  );
+}
+
+async function DashboardContent({
+  selectedMonth,
+  userContext,
+}: {
+  selectedMonth?: string;
+  userContext: Awaited<ReturnType<typeof getUserContext>>;
+}) {
+  const dashboardData = await getDashboardData(selectedMonth, userContext);
+
+  return (
+    <>
+      <AnimatedCard index={0} className="mb-6 lg:mb-8">
+        <section aria-label="Financial summary">
+          <SummarySection
+            summaryData={dashboardData.summaryData}
+            categories={dashboardData.categories}
+            paymentMethods={dashboardData.paymentMethods}
+            createCategoryAction={createCategoryAction}
+            onSubmit={createTransactionAction}
+          />
+        </section>
+      </AnimatedCard>
+
+      <DashboardCharts
+        dashboardData={dashboardData}
+        selectedMonth={selectedMonth}
+      />
     </>
   );
 }

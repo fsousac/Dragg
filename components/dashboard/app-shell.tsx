@@ -6,6 +6,7 @@ import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { NavigationPrefetcher } from "@/components/dashboard/navigation-prefetcher";
 import { PageTransition } from "@/components/dashboard/page-transition";
 import { Sidebar } from "@/components/dashboard/sidebar";
+import { requireAcceptedTerms } from "@/lib/auth/terms";
 import type {
   AuthenticatedUserClaims,
   AuthenticatedUserContext,
@@ -45,6 +46,36 @@ function getMetadataValue(
   return null;
 }
 
+function isAvatarKey(key: string) {
+  const lowerKey = key.toLowerCase();
+  return (
+    lowerKey.includes("avatar") ||
+    lowerKey.includes("picture") ||
+    lowerKey.includes("photo")
+  );
+}
+
+function isImageUrl(value: string) {
+  return (
+    /^https?:\/\//.test(value) &&
+    /(googleusercontent|gravatar|avatar|photo|picture|image)/i.test(value)
+  );
+}
+
+function findAvatarInEntries(value: object, queue: unknown[]) {
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (typeof nestedValue === "string") {
+      if (isAvatarKey(key) || isImageUrl(nestedValue)) {
+        return nestedValue;
+      }
+    } else if (nestedValue && typeof nestedValue === "object") {
+      queue.push(nestedValue);
+    }
+  }
+
+  return null;
+}
+
 function getAvatarUrl(
   metadata: Array<Record<string, unknown> | undefined | null>,
 ) {
@@ -74,25 +105,9 @@ function getAvatarUrl(
       continue;
     }
 
-    for (const [key, nestedValue] of Object.entries(value)) {
-      if (typeof nestedValue === "string") {
-        const lowerKey = key.toLowerCase();
-        const looksLikeAvatarKey =
-          lowerKey.includes("avatar") ||
-          lowerKey.includes("picture") ||
-          lowerKey.includes("photo");
-        const looksLikeImageUrl =
-          /^https?:\/\//.test(nestedValue) &&
-          /(googleusercontent|gravatar|avatar|photo|picture|image)/i.test(
-            nestedValue,
-          );
-
-        if (looksLikeAvatarKey || looksLikeImageUrl) {
-          return nestedValue;
-        }
-      } else if (nestedValue && typeof nestedValue === "object") {
-        queue.push(nestedValue);
-      }
+    const found = findAvatarInEntries(value, queue);
+    if (found) {
+      return found;
     }
   }
 
@@ -108,6 +123,7 @@ async function getShellUser(userContext?: AuthenticatedUserContext) {
   if (userContext) {
     return {
       claims: userContext.claims,
+      supabase: userContext.supabase,
       user: userContext.user,
     };
   }
@@ -120,26 +136,38 @@ async function getShellUser(userContext?: AuthenticatedUserContext) {
 
   return {
     claims: claimsData?.claims as AuthenticatedUserClaims | undefined,
+    supabase,
     user: userData?.user,
   };
 }
 
-export async function AppShell({ children, userContext }: AppShellProps) {
-  const { claims, user } = await getShellUser(userContext);
+type ShellUserResult = Awaited<ReturnType<typeof getShellUser>>;
 
-  if (!claims || !user) {
-    redirect("/");
-  }
-
-  const userEmail = user.email ?? claims.email ?? "";
-  const userName =
+function resolveUserName(
+  user: NonNullable<ShellUserResult["user"]>,
+  userEmail: string,
+) {
+  return (
     user.user_metadata?.full_name ??
     user.user_metadata?.name ??
-    getDisplayName(userEmail);
-  const initials = getInitials(userName);
-  const identityMetadata = user.identities
+    getDisplayName(userEmail)
+  );
+}
+
+function resolveIdentityMetadata(user: NonNullable<ShellUserResult["user"]>) {
+  return user.identities
     ?.map((identity) => identity.identity_data as Record<string, unknown>)
     .filter(Boolean);
+}
+
+function resolveDisplayIdentity(
+  user: NonNullable<ShellUserResult["user"]>,
+  claims: NonNullable<ShellUserResult["claims"]>,
+) {
+  const userEmail = user.email ?? claims.email ?? "";
+  const userName = resolveUserName(user, userEmail);
+  const initials = getInitials(userName);
+  const identityMetadata = resolveIdentityMetadata(user);
   const avatarUrl = getAvatarUrl([
     user.user_metadata ?? {},
     user.app_metadata ?? {},
@@ -147,13 +175,33 @@ export async function AppShell({ children, userContext }: AppShellProps) {
     ...(identityMetadata ?? []),
   ]);
 
-  async function signOut() {
-    "use server";
+  return { userEmail, userName, initials, avatarUrl };
+}
 
-    const supabase = await createClient();
-    await supabase.auth.signOut();
+async function signOut() {
+  "use server";
+
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect("/");
+}
+
+export async function AppShell({
+  children,
+  userContext,
+}: Readonly<AppShellProps>) {
+  const { claims, supabase, user } = await getShellUser(userContext);
+
+  if (!claims || !user) {
     redirect("/");
   }
+
+  await requireAcceptedTerms(supabase, user.id);
+
+  const { userEmail, userName, initials, avatarUrl } = resolveDisplayIdentity(
+    user,
+    claims,
+  );
 
   return (
     <div className="flex min-h-screen bg-background">

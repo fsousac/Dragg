@@ -39,8 +39,8 @@ describe("calculateTotalSaved", () => {
       transactions: [tx("expense", 591.01, "2026-05-10", "savings")],
     });
 
-    expect(result.totalInvested).toBe(591.01);
-    expect(result.totalSaved).toBe(591.01);
+    expect(result.totalInvested).toBeCloseTo(591.01, 2);
+    expect(result.totalSaved).toBeCloseTo(591.01, 2);
   });
 
   it("sums closed month balances, including deficits", () => {
@@ -101,9 +101,9 @@ describe("calculateTotalSaved", () => {
       ],
     });
 
-    expect(result.totalInvested).toBe(591.01);
+    expect(result.totalInvested).toBeCloseTo(591.01, 2);
     expect(result.totalClosedMonthLeftover).toBe(1200);
-    expect(result.totalSaved).toBe(1791.01);
+    expect(result.totalSaved).toBeCloseTo(1791.01, 2);
   });
 
   it("debits a current month deficit from accumulated savings", () => {

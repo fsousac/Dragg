@@ -74,10 +74,10 @@ describe("month route helpers", () => {
     expect(getMonthFromSearchParams(new URLSearchParams("month=2026-05"))).toBe(
       "2026-05",
     );
-    expect(getMonthFromSearchParams(new URLSearchParams("month=may"))).toBe(
-      null,
-    );
-    expect(getMonthFromSearchParams(new URLSearchParams())).toBe(null);
+    expect(
+      getMonthFromSearchParams(new URLSearchParams("month=may")),
+    ).toBeNull();
+    expect(getMonthFromSearchParams(new URLSearchParams())).toBeNull();
   });
 
   it("preserves existing query params when applying the selected month", () => {

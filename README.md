@@ -91,6 +91,7 @@ If you are not using Supabase CLI, apply SQL files from `supabase/migrations` in
 - [Authentication](./docs/auth.md)
 - [Database](./docs/database.md)
 - [Security Notes](./docs/security.md)
+- [End-to-End Tests](./docs/e2e.md)
 - [Contributing Guide](./CONTRIBUTING.md)
 - [Security Policy](./SECURITY.md)
 - [Code of Conduct](./CODE_OF_CONDUCT.md)
@@ -130,6 +131,8 @@ pnpm run lint           # Run ESLint
 pnpm run test           # Run tests once
 pnpm run test:watch     # Run tests in watch mode
 pnpm run test:coverage  # Run tests with coverage
+pnpm run e2e            # Run Playwright E2E tests (see docs/e2e.md)
+pnpm run e2e:ui         # Run Playwright E2E tests interactively
 ```
 
 ### 🚀 Deployment

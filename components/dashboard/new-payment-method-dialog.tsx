@@ -39,27 +39,26 @@ type NewPaymentMethodDialogProps = {
 
 const paymentTypes = ["debit", "credit", "bank", "boleto", "other"] as const;
 
-export function NewPaymentMethodDialog({
-  children,
-  createPaymentMethodAction,
-  onCreated,
-  open: controlledOpen,
-  onOpenChange,
-}: NewPaymentMethodDialogProps) {
-  const router = useRouter();
-  const { t } = useI18n();
+function useControlledOpen(
+  controlledOpen: boolean | undefined,
+  onOpenChange: ((open: boolean) => void) | undefined,
+) {
   const [internalOpen, setInternalOpen] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [name, setName] = useState("");
-  const [type, setType] = useState<CreatePaymentMethodInput["type"]>("debit");
-  const [closingDay, setClosingDay] = useState("");
-  const [creditLimit, setCreditLimit] = useState(0);
-  const [dueDay, setDueDay] = useState("");
   const open = controlledOpen ?? internalOpen;
   const setOpen = (nextOpen: boolean) => {
     onOpenChange?.(nextOpen);
     setInternalOpen(nextOpen);
   };
+
+  return { open, setOpen };
+}
+
+function usePaymentMethodDialogFields(open: boolean) {
+  const [name, setName] = useState("");
+  const [type, setType] = useState<CreatePaymentMethodInput["type"]>("debit");
+  const [closingDay, setClosingDay] = useState("");
+  const [creditLimit, setCreditLimit] = useState(0);
+  const [dueDay, setDueDay] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -71,7 +70,42 @@ export function NewPaymentMethodDialog({
     }
   }, [open]);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  return {
+    name,
+    setName,
+    type,
+    setType,
+    closingDay,
+    setClosingDay,
+    creditLimit,
+    setCreditLimit,
+    dueDay,
+    setDueDay,
+  };
+}
+
+type PaymentMethodDialogFields = ReturnType<typeof usePaymentMethodDialogFields>;
+
+function useCreatePaymentMethodSubmit({
+  fields,
+  setOpen,
+  setIsSaving,
+  createPaymentMethodAction,
+  onCreated,
+  router,
+  t,
+}: {
+  fields: PaymentMethodDialogFields;
+  setOpen: (open: boolean) => void;
+  setIsSaving: (value: boolean) => void;
+  createPaymentMethodAction: NewPaymentMethodDialogProps["createPaymentMethodAction"];
+  onCreated?: () => void;
+  router: ReturnType<typeof useRouter>;
+  t: (key: string) => string;
+}) {
+  const { name, type, closingDay, creditLimit, dueDay } = fields;
+
+  return async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const submittedName = name.trim();
@@ -102,6 +136,182 @@ export function NewPaymentMethodDialog({
       setIsSaving(false);
     }
   };
+}
+
+function PaymentMethodNameField({
+  name,
+  setName,
+  t,
+}: Pick<PaymentMethodDialogFields, "name" | "setName"> & {
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="payment-name">{t("common.name")}</Label>
+      <Input
+        id="payment-name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder={t("paymentMethod.namePlaceholder")}
+        autoComplete="off"
+      />
+    </div>
+  );
+}
+
+function PaymentMethodTypeField({
+  type,
+  setType,
+  t,
+}: Pick<PaymentMethodDialogFields, "type" | "setType"> & {
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{t("paymentMethod.type")}</Label>
+      <Select
+        value={type}
+        onValueChange={(v) => setType(v as CreatePaymentMethodInput["type"])}
+      >
+        <SelectTrigger className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {paymentTypes.map((pt) => (
+            <SelectItem key={pt} value={pt}>
+              {t(`transaction.paymentMethods.${pt}`) || pt}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function DayNumberField({
+  id,
+  labelKey,
+  placeholder,
+  value,
+  onChange,
+  t,
+}: {
+  id: string;
+  labelKey: string;
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{t(labelKey)}</Label>
+      <Input
+        id={id}
+        inputMode="numeric"
+        max="31"
+        min="1"
+        placeholder={placeholder}
+        type="number"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
+
+function PaymentMethodCreditFields({
+  creditLimit,
+  setCreditLimit,
+  closingDay,
+  setClosingDay,
+  dueDay,
+  setDueDay,
+  t,
+}: Pick<
+  PaymentMethodDialogFields,
+  "creditLimit" | "setCreditLimit" | "closingDay" | "setClosingDay" | "dueDay" | "setDueDay"
+> & { t: (key: string) => string }) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-2">
+        <CurrencyInput
+          id="credit-limit"
+          label={t("paymentMethod.creditLimit")}
+          value={creditLimit}
+          onValueChange={setCreditLimit}
+          labelClassName="normal-case tracking-normal text-foreground"
+        />
+      </div>
+      <DayNumberField
+        id="credit-closing-day"
+        labelKey="payments.closingDay"
+        placeholder="7"
+        value={closingDay}
+        onChange={setClosingDay}
+        t={t}
+      />
+      <DayNumberField
+        id="credit-due-day"
+        labelKey="payments.dueDay"
+        placeholder="14"
+        value={dueDay}
+        onChange={setDueDay}
+        t={t}
+      />
+    </div>
+  );
+}
+
+function PaymentMethodDialogFooter({
+  isSaving,
+  setOpen,
+  t,
+}: {
+  isSaving: boolean;
+  setOpen: (open: boolean) => void;
+  t: (key: string) => string;
+}) {
+  return (
+    <DialogFooter>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setOpen(false)}
+        disabled={isSaving}
+      >
+        {t("common.cancel")}
+      </Button>
+      <Button type="submit" disabled={isSaving}>
+        <Plus className="size-4" />
+        {isSaving ? t("paymentMethod.saving") : t("paymentMethod.create")}
+      </Button>
+    </DialogFooter>
+  );
+}
+
+export function NewPaymentMethodDialog({
+  children,
+  createPaymentMethodAction,
+  onCreated,
+  open: controlledOpen,
+  onOpenChange,
+}: NewPaymentMethodDialogProps) {
+  const router = useRouter();
+  const { t } = useI18n();
+  const [isSaving, setIsSaving] = useState(false);
+  const { open, setOpen } = useControlledOpen(controlledOpen, onOpenChange);
+  const fields = usePaymentMethodDialogFields(open);
+
+  const handleSubmit = useCreatePaymentMethodSubmit({
+    fields,
+    setOpen,
+    setIsSaving,
+    createPaymentMethodAction,
+    onCreated,
+    router,
+    t,
+  });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -115,94 +325,18 @@ export function NewPaymentMethodDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="payment-name">{t("common.name")}</Label>
-            <Input
-              id="payment-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t("paymentMethod.namePlaceholder")}
-              autoComplete="off"
-            />
-          </div>
+          <PaymentMethodNameField {...fields} t={t} />
+          <PaymentMethodTypeField {...fields} t={t} />
 
-          <div className="space-y-2">
-            <Label>{t("paymentMethod.type")}</Label>
-            <Select
-              value={type}
-              onValueChange={(v) =>
-                setType(v as CreatePaymentMethodInput["type"])
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {paymentTypes.map((pt) => (
-                  <SelectItem key={pt} value={pt}>
-                    {t(`transaction.paymentMethods.${pt}`) || pt}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {type === "credit" ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <CurrencyInput
-                  id="credit-limit"
-                  label={t("paymentMethod.creditLimit")}
-                  value={creditLimit}
-                  onValueChange={setCreditLimit}
-                  labelClassName="normal-case tracking-normal text-foreground"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="credit-closing-day">
-                  {t("payments.closingDay")}
-                </Label>
-                <Input
-                  id="credit-closing-day"
-                  inputMode="numeric"
-                  max="31"
-                  min="1"
-                  placeholder="7"
-                  type="number"
-                  value={closingDay}
-                  onChange={(e) => setClosingDay(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="credit-due-day">{t("payments.dueDay")}</Label>
-                <Input
-                  id="credit-due-day"
-                  inputMode="numeric"
-                  max="31"
-                  min="1"
-                  placeholder="14"
-                  type="number"
-                  value={dueDay}
-                  onChange={(e) => setDueDay(e.target.value)}
-                />
-              </div>
-            </div>
+          {fields.type === "credit" ? (
+            <PaymentMethodCreditFields {...fields} t={t} />
           ) : null}
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={isSaving}
-            >
-              {t("common.cancel")}
-            </Button>
-            <Button type="submit" disabled={isSaving}>
-              <Plus className="size-4" />
-              {isSaving ? t("paymentMethod.saving") : t("paymentMethod.create")}
-            </Button>
-          </DialogFooter>
+          <PaymentMethodDialogFooter
+            isSaving={isSaving}
+            setOpen={setOpen}
+            t={t}
+          />
         </form>
       </DialogContent>
     </Dialog>

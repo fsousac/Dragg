@@ -1,0 +1,11 @@
+.v0-export/
+.agents/
+.next/
+coverage/
+node_modules/
+out/
+pnpm-lock.yaml
+next-env.d.ts
+
+# shadcn-generated, kept in its own vendor style
+components/ui/

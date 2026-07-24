@@ -85,7 +85,7 @@ const createTransactionActionSchema = z
     installmentCount: z.number().int().min(1).max(120),
     notes: safeOptionalNotesSchema,
     paymentMethod: z.string().trim().min(0).max(64),
-    type: z.enum(["income", "expense"]),
+    type: z.enum(["income", "expense", "saving"]),
   })
   .strict();
 

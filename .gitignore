@@ -17,6 +17,7 @@ next.user-config.*
 
 # Common ignores
 node_modules
+package-lock.json
 .next/
 coverage/
 tsconfig.tsbuildinfo
@@ -24,3 +25,9 @@ tsconfig.tsbuildinfo
 AGENTS.md
 **.csv
 **/.temp
+
+# Playwright
+/playwright-report/
+/test-results/
+/blob-report/
+e2e/.auth/

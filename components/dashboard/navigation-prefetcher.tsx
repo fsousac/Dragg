@@ -20,14 +20,21 @@ export const sidebarRoutes = [
   "/settings",
 ];
 
-export function NavigationPrefetcher() {
-  const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const didMount = useRef(false);
-  const prefetched = useRef<Set<string>>(new Set());
-  const lastRefreshed = useRef<string | null>(null);
+function getPrefetchTargets(pathname: string, searchParams: URLSearchParams) {
+  return sidebarRoutes
+    .filter((route) => route !== pathname)
+    .map((route) => withSelectedMonth(route, searchParams));
+}
 
+function useMonthQueryParamSync({
+  pathname,
+  router,
+  searchParams,
+}: {
+  pathname: string;
+  router: ReturnType<typeof useRouter>;
+  searchParams: URLSearchParams;
+}) {
   useEffect(() => {
     if (getMonthFromSearchParams(searchParams)) {
       return;
@@ -39,22 +46,31 @@ export function NavigationPrefetcher() {
       scroll: false,
     });
   }, [pathname, router, searchParams]);
+}
+
+function usePrefetchSidebarRoutes({
+  pathname,
+  router,
+  searchParams,
+}: {
+  pathname: string;
+  router: ReturnType<typeof useRouter>;
+  searchParams: URLSearchParams;
+}) {
+  const prefetched = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     // Start prefetch only after the page has fully loaded (or after 1s fallback).
     const startPrefetch = () => {
       const prefetchRoutes = () => {
-        sidebarRoutes
-          .filter((route) => route !== pathname)
-          .map((route) => withSelectedMonth(route, searchParams))
-          .forEach((route) => {
-            if (!prefetched.current.has(route)) {
-              prefetched.current.add(route);
-              try {
-                router.prefetch(route);
-              } catch {}
-            }
-          });
+        for (const route of getPrefetchTargets(pathname, searchParams)) {
+          if (!prefetched.current.has(route)) {
+            prefetched.current.add(route);
+            try {
+              router.prefetch(route);
+            } catch {}
+          }
+        }
       };
 
       if (typeof window.requestIdleCallback === "function") {
@@ -78,6 +94,17 @@ export function NavigationPrefetcher() {
       };
     }
   }, [pathname, router, searchParams]);
+}
+
+function useRefreshOnPathnameChange({
+  pathname,
+  router,
+}: {
+  pathname: string;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const didMount = useRef(false);
+  const lastRefreshed = useRef<string | null>(null);
 
   useEffect(() => {
     // Only refresh once per pathname change and avoid repeated refreshes.
@@ -94,6 +121,16 @@ export function NavigationPrefetcher() {
 
     return () => window.clearTimeout(refreshTimeoutId);
   }, [pathname, router]);
+}
+
+export function NavigationPrefetcher() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useMonthQueryParamSync({ pathname, router, searchParams });
+  usePrefetchSidebarRoutes({ pathname, router, searchParams });
+  useRefreshOnPathnameChange({ pathname, router });
 
   return null;
 }

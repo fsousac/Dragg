@@ -24,8 +24,140 @@ const amountColors = {
   saving: "text-savings",
 };
 
+interface TransactionsListHeaderProps {
+  readonly t: (key: string) => string;
+  readonly searchParams: URLSearchParams;
+  readonly router: ReturnType<typeof useRouter>;
+}
+
+function TransactionsListHeader({
+  t,
+  searchParams,
+  router,
+}: TransactionsListHeaderProps) {
+  const href = withSelectedMonth("/transactions", searchParams);
+  const prefetch = () => router.prefetch(href);
+
+  return (
+    <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <div>
+        <CardTitle className="text-base lg:text-lg font-semibold text-foreground">
+          {t("dashboard.latestTransactions.title")}
+        </CardTitle>
+        <p className="text-xs lg:text-sm text-muted-foreground mt-1">
+          {t("dashboard.latestTransactions.description")}
+        </p>
+      </div>
+      <Link
+        href={href}
+        prefetch
+        onMouseEnter={prefetch}
+        onFocus={prefetch}
+        className="flex items-center gap-3 rounded-xl transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      >
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-primary hover:text-primary/80"
+        >
+          {t("common.viewAll")}
+          <ArrowRight className="w-4 h-4 ml-1" />
+        </Button>
+      </Link>
+    </CardHeader>
+  );
+}
+
+interface TransactionRowProps {
+  readonly transaction: Transaction;
+  readonly today: string;
+  readonly formatCurrency: (value: number) => string;
+  readonly formatDate: (
+    date: string,
+    options?: Intl.DateTimeFormatOptions,
+  ) => string;
+  readonly t: (key: string) => string;
+}
+
+function getTransactionRowTitle(
+  transaction: Transaction,
+  t: (key: string) => string,
+) {
+  if (!transaction.isCreditCardInvoice) return t(transaction.descriptionKey);
+
+  const invoiceKey =
+    transaction.invoice?.paymentMethodKey ?? transaction.paymentMethodKey;
+
+  return invoiceKey
+    ? `${t("transaction.creditCardInvoiceFor")} ${t(invoiceKey)}`
+    : t("transaction.creditCardInvoice");
+}
+
+function TransactionRowMeta({
+  transaction,
+  formatDate,
+  t,
+}: Pick<TransactionRowProps, "transaction" | "formatDate" | "t">) {
+  return (
+    <div className="mt-1 flex items-center gap-2">
+      <span
+        className="rounded-full px-2 py-0.5 text-[10px] font-medium capitalize lg:text-xs"
+        style={getGroupBadgeStyle(transaction.group)}
+      >
+        {t(`data.group.${transaction.group}`)}
+      </span>
+      <span className="text-xs text-muted-foreground">
+        {formatDate(transaction.date, { month: "short", day: "numeric" })}
+      </span>
+    </div>
+  );
+}
+
+function TransactionRow({
+  transaction,
+  today,
+  formatCurrency,
+  formatDate,
+  t,
+}: TransactionRowProps) {
+  const shouldPresentAsPlanned =
+    Boolean(transaction.isPlanned) && transaction.date > today;
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50 lg:gap-4 lg:px-6 lg:py-4",
+        shouldPresentAsPlanned && "opacity-70",
+      )}
+    >
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-xl lg:h-12 lg:w-12 lg:text-2xl">
+        {transaction.icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">
+          {getTransactionRowTitle(transaction, t)}
+        </p>
+        <TransactionRowMeta
+          transaction={transaction}
+          formatDate={formatDate}
+          t={t}
+        />
+      </div>
+      <p
+        className={cn(
+          "text-sm font-semibold tabular-nums lg:text-base",
+          amountColors[transaction.type],
+        )}
+      >
+        {transaction.amount > 0 ? "+" : ""}
+        {formatCurrency(Math.abs(transaction.amount))}
+      </p>
+    </div>
+  );
+}
+
 type TransactionsListProps = {
-  transactions: Transaction[];
+  readonly transactions: Transaction[];
 };
 
 export function TransactionsList({ transactions }: TransactionsListProps) {
@@ -36,94 +168,23 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
 
   return (
     <Card className="h-fit bg-card border-border card-shadow flex flex-col">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <div>
-          <CardTitle className="text-base lg:text-lg font-semibold text-foreground">
-            {t("dashboard.latestTransactions.title")}
-          </CardTitle>
-          <p className="text-xs lg:text-sm text-muted-foreground mt-1">
-            {t("dashboard.latestTransactions.description")}
-          </p>
-        </div>
-        <Link
-          href={withSelectedMonth("/transactions", searchParams)}
-          prefetch
-          onMouseEnter={() =>
-            router.prefetch(withSelectedMonth("/transactions", searchParams))
-          }
-          onFocus={() =>
-            router.prefetch(withSelectedMonth("/transactions", searchParams))
-          }
-          className="flex items-center gap-3 rounded-xl transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-primary hover:text-primary/80"
-          >
-            {t("common.viewAll")}
-            <ArrowRight className="w-4 h-4 ml-1" />
-          </Button>
-        </Link>
-      </CardHeader>
+      <TransactionsListHeader
+        t={t}
+        searchParams={searchParams}
+        router={router}
+      />
       <CardContent className="p-0 flex-1 overflow-hidden">
         <div className="divide-y divide-border">
-          {transactions.map((transaction) => {
-            const shouldPresentAsPlanned =
-              Boolean(transaction.isPlanned) && transaction.date > today;
-
-            return (
-              <div
-                key={transaction.id}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50 lg:gap-4 lg:px-6 lg:py-4",
-                  shouldPresentAsPlanned && "opacity-70",
-                )}
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-xl lg:h-12 lg:w-12 lg:text-2xl">
-                  {transaction.icon}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {transaction.isCreditCardInvoice
-                      ? (() => {
-                          const invoiceKey =
-                            transaction.invoice?.paymentMethodKey ??
-                            transaction.paymentMethodKey;
-
-                          return invoiceKey
-                            ? `${t("transaction.creditCardInvoiceFor")} ${t(invoiceKey)}`
-                            : t("transaction.creditCardInvoice");
-                        })()
-                      : t(transaction.descriptionKey)}
-                  </p>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span
-                      className="rounded-full px-2 py-0.5 text-[10px] font-medium capitalize lg:text-xs"
-                      style={getGroupBadgeStyle(transaction.group)}
-                    >
-                      {t(`data.group.${transaction.group}`)}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatDate(transaction.date, {
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </span>
-                  </div>
-                </div>
-                <p
-                  className={cn(
-                    "text-sm font-semibold tabular-nums lg:text-base",
-                    amountColors[transaction.type],
-                  )}
-                >
-                  {transaction.amount > 0 ? "+" : ""}
-                  {formatCurrency(Math.abs(transaction.amount))}
-                </p>
-              </div>
-            );
-          })}
+          {transactions.map((transaction) => (
+            <TransactionRow
+              key={transaction.id}
+              transaction={transaction}
+              today={today}
+              formatCurrency={formatCurrency}
+              formatDate={formatDate}
+              t={t}
+            />
+          ))}
         </div>
       </CardContent>
     </Card>
