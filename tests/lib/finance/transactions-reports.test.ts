@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -192,6 +192,10 @@ function row(overrides: RowOverrides = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("listTransactions", () => {
@@ -462,6 +466,10 @@ describe("listTransactions", () => {
   });
 
   it("marks future-dated rows and credit-card invoices as planned when includeFuture is set", async () => {
+    // Pin "today" mid-month so the "future" fixture date below stays in the
+    // future regardless of which day this suite actually runs on.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-15T12:00:00.000Z"));
     setup([
       qb({
         data: [
@@ -579,6 +587,10 @@ describe("getDashboardData", () => {
   });
 
   it("aggregates income, expenses, budgets, trends, and merges the latest transactions", async () => {
+    // Pin "today" mid-month so the future-dated fixtures below stay in the
+    // future regardless of which day this suite actually runs on.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-15T12:00:00.000Z"));
     const actualDataset = [
       row({ id: "inc-1", amount: 5000, kind: "income", date: "2026-07-05" }),
       row({
