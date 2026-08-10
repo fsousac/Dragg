@@ -989,60 +989,67 @@ describe("Transaction details dialog - invoice view", () => {
 });
 
 describe("Transaction details dialog - edit mode", () => {
-  it("updates amount, description, date, category, payment method and notes fields, then saves them all", async () => {
-    const user = userEvent.setup();
-    const plainTx = makeTransaction({
-      id: "tx-edit",
-      date: "2026-07-01",
-      descriptionKey: "Edit me",
-      categoryId: "cat-wants",
-      paymentMethodId: "pm-card",
-      notes: "old notes",
-      amount: -50,
-    });
-    const updateTransactionAction = vi.fn().mockResolvedValue(undefined);
-    renderScreen({ transactions: [plainTx], updateTransactionAction });
-
-    await user.click(getRowOpenButton("Edit me"));
-    const dialog = await screen.findByRole("dialog");
-
-    const amountInput = within(dialog).getByLabelText("Transaction amount");
-    fireChange(amountInput, "5000");
-
-    const descriptionInput = within(dialog).getByLabelText("Description");
-    await user.clear(descriptionInput);
-    await user.type(descriptionInput, "Updated description");
-
-    const dateInput = within(dialog).getByLabelText("Transaction date");
-    fireChange(dateInput, "2026-07-15");
-
-    await user.click(within(dialog).getByLabelText("Category"));
-    let listbox = await screen.findByRole("listbox");
-    await user.click(within(listbox).getByText("Rent"));
-
-    await user.click(within(dialog).getByLabelText("Payment method"));
-    listbox = await screen.findByRole("listbox");
-    await user.click(within(listbox).getByText("Payment method"));
-
-    const notesInput = within(dialog).getByLabelText("Notes");
-    await user.clear(notesInput);
-    await user.type(notesInput, "new notes");
-
-    await user.click(within(dialog).getByText("Save changes"));
-
-    await vi.waitFor(() => {
-      expect(updateTransactionAction).toHaveBeenCalledWith({
-        amount: 50,
-        category: "cat-needs",
-        date: "2026-07-15",
-        description: "Updated description",
+  it(
+    "updates amount, description, date, category, payment method and notes fields, then saves them all",
+    async () => {
+      const user = userEvent.setup();
+      const plainTx = makeTransaction({
         id: "tx-edit",
-        notes: "new notes",
-        paymentMethod: "none",
-        type: "expense",
+        date: "2026-07-01",
+        descriptionKey: "Edit me",
+        categoryId: "cat-wants",
+        paymentMethodId: "pm-card",
+        notes: "old notes",
+        amount: -50,
       });
-    });
-  });
+      const updateTransactionAction = vi.fn().mockResolvedValue(undefined);
+      renderScreen({ transactions: [plainTx], updateTransactionAction });
+
+      await user.click(getRowOpenButton("Edit me"));
+      const dialog = await screen.findByRole("dialog");
+
+      const amountInput = within(dialog).getByLabelText("Transaction amount");
+      fireChange(amountInput, "5000");
+
+      const descriptionInput = within(dialog).getByLabelText("Description");
+      await user.clear(descriptionInput);
+      await user.type(descriptionInput, "Updated description");
+
+      const dateInput = within(dialog).getByLabelText("Transaction date");
+      fireChange(dateInput, "2026-07-15");
+
+      await user.click(within(dialog).getByLabelText("Category"));
+      let listbox = await screen.findByRole("listbox");
+      await user.click(within(listbox).getByText("Rent"));
+
+      await user.click(within(dialog).getByLabelText("Payment method"));
+      listbox = await screen.findByRole("listbox");
+      await user.click(within(listbox).getByText("Payment method"));
+
+      const notesInput = within(dialog).getByLabelText("Notes");
+      await user.clear(notesInput);
+      await user.type(notesInput, "new notes");
+
+      await user.click(within(dialog).getByText("Save changes"));
+
+      await vi.waitFor(() => {
+        expect(updateTransactionAction).toHaveBeenCalledWith({
+          amount: 50,
+          category: "cat-needs",
+          date: "2026-07-15",
+          description: "Updated description",
+          id: "tx-edit",
+          notes: "new notes",
+          paymentMethod: "none",
+          type: "expense",
+        });
+      });
+    },
+    // Six sequential real-timer userEvent interactions (type x2,
+    // click-through comboboxes x2) can exceed the default 10s testTimeout
+    // under CPU contention (e.g. the full suite running under coverage).
+    20_000,
+  );
 
   it("saves changes successfully: calls updateTransactionAction, closes, and refreshes", async () => {
     const user = userEvent.setup();

@@ -44,4 +44,42 @@ describe("updateSession", () => {
     expect(response.cookies.get("sb-token")?.value).toBe("abc");
     expect(response.headers.get("x-refreshed")).toBe("1");
   });
+
+  it("logs auth cookie names/size and the claims outcome when DEBUG_AUTH_TRACE is set", async () => {
+    const originalDebugAuthTrace = process.env.DEBUG_AUTH_TRACE;
+    process.env.DEBUG_AUTH_TRACE = "1";
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    createServerClient.mockImplementation(() => ({
+      auth: {
+        getClaims: vi.fn().mockResolvedValue({
+          data: { claims: { sub: "1" } },
+          error: null,
+        }),
+      },
+    }));
+
+    const request = new NextRequest("http://localhost/dashboard", {
+      headers: {
+        cookie: "sb-project-auth-token=abc; sb-project-auth-token.1=def; other=1",
+      },
+    });
+
+    try {
+      await updateSession(request);
+    } finally {
+      process.env.DEBUG_AUTH_TRACE = originalDebugAuthTrace;
+    }
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[DEBUG_AUTH_TRACE] updateSession",
+      expect.objectContaining({
+        authCookieNames: ["sb-project-auth-token", "sb-project-auth-token.1"],
+        authCookieTotalSize: 6,
+        claimsError: null,
+        hasClaims: true,
+        path: "/dashboard",
+      }),
+    );
+  });
 });

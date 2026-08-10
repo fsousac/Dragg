@@ -85,13 +85,20 @@ function qb(response: { data?: unknown; error?: unknown }) {
 
 function makeSupabase(
   fromResponses: unknown[],
-  opts: { createdAt?: string | null; noClaims?: boolean; noUser?: boolean } = {},
+  opts: {
+    claimsError?: unknown;
+    createdAt?: string | null;
+    noClaims?: boolean;
+    noUser?: boolean;
+    userError?: unknown;
+  } = {},
 ) {
   const queue = [...fromResponses];
   return {
     auth: {
       getClaims: vi.fn().mockResolvedValue({
         data: { claims: opts.noClaims ? {} : { sub: USER_ID } },
+        error: opts.claimsError ?? null,
       }),
       getUser: vi.fn().mockResolvedValue({
         data: {
@@ -99,6 +106,7 @@ function makeSupabase(
             ? null
             : { id: USER_ID, created_at: opts.createdAt ?? null },
         },
+        error: opts.userError ?? null,
       }),
     },
     from: vi.fn(() => {
@@ -113,7 +121,13 @@ function makeSupabase(
 
 function setup(
   fromResponses: unknown[] = [],
-  opts: { createdAt?: string | null; noClaims?: boolean; noUser?: boolean } = {},
+  opts: {
+    claimsError?: unknown;
+    createdAt?: string | null;
+    noClaims?: boolean;
+    noUser?: boolean;
+    userError?: unknown;
+  } = {},
 ) {
   const supabase = makeSupabase(fromResponses, opts);
   vi.mocked(createClient).mockResolvedValue(supabase as never);
@@ -175,6 +189,12 @@ describe("getUserContext", () => {
   it("redirects when claims are missing", async () => {
     setup([], { noClaims: true });
     await expect(getUserContext()).rejects.toThrow("REDIRECT:/");
+  });
+
+  it("throws an unexpected claims/user query error instead of masking it as logged-out", async () => {
+    const queryError = new Error("network down");
+    setup([], { claimsError: queryError });
+    await expect(getUserContext()).rejects.toBe(queryError);
   });
 });
 

@@ -92,6 +92,50 @@ describe("shrinkAuthTokenCookies", () => {
     expect(shrinkAuthTokenCookies(cookies)).toEqual(cookies);
   });
 
+  it("drops identities when there's no user_metadata to trim alongside it", () => {
+    const session = {
+      user: {
+        identities: [{ id: "identity-1", identity_data: { some: "payload" } }],
+      },
+    };
+
+    const cookies = chunkCookies(KEY, encodeSession(session));
+    const shrunk = shrinkAuthTokenCookies(cookies);
+
+    const decoded = decodeSession(shrunk);
+    expect(decoded.user.identities).toBeUndefined();
+  });
+
+  it("keeps metadata fields whose duplicate/canonical values differ", () => {
+    const session = {
+      user: {
+        identities: [{ id: "identity-1", identity_data: { some: "payload" } }],
+        user_metadata: {
+          avatar_url: "https://example.com/new.png",
+          picture: "https://example.com/old.png",
+          full_name: "Ada Lovelace",
+          name: "A. Lovelace",
+          provider_id: "12345",
+          sub: "67890",
+        },
+      },
+    };
+
+    const cookies = chunkCookies(KEY, encodeSession(session));
+    const shrunk = shrinkAuthTokenCookies(cookies);
+
+    const decoded = decodeSession(shrunk);
+    expect(decoded.user.user_metadata).toEqual(session.user.user_metadata);
+  });
+
+  it("falls back to the untouched cookie when the base64-prefixed value fails to decode", () => {
+    const cookies: CookieToSet[] = [
+      { name: KEY, value: `${BASE64_PREFIX}not-valid-base64-json-payload`, options: {} },
+    ];
+
+    expect(shrinkAuthTokenCookies(cookies)).toEqual(cookies);
+  });
+
   it("leaves a cookie unchanged when there's nothing to trim", () => {
     const session = { user: { id: "1" } };
     const cookies = chunkCookies(KEY, encodeSession(session));

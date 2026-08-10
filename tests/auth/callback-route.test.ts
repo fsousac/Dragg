@@ -98,4 +98,29 @@ describe("GET /auth/callback", () => {
       "http://localhost/dashboard",
     );
   });
+
+  it("logs the exchange outcome when DEBUG_AUTH_TRACE is set", async () => {
+    const originalDebugAuthTrace = process.env.DEBUG_AUTH_TRACE;
+    process.env.DEBUG_AUTH_TRACE = "1";
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const request = new NextRequest(
+      "http://localhost/auth/callback?code=abc123&sb_flow_id=flow-xyz",
+    );
+
+    try {
+      await GET(request);
+    } finally {
+      process.env.DEBUG_AUTH_TRACE = originalDebugAuthTrace;
+    }
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[DEBUG_AUTH_TRACE] auth/callback.exchangeCodeForSession",
+      expect.objectContaining({
+        error: null,
+        flowId: "flow-xyz",
+        hasSession: false,
+      }),
+    );
+  });
 });
