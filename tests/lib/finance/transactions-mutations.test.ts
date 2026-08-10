@@ -6,6 +6,13 @@ vi.mock("next/navigation", () => ({
     throw new Error(`REDIRECT:${url}`);
   }),
 }));
+vi.mock("@/lib/crypto/field-encryption", () => ({
+  decryptDescription: (value: string | null | undefined) => value ?? null,
+  decryptField: (value: string | null | undefined) => value ?? null,
+  encryptDescription: (value: string) => value,
+  encryptField: (value: string | null | undefined) => value ?? null,
+  isAlreadyEncrypted: () => false,
+}));
 
 import { createClient } from "@/lib/supabase/server";
 import {

@@ -1,8 +1,18 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
-import { type SupabaseClient, type User } from "@supabase/supabase-js";
+import {
+  isAuthSessionMissingError,
+  type SupabaseClient,
+  type User,
+} from "@supabase/supabase-js";
 
+import {
+  decryptDescription,
+  decryptField,
+  encryptDescription,
+  encryptField,
+} from "@/lib/crypto/field-encryption";
 import {
   type CreditCardInvoiceDetails,
   type Transaction,
@@ -693,10 +703,22 @@ export async function getUserContext(
   const supabase = supabaseClient
     ? await (supabaseClient as Promise<SupabaseClient>)
     : await createClient();
-  const [{ data: claimsData }, { data: userData }] = await Promise.all([
-    supabase.auth.getClaims(),
-    supabase.auth.getUser(),
-  ]);
+  const [
+    { data: claimsData, error: claimsError },
+    { data: userData, error: userError },
+  ] = await Promise.all([supabase.auth.getClaims(), supabase.auth.getUser()]);
+
+  // A missing session is the expected "not logged in" case and belongs on
+  // the redirect path below. Any other error (malformed/corrupted JWT from
+  // a chunked auth cookie, RLS race, network) must not be masked as "not
+  // logged in" — doing so silently redirects on a transient failure and can
+  // loop with the page it redirects to once the transient failure clears.
+  const unexpectedError = [claimsError, userError].find(
+    (error) => error && !isAuthSessionMissingError(error),
+  );
+  if (unexpectedError) {
+    throw unexpectedError;
+  }
 
   const claims = claimsData?.claims as AuthenticatedUserClaims | undefined;
   const user = userData.user;
@@ -966,8 +988,12 @@ function resolveRawCategoryName(row: TransactionRow) {
   return row.categories?.name ?? row.kind;
 }
 
-function resolveDescriptionKey(row: TransactionRow, categoryName: string) {
-  return row.description || row.notes || categoryName;
+function resolveDescriptionKey(
+  description: string | null,
+  notes: string | null,
+  categoryName: string,
+) {
+  return description || notes || categoryName;
 }
 
 function toTransaction(row: TransactionRow): Transaction {
@@ -977,6 +1003,8 @@ function toTransaction(row: TransactionRow): Transaction {
   const rawCategoryName = resolveRawCategoryName(row);
   const categoryName = resolveTransactionCategoryName(row, rawCategoryName);
   const paymentMethodKey = resolveTransactionPaymentMethodKey(row);
+  const description = decryptDescription(row.description);
+  const notes = decryptField(row.notes);
 
   return {
     id: row.id,
@@ -986,13 +1014,13 @@ function toTransaction(row: TransactionRow): Transaction {
     categoryId: row.category_id,
     categoryKey: categoryName,
     date: row.date,
-    descriptionKey: resolveDescriptionKey(row, categoryName),
+    descriptionKey: resolveDescriptionKey(description, notes, categoryName),
     group,
     icon: resolveTransactionIcon(row, rawCategoryName),
     installmentGroupId: row.installment_group_id ?? null,
     installmentNumber: resolveInstallmentNumber(row),
     installmentTotal: resolveInstallmentTotal(row),
-    notes: row.notes,
+    notes,
     paymentMethodId: row.payment_method_id,
     paymentMethodClosingDay: resolveTransactionPaymentMethodClosingDay(row),
     paymentMethodDueDay: resolveTransactionPaymentMethodDueDay(row),
@@ -1770,17 +1798,19 @@ function buildInstallmentRow(index: number, context: InstallmentRowContext) {
     amount: resolveOccurrenceAmount(index, plan),
     category_id: categoryId,
     date: formatOccurrenceDate(baseDate, index),
-    description: resolveOccurrenceDescription({
-      description,
-      installmentMetadata,
-      index,
-      installmentCount,
-    }),
+    description: encryptDescription(
+      resolveOccurrenceDescription({
+        description,
+        installmentMetadata,
+        index,
+        installmentCount,
+      }),
+    ),
     installment_group_id: installmentMetadata?.installmentGroupId ?? null,
     installment_number: installmentMetadata?.installmentNumber ?? null,
     installment_total: installmentMetadata?.installmentTotal ?? null,
     kind,
-    notes: resolveOccurrenceNotes(installmentMetadata, notes),
+    notes: encryptField(resolveOccurrenceNotes(installmentMetadata, notes)),
     payment_method_id: paymentMethodId,
     user_id: userId,
   };
@@ -1991,9 +2021,9 @@ export async function createInvoiceAdvancePayment(
     amount,
     category_id: null,
     date,
-    description: "transaction.invoiceAdvancePayment",
+    description: encryptDescription("transaction.invoiceAdvancePayment"),
     kind: "expense" satisfies DbTransactionKind,
-    notes: getInvoiceAdvancePaymentNote(input.invoiceId),
+    notes: encryptField(getInvoiceAdvancePaymentNote(input.invoiceId)),
     payment_method_id: paymentMethodId,
     user_id: userId,
   });
@@ -2020,6 +2050,7 @@ function buildSubscriptionRows({
 }) {
   const [year, month, day] = date.split("-").map(Number);
   const baseDate = new Date(year, month - 1, day);
+  const encryptedDescription = encryptDescription(description);
 
   return Array.from({ length: 12 }, (_, index) => {
     const occurrenceDate = addMonthsClamped(baseDate, index);
@@ -2033,9 +2064,9 @@ function buildSubscriptionRows({
       amount,
       category_id: categoryId,
       date: dateValue,
-      description,
+      description: encryptedDescription,
       kind: "expense" as DbTransactionKind,
-      notes: `subscription ${index + 1}/12`,
+      notes: encryptField(`subscription ${index + 1}/12`),
       payment_method_id: paymentMethodId,
       user_id: userId,
     };
@@ -2109,7 +2140,13 @@ async function loadSubscriptionReference(
 
   const subscription = reference as SubscriptionReferenceRow | null;
 
-  if (!subscription?.notes?.startsWith("subscription")) {
+  if (!subscription) {
+    throw new Error("Subscription is invalid.");
+  }
+
+  const decryptedNotes = decryptField(subscription.notes);
+
+  if (!decryptedNotes?.startsWith("subscription")) {
     throw new Error("Subscription is invalid.");
   }
 
@@ -2123,10 +2160,9 @@ async function queryFutureSubscriptionOccurrences(
 ) {
   let query = supabase
     .from("transactions")
-    .select("id, date")
+    .select("id, date, notes")
     .eq("user_id", userId)
     .eq("description", subscription.description)
-    .like("notes", "subscription%")
     .gte("date", getTodayValue())
     .order("date", { ascending: true });
 
@@ -2144,7 +2180,12 @@ async function queryFutureSubscriptionOccurrences(
     throw new Error(`Unable to load subscription charges: ${error.message}`);
   }
 
-  const occurrences = (data ?? []) as SubscriptionOccurrenceRow[];
+  const rows = (data ?? []) as Array<
+    SubscriptionOccurrenceRow & { notes: string | null }
+  >;
+  const occurrences: SubscriptionOccurrenceRow[] = rows
+    .filter((row) => decryptField(row.notes)?.startsWith("subscription"))
+    .map(({ id, date }) => ({ id, date }));
 
   if (!occurrences.length) {
     throw new Error("No future subscription charges found.");
@@ -2199,7 +2240,7 @@ async function relabelSubscriptionOccurrences(
   const occurrenceIds = occurrences.map((occurrence) => occurrence.id);
   const { error } = await supabase
     .from("transactions")
-    .update({ notes: `subscription ${occurrences.length}/12` })
+    .update({ notes: encryptField(`subscription ${occurrences.length}/12`) })
     .in("id", occurrenceIds)
     .eq("user_id", userId);
 
@@ -2226,6 +2267,7 @@ async function applySubscriptionOccurrenceUpdates({
     paymentMethodId: string | null;
   };
 }) {
+  const encryptedDescription = encryptDescription(fields.description);
   const results = await Promise.all(
     occurrences.map((occurrence, index) =>
       supabase
@@ -2234,7 +2276,7 @@ async function applySubscriptionOccurrenceUpdates({
           amount: fields.amount,
           category_id: fields.categoryId,
           date: toDateValue(addMonthsClamped(baseDate, index)),
-          description: fields.description,
+          description: encryptedDescription,
           payment_method_id: fields.paymentMethodId,
         })
         .eq("id", occurrence.id)
@@ -2283,9 +2325,11 @@ export async function setSubscriptionPaused(
     supabase
       .from("transactions")
       .update({
-        notes: paused
-          ? `subscription paused ${index + 1}/12`
-          : `subscription ${index + 1}/12`,
+        notes: encryptField(
+          paused
+            ? `subscription paused ${index + 1}/12`
+            : `subscription ${index + 1}/12`,
+        ),
       })
       .eq("id", occurrence.id)
       .eq("user_id", userId),
@@ -2636,9 +2680,9 @@ export async function updateTransaction(input: UpdateTransactionInput) {
       amount,
       category_id: categoryId,
       date,
-      description,
+      description: encryptDescription(description),
       kind,
-      notes: input.notes?.trim() || null,
+      notes: encryptField(input.notes?.trim() || null),
       payment_method_id: paymentMethodId,
     })
     .eq("id", input.id)
@@ -2898,10 +2942,9 @@ function getSubscriptionGroupQuery(
 ) {
   let query = supabase
     .from("transactions")
-    .select("id, date")
+    .select("id, date, notes")
     .eq("user_id", userId)
-    .eq("description", subscription.description)
-    .like("notes", "subscription%");
+    .eq("description", subscription.description);
 
   query = subscription.category_id
     ? query.eq("category_id", subscription.category_id)
@@ -2935,7 +2978,12 @@ async function resolveSubscriptionOccurrenceIdsToDelete({
     throw new Error(`Unable to load subscription charges: ${error.message}`);
   }
 
-  const occurrences = (data ?? []) as SubscriptionOccurrenceRow[];
+  const rows = (data ?? []) as Array<
+    SubscriptionOccurrenceRow & { notes: string | null }
+  >;
+  const occurrences: SubscriptionOccurrenceRow[] = rows
+    .filter((row) => decryptField(row.notes)?.startsWith("subscription"))
+    .map(({ id, date }) => ({ id, date }));
   const selectedOccurrence = occurrences.find(
     (occurrence) => occurrence.id === input.transactionId,
   );
@@ -3578,8 +3626,19 @@ function assembleDashboardData({
   sourceData: Awaited<ReturnType<typeof fetchDashboardSourceData>>;
   budgetContext: ReturnType<typeof buildDashboardBudgetContext>;
 }): DashboardData {
-  const { transactions, previousTransactions, scheduledTransactions, displayTransactions, displayScheduledTransactions, totalSaved, previousTotalSaved, categories, paymentMethods } = sourceData;
-  const { trendExpenseTransactions, scheduledExpenseTransactions, budgetData } = budgetContext;
+  const {
+    transactions,
+    previousTransactions,
+    scheduledTransactions,
+    displayTransactions,
+    displayScheduledTransactions,
+    totalSaved,
+    previousTotalSaved,
+    categories,
+    paymentMethods,
+  } = sourceData;
+  const { trendExpenseTransactions, scheduledExpenseTransactions, budgetData } =
+    budgetContext;
 
   return {
     budgetData,
@@ -3616,7 +3675,11 @@ export async function getDashboardData(
   const previousMonth = getPreviousMonthValue(selectedMonth);
   const monthBuckets = getLastSixMonthKeys(selectedMonth);
   const ctx = userContext ?? (await getUserContext());
-  const sourceData = await fetchDashboardSourceData(selectedMonth, previousMonth, ctx);
+  const sourceData = await fetchDashboardSourceData(
+    selectedMonth,
+    previousMonth,
+    ctx,
+  );
   const budgetContext = buildDashboardBudgetContext(
     sourceData.transactions,
     sourceData.scheduledTransactions,

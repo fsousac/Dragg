@@ -22,6 +22,7 @@ describe("createClient (browser)", () => {
     expect(createBrowserClient).toHaveBeenCalledWith(
       "https://project.supabase.co",
       "publishable-key",
+      { auth: { experimental: { appendPkceFlowIdToRedirects: true } } },
     );
     expect(client).toEqual({ marker: "browser-client" });
   });

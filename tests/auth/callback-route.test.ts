@@ -1,8 +1,11 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { exchangeCodeForSession, createClient } = vi.hoisted(() => ({
-  exchangeCodeForSession: vi.fn().mockResolvedValue({ error: null }),
+const { exchangeCodeForSession, setSession, createClient } = vi.hoisted(() => ({
+  exchangeCodeForSession: vi
+    .fn()
+    .mockResolvedValue({ data: { session: null }, error: null }),
+  setSession: vi.fn(),
   createClient: vi.fn(),
 }));
 
@@ -13,8 +16,12 @@ import { GET } from "@/app/auth/callback/route";
 describe("GET /auth/callback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    exchangeCodeForSession.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
     createClient.mockResolvedValue({
-      auth: { exchangeCodeForSession },
+      auth: { exchangeCodeForSession, setSession },
     });
   });
 
@@ -25,11 +32,47 @@ describe("GET /auth/callback", () => {
 
     const response = await GET(request);
 
-    expect(exchangeCodeForSession).toHaveBeenCalledWith("abc123");
+    expect(exchangeCodeForSession).toHaveBeenCalledWith("abc123", undefined);
+    expect(setSession).not.toHaveBeenCalled();
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe(
       "http://localhost/transactions",
     );
+  });
+
+  it("passes sb_flow_id through so the matching PKCE verifier cookie is cleaned up", async () => {
+    const request = new NextRequest(
+      "http://localhost/auth/callback?code=abc123&sb_flow_id=flow-xyz",
+    );
+
+    await GET(request);
+
+    expect(exchangeCodeForSession).toHaveBeenCalledWith("abc123", {
+      flowId: "flow-xyz",
+    });
+  });
+
+  it("re-saves the session via setSession to drop the provider token bloat", async () => {
+    exchangeCodeForSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: "at-123",
+          refresh_token: "rt-456",
+          provider_token: "google-at",
+        },
+      },
+      error: null,
+    });
+    const request = new NextRequest(
+      "http://localhost/auth/callback?code=abc123",
+    );
+
+    await GET(request);
+
+    expect(setSession).toHaveBeenCalledWith({
+      access_token: "at-123",
+      refresh_token: "rt-456",
+    });
   });
 
   it("skips the exchange and redirects to /dashboard when there is no code or 'next' param", async () => {

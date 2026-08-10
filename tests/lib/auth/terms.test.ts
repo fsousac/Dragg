@@ -11,7 +11,7 @@ vi.mock("next/navigation", () => ({
 function mockSupabase(termsAccepted: boolean | null) {
   const single = vi
     .fn()
-    .mockResolvedValue({ data: { terms_accepted: termsAccepted } });
+    .mockResolvedValue({ data: { terms_accepted: termsAccepted }, error: null });
   const eq = vi.fn(() => ({ single }));
   const select = vi.fn(() => ({ eq }));
   const from = vi.fn(() => ({ select }));
@@ -39,12 +39,27 @@ describe("requireAcceptedTerms", () => {
     ).rejects.toThrow("REDIRECT:/auth/accept-terms");
   });
 
-  it("redirects when the profile row is missing", async () => {
+  it("redirects when the profile row is missing (PGRST116)", async () => {
     const supabase = mockSupabase(null);
-    supabase.single.mockResolvedValueOnce({ data: null });
+    supabase.single.mockResolvedValueOnce({
+      data: null,
+      error: { code: "PGRST116", message: "no rows" },
+    });
 
     await expect(
       requireAcceptedTerms(supabase as never, "user-1"),
     ).rejects.toThrow("REDIRECT:/auth/accept-terms");
+  });
+
+  it("throws instead of redirecting when the query errors transiently", async () => {
+    const supabase = mockSupabase(null);
+    supabase.single.mockResolvedValueOnce({
+      data: null,
+      error: { code: "PGRST301", message: "JWT expired" },
+    });
+
+    await expect(
+      requireAcceptedTerms(supabase as never, "user-1"),
+    ).rejects.toThrow("JWT expired");
   });
 });

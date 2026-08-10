@@ -561,6 +561,8 @@ describe("getMonthlySummary", () => {
   });
 
   it("falls back to the current month when no/invalid month is passed", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-15T12:00:00.000Z"));
     setup([
       qb({
         data: [row({ id: "current-month", amount: 500, kind: "income", date: "2026-07-05" })],

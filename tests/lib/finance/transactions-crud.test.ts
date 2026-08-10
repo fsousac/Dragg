@@ -6,6 +6,13 @@ vi.mock("next/navigation", () => ({
     throw new Error(`REDIRECT:${url}`);
   }),
 }));
+vi.mock("@/lib/crypto/field-encryption", () => ({
+  decryptDescription: (value: string | null | undefined) => value ?? null,
+  decryptField: (value: string | null | undefined) => value ?? null,
+  encryptDescription: (value: string) => value,
+  encryptField: (value: string | null | undefined) => value ?? null,
+  isAlreadyEncrypted: () => false,
+}));
 
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -234,7 +241,7 @@ describe("updateSubscription", () => {
         }),
         error: null,
       }),
-      qb({ data: [{ date: "2026-08-01", id: "occ-1" }], error: null }),
+      qb({ data: [{ date: "2026-08-01", id: "occ-1", notes: "subscription 1/12" }], error: null }),
       qb({ data: { id: CATEGORY_ID }, error: null }),
       qb({ data: { id: PAYMENT_METHOD_ID }, error: null }),
       qb({ error: { message: "notes failed" } }),
@@ -257,7 +264,7 @@ describe("updateSubscription", () => {
         }),
         error: null,
       }),
-      qb({ data: [{ date: "2026-08-01", id: "occ-1" }], error: null }),
+      qb({ data: [{ date: "2026-08-01", id: "occ-1", notes: "subscription 1/12" }], error: null }),
       qb({ data: { id: CATEGORY_ID }, error: null }),
       qb({ data: { id: PAYMENT_METHOD_ID }, error: null }),
       qb({ error: null }),
@@ -276,7 +283,7 @@ describe("updateSubscription", () => {
   it("throws when updating an occurrence fails", async () => {
     setup([
       qb({ data: subscriptionReference(), error: null }),
-      qb({ data: [{ date: "2026-08-01", id: "occ-1" }], error: null }),
+      qb({ data: [{ date: "2026-08-01", id: "occ-1", notes: "subscription 1/12" }], error: null }),
       qb({ error: null }),
       qb({ error: { message: "update failed" } }),
     ]);
@@ -297,7 +304,7 @@ describe("setSubscriptionPaused", () => {
   it("pauses every future occurrence (category/payment null)", async () => {
     setup([
       qb({ data: subscriptionReference(), error: null }),
-      qb({ data: [{ date: "2026-08-01", id: "occ-1" }], error: null }),
+      qb({ data: [{ date: "2026-08-01", id: "occ-1", notes: "subscription 1/12" }], error: null }),
       qb({ error: null }),
     ]);
     await expect(
@@ -308,7 +315,7 @@ describe("setSubscriptionPaused", () => {
   it("resumes every future occurrence", async () => {
     setup([
       qb({ data: subscriptionReference(), error: null }),
-      qb({ data: [{ date: "2026-08-01", id: "occ-1" }], error: null }),
+      qb({ data: [{ date: "2026-08-01", id: "occ-1", notes: "subscription 1/12" }], error: null }),
       qb({ error: null }),
     ]);
     await expect(
@@ -319,7 +326,7 @@ describe("setSubscriptionPaused", () => {
   it("throws when an occurrence update fails", async () => {
     setup([
       qb({ data: subscriptionReference(), error: null }),
-      qb({ data: [{ date: "2026-08-01", id: "occ-1" }], error: null }),
+      qb({ data: [{ date: "2026-08-01", id: "occ-1", notes: "subscription 1/12" }], error: null }),
       qb({ error: { message: "pause failed" } }),
     ]);
     await expect(setSubscriptionPaused(SUBSCRIPTION_ID, true)).rejects.toThrow(
@@ -332,7 +339,7 @@ describe("deleteSubscription", () => {
   it("deletes every future occurrence", async () => {
     const supabase = setup([
       qb({ data: subscriptionReference(), error: null }),
-      qb({ data: [{ date: "2026-08-01", id: "occ-1" }], error: null }),
+      qb({ data: [{ date: "2026-08-01", id: "occ-1", notes: "subscription 1/12" }], error: null }),
       qb({ error: null }),
     ]);
     await expect(deleteSubscription(SUBSCRIPTION_ID)).resolves.toBeUndefined();
@@ -342,7 +349,7 @@ describe("deleteSubscription", () => {
   it("throws when the delete fails", async () => {
     setup([
       qb({ data: subscriptionReference(), error: null }),
-      qb({ data: [{ date: "2026-08-01", id: "occ-1" }], error: null }),
+      qb({ data: [{ date: "2026-08-01", id: "occ-1", notes: "subscription 1/12" }], error: null }),
       qb({ error: { message: "delete failed" } }),
     ]);
     await expect(deleteSubscription(SUBSCRIPTION_ID)).rejects.toThrow(
@@ -408,7 +415,7 @@ describe("deleteSubscriptionOccurrences", () => {
   it("throws when the selected occurrence is not in the group", async () => {
     setup([
       qb({ data: subscriptionReference(), error: null }),
-      qb({ data: [{ date: "2026-08-01", id: "other-occurrence" }], error: null }),
+      qb({ data: [{ date: "2026-08-01", id: "other-occurrence", notes: "subscription 1/12" }], error: null }),
     ]);
     await expect(
       deleteSubscriptionOccurrences({
@@ -427,7 +434,7 @@ describe("deleteSubscriptionOccurrences", () => {
         }),
         error: null,
       }),
-      qb({ data: [{ date: "2026-08-01", id: SUBSCRIPTION_ID }], error: null }),
+      qb({ data: [{ date: "2026-08-01", id: SUBSCRIPTION_ID, notes: "subscription 1/12" }], error: null }),
       qb({ error: null }),
     ]);
     await expect(
@@ -442,7 +449,7 @@ describe("deleteSubscriptionOccurrences", () => {
   it("deletes the selected occurrence group (category/payment null)", async () => {
     setup([
       qb({ data: subscriptionReference(), error: null }),
-      qb({ data: [{ date: "2026-08-01", id: SUBSCRIPTION_ID }], error: null }),
+      qb({ data: [{ date: "2026-08-01", id: SUBSCRIPTION_ID, notes: "subscription 1/12" }], error: null }),
       qb({ error: null }),
     ]);
     await expect(
@@ -456,7 +463,7 @@ describe("deleteSubscriptionOccurrences", () => {
   it("throws when the final delete fails", async () => {
     setup([
       qb({ data: subscriptionReference(), error: null }),
-      qb({ data: [{ date: "2026-08-01", id: SUBSCRIPTION_ID }], error: null }),
+      qb({ data: [{ date: "2026-08-01", id: SUBSCRIPTION_ID, notes: "subscription 1/12" }], error: null }),
       qb({ error: { message: "delete failed" } }),
     ]);
     await expect(
@@ -496,7 +503,7 @@ describe("deleteSubscriptionOccurrences", () => {
         data: subscriptionReference({ category_id: CATEGORY_ID }),
         error: null,
       }),
-      qb({ data: [{ date: "2026-08-01", id: SUBSCRIPTION_ID }], error: null }),
+      qb({ data: [{ date: "2026-08-01", id: SUBSCRIPTION_ID, notes: "subscription 1/12" }], error: null }),
       qb({ error: null }),
     ]);
     await expect(
@@ -514,7 +521,7 @@ describe("deleteSubscriptionOccurrences", () => {
         data: subscriptionReference({ payment_method_id: PAYMENT_METHOD_ID }),
         error: null,
       }),
-      qb({ data: [{ date: "2026-08-01", id: SUBSCRIPTION_ID }], error: null }),
+      qb({ data: [{ date: "2026-08-01", id: SUBSCRIPTION_ID, notes: "subscription 1/12" }], error: null }),
       qb({ error: null }),
     ]);
     await expect(
@@ -531,9 +538,9 @@ describe("deleteSubscriptionOccurrences", () => {
       qb({ data: subscriptionReference(), error: null }),
       qb({
         data: [
-          { date: "2026-06-01", id: "past-occurrence" },
-          { date: "2026-08-01", id: SUBSCRIPTION_ID },
-          { date: "2026-09-01", id: "future-occurrence" },
+          { date: "2026-06-01", id: "past-occurrence", notes: "subscription 1/12" },
+          { date: "2026-08-01", id: SUBSCRIPTION_ID, notes: "subscription 1/12" },
+          { date: "2026-09-01", id: "future-occurrence", notes: "subscription 1/12" },
         ],
         error: null,
       }),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,18 +70,16 @@ function useCurrencyDigits(
   onValueChange: (value: number) => void,
 ) {
   const [digits, setDigits] = useState(() => digitsFromValue(value));
-  const prevValueRef = useRef(value);
+  const [prevValue, setPrevValue] = useState(value);
 
-  /* c8 ignore start */
-  useEffect(() => {
+  if (value !== prevValue) {
+    setPrevValue(value);
     const externalCents = Math.round(value * 100);
     const internalCents = digits ? Number.parseInt(digits, 10) : 0;
-    if (externalCents !== internalCents && value !== prevValueRef.current) {
+    if (externalCents !== internalCents) {
       setDigits(digitsFromValue(value));
     }
-    prevValueRef.current = value;
-  }, [value, digits]);
-  /* c8 ignore stop */
+  }
 
   function pushDigits(newDigits: string) {
     // Remove leading zeros, cap at 13 digits (~999 billion cents)
