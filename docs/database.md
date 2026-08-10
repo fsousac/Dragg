@@ -20,6 +20,7 @@ The current committed schema defines these Supabase tables:
 - `002_security_lgpd_hardening.sql`: adds `updated_at` and `deleted_at` columns, moves helper functions into the private schema, adds privacy requests, hardens grants and RLS policies, validates transaction ownership references, and adds LGPD-oriented comments.
 - `005_add_installment_group_metadata.sql`: adds stable installment grouping metadata and an authenticated-user scoped installment group index.
 - `006_add_installment_prepayment_metadata.sql`: adds installment prepayment metadata and an authenticated-user scoped prepayment month index.
+- `010_stop_writing_plaintext_profile_pii.sql`: stops the signup trigger from writing plaintext `profiles.name`/`email` (application-layer encryption now owns these fields, see `lib/crypto/field-encryption.ts`), and drops the now-unused `transactions_user_id_notes_idx` partial index.
 
 ## What belongs in the repository
 
@@ -44,11 +45,13 @@ The repository must not include:
 ## Profile fields used by the app
 
 - `id`
-- `email`
-- `name`
+- `email` — application-layer encrypted (`lib/crypto/field-encryption.ts`), never plaintext at rest. Distinct from `auth.users.email`, which Supabase Auth manages and is unaffected.
+- `name` — application-layer encrypted (`lib/crypto/field-encryption.ts`), never plaintext at rest.
 - `created_at`
 - `updated_at`
 - `deleted_at`
+
+`private.handle_new_user()` no longer writes plaintext `name`/`email` into `profiles` (see migration `010`). `lib/auth/encrypted-profile.ts` fills them in, encrypted, on the user's next authenticated request.
 
 ## Category fields used by the app
 
@@ -85,14 +88,14 @@ The application has backward-compatible fallbacks for older environments that do
 - `amount`
 - `category_id`
 - `date`
-- `description`
+- `description` — application-layer encrypted with a deterministic IV (`lib/crypto/field-encryption.ts`) so equality lookups (subscription grouping) still work; never plaintext at rest.
 - `kind`
 - `installment_group_id`
 - `installment_number`
 - `installment_total`
 - `advanced_to_month`
 - `advanced_at`
-- `notes`
+- `notes` — application-layer encrypted (`lib/crypto/field-encryption.ts`), random IV; never plaintext at rest.
 - `payment_method_id`
 - `created_at`
 - `updated_at`
@@ -102,7 +105,7 @@ Installments and subscriptions are modeled as multiple transaction rows. Install
 
 Installment prepayment uses `advanced_to_month` and `advanced_at`. The original transaction `date`, category, payment method, and installment metadata are preserved for auditability. Payment and invoice views use `advanced_to_month` as the payment context so advanced installments appear in the target month and no longer appear as future obligations.
 
-Subscription rows use `notes` values beginning with `subscription`; paused subscriptions use `subscription paused`.
+Subscription rows use `notes` values beginning with `subscription`; paused subscriptions use `subscription paused`. Since `notes` is stored encrypted, this prefix check happens in application code against the decrypted value (`lib/finance/transactions.ts`), not as a SQL `LIKE` predicate.
 
 ## Monthly budget fields in the schema
 
