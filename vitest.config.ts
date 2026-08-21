@@ -24,6 +24,7 @@ export default defineConfig({
         "lib/animations/**",
         "e2e/**",
         "playwright.config.ts",
+        "scripts/**",
       ],
       thresholds: {
         branches: 100,

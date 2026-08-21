@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -20,9 +20,21 @@ import {
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 
-// Dynamic "today"/"current month", mirroring how the source computes them
-// (getTodayValue/getCurrentMonthValue both use the real clock), so tests stay
-// correct regardless of which day this suite actually runs on.
+// Pin the clock to the 15th of the real current month so the day-of-month
+// arithmetic below never clamps back to "today" near month boundaries (e.g.
+// the last day of the month) — see project_flaky_date_test memory.
+const realNow = new Date();
+vi.useFakeTimers();
+vi.setSystemTime(
+  new Date(Date.UTC(realNow.getUTCFullYear(), realNow.getUTCMonth(), 15, 12)),
+);
+afterAll(() => {
+  vi.useRealTimers();
+});
+
+// "today"/"current month", mirroring how the source computes them
+// (getTodayValue/getCurrentMonthValue both use the clock, now pinned above),
+// so tests stay correct regardless of which month this suite actually runs in.
 const now = new Date();
 const CURRENT_MONTH = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
@@ -30,11 +42,8 @@ const CURRENT_MONTH = `${now.getFullYear()}-${String(now.getMonth() + 1).padStar
 // closing_day, so the invoice cycle stays anchored to the current month —
 // see getCreditCardInvoiceCycle) so a credit card invoice due on this day
 // deterministically lands in the getPaymentsDueStatus "next" (due within 3
-// days) bucket regardless of which day this suite runs on.
-// ponytail: still misses the "next" bucket in the first ~6 days of a month
-// (floor of 10 pushes the due date more than 3 days out) or on the very
-// last day (rollover clamps back to today) — acceptable, much narrower than
-// the fixed due_day=20 this replaced, which only worked on 4 days a month.
+// days) bucket. The clock is pinned to the 15th above, so this no longer
+// clamps back to "today" near month boundaries.
 const daysInCurrentMonth = new Date(
   Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0),
 ).getUTCDate();
@@ -76,13 +85,20 @@ function qb(response: { data?: unknown; error?: unknown }) {
 
 function makeSupabase(
   fromResponses: unknown[],
-  opts: { createdAt?: string | null; noClaims?: boolean; noUser?: boolean } = {},
+  opts: {
+    claimsError?: unknown;
+    createdAt?: string | null;
+    noClaims?: boolean;
+    noUser?: boolean;
+    userError?: unknown;
+  } = {},
 ) {
   const queue = [...fromResponses];
   return {
     auth: {
       getClaims: vi.fn().mockResolvedValue({
         data: { claims: opts.noClaims ? {} : { sub: USER_ID } },
+        error: opts.claimsError ?? null,
       }),
       getUser: vi.fn().mockResolvedValue({
         data: {
@@ -90,6 +106,7 @@ function makeSupabase(
             ? null
             : { id: USER_ID, created_at: opts.createdAt ?? null },
         },
+        error: opts.userError ?? null,
       }),
     },
     from: vi.fn(() => {
@@ -104,7 +121,13 @@ function makeSupabase(
 
 function setup(
   fromResponses: unknown[] = [],
-  opts: { createdAt?: string | null; noClaims?: boolean; noUser?: boolean } = {},
+  opts: {
+    claimsError?: unknown;
+    createdAt?: string | null;
+    noClaims?: boolean;
+    noUser?: boolean;
+    userError?: unknown;
+  } = {},
 ) {
   const supabase = makeSupabase(fromResponses, opts);
   vi.mocked(createClient).mockResolvedValue(supabase as never);
@@ -166,6 +189,12 @@ describe("getUserContext", () => {
   it("redirects when claims are missing", async () => {
     setup([], { noClaims: true });
     await expect(getUserContext()).rejects.toThrow("REDIRECT:/");
+  });
+
+  it("throws an unexpected claims/user query error instead of masking it as logged-out", async () => {
+    const queryError = new Error("network down");
+    setup([], { claimsError: queryError });
+    await expect(getUserContext()).rejects.toBe(queryError);
   });
 });
 

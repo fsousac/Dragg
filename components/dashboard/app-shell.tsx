@@ -6,6 +6,7 @@ import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { NavigationPrefetcher } from "@/components/dashboard/navigation-prefetcher";
 import { PageTransition } from "@/components/dashboard/page-transition";
 import { Sidebar } from "@/components/dashboard/sidebar";
+import { ensureEncryptedProfile } from "@/lib/auth/encrypted-profile";
 import { requireAcceptedTerms } from "@/lib/auth/terms";
 import type {
   AuthenticatedUserClaims,
@@ -202,6 +203,11 @@ export async function AppShell({
     user,
     claims,
   );
+
+  await ensureEncryptedProfile(supabase, user.id, {
+    email: userEmail,
+    name: userName,
+  });
 
   return (
     <div className="flex min-h-screen bg-background">

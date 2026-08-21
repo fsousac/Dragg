@@ -391,7 +391,12 @@ describe("installment eligibility across payment method types", () => {
 
 describe("date field", () => {
   it("defaults to today's date, round-trips a valid typed date, and clears back to today on an invalid date", () => {
-    const todayInputValue = new Date().toISOString().slice(0, 10);
+    const today = new Date();
+    const todayInputValue = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, "0"),
+      String(today.getDate()).padStart(2, "0"),
+    ].join("-");
     render(<TransactionForm {...baseProps()} />);
 
     const dateInput = screen.getByLabelText("Date") as HTMLInputElement;
