@@ -26,6 +26,16 @@ const supabaseConnectSrc = ["https://*.supabase.co", supabaseOrigin]
 const nextConfig = {
   poweredByHeader: false,
 
+  experimental: {
+    // Next 16.2.7+ enables this by default in dev. Its cache-restore path
+    // (dist/client/dev/debug-channel.js) calls location.reload() reusing the
+    // original navigation entry whenever the initial document's
+    // PerformanceNavigationTiming reports transferSize === 0, which Firefox
+    // does for the page landed on right after the Google OAuth redirect —
+    // causing an infinite full-page reload loop, dev-only, Firefox-only.
+    reactDebugChannel: false,
+  },
+
   async headers() {
     return [
       {
@@ -61,8 +71,7 @@ const nextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value:
-              `default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; form-action 'self' ${supabaseConnectSrc}; connect-src 'self' ${supabaseConnectSrc} https://va.vercel-scripts.com https://vitals.vercel-insights.com; img-src 'self' data: blob: ${supabaseConnectSrc} https://*.googleusercontent.com https://lh3.googleusercontent.com; style-src 'self' 'unsafe-inline'; script-src ${scriptSrc};`,
+            value: `default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; form-action 'self' ${supabaseConnectSrc}; connect-src 'self' ${supabaseConnectSrc} https://va.vercel-scripts.com https://vitals.vercel-insights.com; img-src 'self' data: blob: ${supabaseConnectSrc} https://*.googleusercontent.com https://lh3.googleusercontent.com; style-src 'self' 'unsafe-inline'; script-src ${scriptSrc};`,
           },
         ],
       },

@@ -708,11 +708,10 @@ export async function getUserContext(
     { data: userData, error: userError },
   ] = await Promise.all([supabase.auth.getClaims(), supabase.auth.getUser()]);
 
-  // A missing session is the expected "not logged in" case and belongs on
-  // the redirect path below. Any other error (malformed/corrupted JWT from
-  // a chunked auth cookie, RLS race, network) must not be masked as "not
-  // logged in" — doing so silently redirects on a transient failure and can
-  // loop with the page it redirects to once the transient failure clears.
+  // Sessão ausente é o caso esperado de "deslogado", tratado no
+  // redirect abaixo. Qualquer outro erro não pode ser mascarado como
+  // isso, ou uma falha transitória entra em loop com a página pra
+  // onde redireciona assim que a falha passa.
   const unexpectedError = [claimsError, userError].find(
     (error) => error && !isAuthSessionMissingError(error),
   );
