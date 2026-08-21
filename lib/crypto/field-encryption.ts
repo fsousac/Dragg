@@ -70,7 +70,9 @@ function decrypt(stored: string): string {
   const authTag = buffer.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
   const ciphertext = buffer.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
 
-  const decipher = createDecipheriv(ALGORITHM, cipherKey, iv);
+  const decipher = createDecipheriv(ALGORITHM, cipherKey, iv, {
+    authTagLength: AUTH_TAG_LENGTH,
+  });
   decipher.setAuthTag(authTag);
 
   return Buffer.concat([
