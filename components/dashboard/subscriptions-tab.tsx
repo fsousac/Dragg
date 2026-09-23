@@ -40,7 +40,6 @@ type Subscriptions = SubscriptionActionHandlers & {
 const statusColor = {
   active: "bg-income text-white",
   cancelled: "bg-destructive text-white",
-  paused: "bg-yellow text-black",
 };
 
 type SubscriptionSummaryCardsProps = {
@@ -103,8 +102,11 @@ function SubscriptionInfo({
             {payment.name}
           </p>
           <Badge
-            variant="secondary"
-            className={cn("shrink-0 text-xs", statusColor[payment.status])}
+            variant={payment.status === "paused" ? "warning" : "secondary"}
+            className={cn(
+              "shrink-0 text-xs",
+              payment.status !== "paused" ? statusColor[payment.status] : undefined,
+            )}
           >
             {t(`common.${payment.status}`)}
           </Badge>
