@@ -1,5 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -50,8 +49,7 @@ const translations: Record<string, string> = {
   "transaction.paymentMethod": "Payment method",
   "transaction.addPaymentMethod": "Add payment method",
   "transaction.date": "Date",
-  "transaction.installmentFrequency": "Installments",
-  "transaction.installmentOption.full": "Full payment",
+  "transaction.installmentCount": "Number of installments",
   "transaction.notes": "Notes",
   "transaction.notesPlaceholder": "Add a note",
   "transaction.saving": "Saving...",
@@ -344,48 +342,87 @@ describe("handlePaymentMethodChange defensive fallback", () => {
 });
 
 describe("installment eligibility across payment method types", () => {
-  it("shows the installment select for credit/boleto/label-contains-boleto methods and hides it for debit, resetting the count on non-installment methods", async () => {
-    const user = userEvent.setup();
+  const installmentInput = () =>
+    screen.getByLabelText("Number of installments") as HTMLInputElement;
+
+  it("shows the installment input for credit/boleto/label-contains-boleto methods and hides it for debit, resetting the count on non-installment methods", () => {
     render(<TransactionForm {...baseProps({ paymentMethods: paymentMethodsAllTypes })} />);
 
-    // Default payment method is debit -> no installment select.
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    // Default payment method is debit -> no installment input.
+    expect(screen.queryByLabelText("Number of installments")).not.toBeInTheDocument();
 
-    // Switch to credit -> select appears (type === "credit" branch).
+    // Switch to credit -> input appears (type === "credit" branch).
     fireEvent.click(screen.getByText("Credit Card"));
-    expect(screen.getByRole("combobox")).toBeInTheDocument();
+    expect(installmentInput().value).toBe("1");
 
-    // Bump installment count to 3x while on the credit method.
-    await user.click(screen.getByRole("combobox"));
-    const listbox = await screen.findByRole("listbox");
-    await user.click(within(listbox).getByText("3x"));
-    expect(screen.getByRole("combobox")).toHaveTextContent("3x");
+    // Bump installment count to 3 while on the credit method.
+    fireEvent.change(installmentInput(), { target: { value: "3" } });
+    expect(installmentInput().value).toBe("3");
 
     // Re-selecting an installment-capable method preserves the count.
     fireEvent.click(screen.getByText("Boleto"));
-    expect(screen.getByRole("combobox")).toHaveTextContent("3x");
+    expect(installmentInput().value).toBe("3");
 
     // Label-contains-"boleto" branch: type is "other" but label includes "boleto".
     fireEvent.click(screen.getByText("Store Boleto Plan"));
-    expect(screen.getByRole("combobox")).toHaveTextContent("3x");
+    expect(installmentInput().value).toBe("3");
 
-    // Switching to a non-installment method hides the select and resets the count.
+    // Switching to a non-installment method hides the input and resets the count.
     fireEvent.click(screen.getByText("Debit Card"));
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Number of installments")).not.toBeInTheDocument();
 
-    // Switching back to credit confirms the count was reset to 1 ("Full payment").
+    // Switching back to credit confirms the count was reset to 1 (lump sum).
     fireEvent.click(screen.getByText("Credit Card"));
-    expect(screen.getByRole("combobox")).toHaveTextContent("Full payment");
+    expect(installmentInput().value).toBe("1");
   });
 
-  it("hides the installment select outside of expense type even with a credit payment method", () => {
+  it("hides the installment input outside of expense type even with a credit payment method", () => {
     render(<TransactionForm {...baseProps({ paymentMethods: paymentMethodsAllTypes })} />);
 
     fireEvent.click(screen.getByText("Credit Card"));
-    expect(screen.getByRole("combobox")).toBeInTheDocument();
+    expect(screen.getByLabelText("Number of installments")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Saving"));
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Number of installments")).not.toBeInTheDocument();
+  });
+
+  it("accepts a value above the old 24-installment ceiling, e.g. 36", () => {
+    render(<TransactionForm {...baseProps({ paymentMethods: paymentMethodsAllTypes })} />);
+    fireEvent.click(screen.getByText("Credit Card"));
+
+    fireEvent.change(installmentInput(), { target: { value: "36" } });
+    expect(installmentInput().value).toBe("36");
+  });
+
+  it("clamps a value above the 120-installment cap down to 120", () => {
+    render(<TransactionForm {...baseProps({ paymentMethods: paymentMethodsAllTypes })} />);
+    fireEvent.click(screen.getByText("Credit Card"));
+
+    fireEvent.change(installmentInput(), { target: { value: "121" } });
+    expect(installmentInput().value).toBe("120");
+  });
+
+  it("falls back to 1 for non-numeric or empty input instead of crashing or producing NaN", () => {
+    render(<TransactionForm {...baseProps({ paymentMethods: paymentMethodsAllTypes })} />);
+    fireEvent.click(screen.getByText("Credit Card"));
+
+    fireEvent.change(installmentInput(), { target: { value: "abc" } });
+    expect(installmentInput().value).toBe("1");
+
+    fireEvent.change(installmentInput(), { target: { value: "3" } });
+    fireEvent.change(installmentInput(), { target: { value: "" } });
+    expect(installmentInput().value).toBe("1");
+  });
+
+  it("clamps a zero or negative value up to 1", () => {
+    render(<TransactionForm {...baseProps({ paymentMethods: paymentMethodsAllTypes })} />);
+    fireEvent.click(screen.getByText("Credit Card"));
+
+    fireEvent.change(installmentInput(), { target: { value: "0" } });
+    expect(installmentInput().value).toBe("1");
+
+    fireEvent.change(installmentInput(), { target: { value: "-5" } });
+    expect(installmentInput().value).toBe("1");
   });
 });
 
