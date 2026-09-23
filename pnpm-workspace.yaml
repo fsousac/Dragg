@@ -10,7 +10,7 @@ overrides:
   brace-expansion@1: ^1.1.16
   brace-expansion@5: ^5.0.7
   js-yaml: ^4.3.0
-  sharp: ^0.35.0
+  sharp: ^0.35.4
 onlyBuiltDependencies:
   - sharp
   - unrs-resolver
