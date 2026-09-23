@@ -8,7 +8,6 @@ import { toast } from "sonner";
 
 import { NewCategoryDialog } from "@/components/dashboard/new-category-dialog";
 import { CompactInput } from "@/components/dashboard/form-inputs/compact-input";
-import { CompactSelect } from "@/components/dashboard/form-inputs/compact-select";
 import { CompactTextarea } from "@/components/dashboard/form-inputs/compact-textarea";
 import { CurrencyInput } from "@/components/dashboard/form-inputs/currency-input";
 import { withSelectedMonth } from "@/components/dashboard/month-route";
@@ -335,17 +334,16 @@ function usePaymentMethodInstallmentEligibility({
   return { canInstallment, handlePaymentMethodChange };
 }
 
-const INSTALLMENT_COUNTS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 24];
-
 const SECTION_LABEL_CLASS = "mb-2.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground";
 const CHIP_BASE_CLASS = "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all duration-200 cursor-pointer max-w-full";
 const CHIP_ADD_ACTION_CLASS = "border-dashed border-border/40 text-foreground/50 hover:border-border/60 hover:text-foreground/70";
 
-function getInstallmentOptions(t: (key: string) => string) {
-  return [
-    { value: "1", label: t("transaction.installmentOption.full") },
-    ...INSTALLMENT_COUNTS.map((count) => ({ value: String(count), label: `${count}x` })),
-  ];
+const MAX_INSTALLMENT_COUNT = 120;
+
+function clampInstallmentCount(rawValue: string) {
+  const parsed = Number.parseInt(rawValue, 10);
+  if (Number.isNaN(parsed)) return 1;
+  return Math.min(MAX_INSTALLMENT_COUNT, Math.max(1, parsed));
 }
 
 function getDisplayedCategoryOptions({
@@ -586,7 +584,6 @@ function TransactionPaymentMethodChips({
 type TransactionDateAndInstallmentsProps = TransactionFormFieldProps & {
   readonly error: string | undefined;
   readonly canInstallment: boolean;
-  readonly installmentOptions: ReturnType<typeof getInstallmentOptions>;
   readonly todayDateInputValue: string;
   readonly t: (key: string) => string;
 };
@@ -596,7 +593,6 @@ function TransactionDateAndInstallments({
   setFormData,
   error,
   canInstallment,
-  installmentOptions,
   todayDateInputValue,
   t,
 }: TransactionDateAndInstallmentsProps) {
@@ -615,12 +611,20 @@ function TransactionDateAndInstallments({
         inputClassName="w-full max-w-full min-w-0 appearance-none overflow-hidden pr-3 text-left [&::-webkit-calendar-picker-indicator]:shrink-0 [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:overflow-hidden [&::-webkit-date-and-time-value]:text-left"
       />
       {canInstallment ? (
-        <CompactSelect
-          label={t("transaction.installmentFrequency")}
+        <CompactInput
+          label={t("transaction.installmentCount")}
           id="installment"
-          value={formData.installmentCount.toString()}
-          onChange={(value) => setFormData({ ...formData, installmentCount: Number.parseInt(value, 10) })}
-          options={installmentOptions}
+          type="number"
+          inputMode="numeric"
+          min="1"
+          max={MAX_INSTALLMENT_COUNT.toString()}
+          value={formData.installmentCount}
+          onChange={(event) =>
+            setFormData({
+              ...formData,
+              installmentCount: clampInstallmentCount(event.target.value),
+            })
+          }
         />
       ) : null}
     </div>
@@ -813,7 +817,7 @@ function useTransactionFormHandlers({
     t,
   });
 
-  return { handleSubmit, canInstallment, handlePaymentMethodChange, installmentOptions: getInstallmentOptions(t) };
+  return { handleSubmit, canInstallment, handlePaymentMethodChange };
 }
 
 function useTransactionFormState({
