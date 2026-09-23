@@ -93,7 +93,7 @@ function SubscriptionInfo({
 
   return (
     <>
-      <div className="flex size-12 items-center justify-center rounded-lg bg-accent text-2xl">
+      <div className="flex size-12 items-center justify-center rounded-lg bg-muted text-2xl">
         {payment.icon}
       </div>
       <div className="min-w-0">
