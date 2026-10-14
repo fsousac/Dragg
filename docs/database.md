@@ -20,6 +20,7 @@ The current committed schema defines these Supabase tables:
 - `002_security_lgpd_hardening.sql`: adds `updated_at` and `deleted_at` columns, moves helper functions into the private schema, adds privacy requests, hardens grants and RLS policies, validates transaction ownership references, and adds LGPD-oriented comments.
 - `005_add_installment_group_metadata.sql`: adds stable installment grouping metadata and an authenticated-user scoped installment group index.
 - `006_add_installment_prepayment_metadata.sql`: adds installment prepayment metadata and an authenticated-user scoped prepayment month index.
+- `008_add_transaction_import_key.sql`: adds `transactions.import_key` and a per-user unique index so re-importing a bank statement never duplicates rows.
 
 ## What belongs in the repository
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { importStatementRows } from "@/lib/finance/import/import-statement";
 import {
   advanceInstallments,
   createCategory,
@@ -175,6 +176,52 @@ const deleteSubscriptionOccurrencesActionSchema = z
     transactionId: uuidSchema,
   })
   .strict();
+
+const importStatementActionSchema = z
+  .object({
+    paymentMethod: z.string().trim().max(64),
+    rows: z
+      .array(
+        z
+          .object({
+            amount: z
+              .number()
+              .finite()
+              .refine(
+                (value) => value !== 0 && Math.abs(value) <= 1_000_000_000,
+              ),
+            date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+            description: safeShortTextSchema,
+            externalId: z.string().trim().min(1).max(64).optional(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(5000),
+  })
+  .strict();
+
+export async function importStatementAction(
+  data: z.input<typeof importStatementActionSchema>,
+) {
+  const parsed = importStatementActionSchema.parse(data);
+  const paymentMethod = parsed.paymentMethod;
+
+  if (paymentMethod && paymentMethod !== "none") {
+    uuidSchema.parse(paymentMethod);
+  }
+
+  const result = await importStatementRows(
+    parsed.rows,
+    paymentMethod && paymentMethod !== "none" ? paymentMethod : null,
+  );
+
+  revalidatePath("/dashboard");
+  revalidatePath("/transactions");
+  revalidatePath("/reports");
+
+  return result;
+}
 
 export async function createCategoryAction(data: CreateCategoryInput) {
   const parsed = createCategoryActionSchema.parse(data);

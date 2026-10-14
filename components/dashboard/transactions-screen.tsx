@@ -18,6 +18,7 @@ import {
   Trash2,
   TrendingDown,
   TrendingUp,
+  Upload,
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -617,13 +618,21 @@ export function TransactionsScreen({
         title={t("screen.transactions.title")}
         description={t("screen.transactions.description")}
         actions={
-          <Button
-            className="gap-2 text-background"
-            onClick={() => setIsNewTransactionOpen(true)}
-          >
-            <Plus className="size-4" />
-            {t("screen.transactions.add")}
-          </Button>
+          <div className="flex gap-2">
+            <Button asChild variant="outline" className="gap-2">
+              <Link href="/transactions/import">
+                <Upload className="size-4" />
+                {t("screen.transactions.import")}
+              </Link>
+            </Button>
+            <Button
+              className="gap-2 text-background"
+              onClick={() => setIsNewTransactionOpen(true)}
+            >
+              <Plus className="size-4" />
+              {t("screen.transactions.add")}
+            </Button>
+          </div>
         }
       />
 
