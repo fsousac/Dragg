@@ -8,7 +8,6 @@ import { toast } from "sonner";
 
 import { NewCategoryDialog } from "@/components/dashboard/new-category-dialog";
 import { CompactInput } from "@/components/dashboard/form-inputs/compact-input";
-import { CompactSelect } from "@/components/dashboard/form-inputs/compact-select";
 import { CompactTextarea } from "@/components/dashboard/form-inputs/compact-textarea";
 import {
   CHIP_BASE_CLASS,
@@ -366,16 +365,15 @@ function usePaymentMethodInstallmentEligibility({
   return { canInstallment, handlePaymentMethodChange };
 }
 
-const INSTALLMENT_COUNTS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 24];
-
 const SECTION_LABEL_CLASS = "mb-2.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground";
 const CHIP_ADD_ACTION_CLASS = "border-dashed border-border/40 text-foreground/50 hover:border-border/60 hover:text-foreground/70";
 
-function getInstallmentOptions(t: (key: string) => string) {
-  return [
-    { value: "1", label: t("transaction.installmentOption.full") },
-    ...INSTALLMENT_COUNTS.map((count) => ({ value: String(count), label: `${count}x` })),
-  ];
+const MAX_INSTALLMENT_COUNT = 120;
+
+function clampInstallmentCount(rawValue: string) {
+  const parsed = Number.parseInt(rawValue, 10);
+  if (Number.isNaN(parsed)) return 1;
+  return Math.min(MAX_INSTALLMENT_COUNT, Math.max(1, parsed));
 }
 
 function getDisplayedCategoryOptions({
@@ -636,7 +634,6 @@ function TransactionDateField({ formData, setFormData, error, todayDateInputValu
 
 type TransactionInstallmentsFieldProps = TransactionFormFieldProps & {
   readonly canInstallment: boolean;
-  readonly installmentOptions: ReturnType<typeof getInstallmentOptions>;
   readonly t: (key: string) => string;
 };
 
@@ -646,18 +643,25 @@ function TransactionInstallmentsField({
   formData,
   setFormData,
   canInstallment,
-  installmentOptions,
   t,
 }: TransactionInstallmentsFieldProps) {
   return (
     <div className="space-y-1.5">
-      <CompactSelect
-        label={t("transaction.installmentFrequency")}
+      <CompactInput
+        label={t("transaction.installmentCount")}
         id="installment"
-        value={canInstallment ? formData.installmentCount.toString() : "1"}
-        onChange={(value) => setFormData({ ...formData, installmentCount: Number.parseInt(value, 10) })}
-        options={installmentOptions}
+        type="number"
+        inputMode="numeric"
+        min="1"
+        max={MAX_INSTALLMENT_COUNT.toString()}
+        value={canInstallment ? formData.installmentCount : 1}
         disabled={!canInstallment}
+        onChange={(event) =>
+          setFormData({
+            ...formData,
+            installmentCount: clampInstallmentCount(event.target.value),
+          })
+        }
       />
       {canInstallment ? null : (
         <p className="text-xs text-muted-foreground">{t("transaction.installmentUnavailable")}</p>
@@ -860,7 +864,7 @@ function useTransactionFormHandlers({
     canInstallment,
   });
 
-  return { handleSubmit, canInstallment, handlePaymentMethodChange, installmentOptions: getInstallmentOptions(t) };
+  return { handleSubmit, canInstallment, handlePaymentMethodChange };
 }
 
 function useTransactionFormState({
