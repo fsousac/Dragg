@@ -24,6 +24,7 @@ Dragg is a Next.js App Router application backed by Supabase Auth and Supabase P
 - `/categories`: category management with icons, groups, and monthly limits.
 - `/budgets`: 50/30/20 allocation and category budget progress.
 - `/payments`: payment methods, credit limits, due payments, and subscription management.
+- `/debts`: read-only tracking of interest-bearing debts (financed purchases and loans): outstanding balance split into principal and interest, installments paid, next installment, CET, and the per-installment schedule.
 - `/goals`: goals with target/current amounts, funding, deadlines, colors, and icons.
 - `/reports`: monthly reports, net worth progression, and transaction exports.
 - `/settings`: read-only OAuth profile information and user preferences UI.
@@ -32,6 +33,8 @@ Dragg is a Next.js App Router application backed by Supabase Auth and Supabase P
 
 - Transactions are income, expense, or saving records.
 - Expenses can be split into installments; each occurrence is stored as its own transaction and grouped by shared installment metadata.
+- Expenses can carry interest (Simple, Price, SAC, or a rate implied by the installment amount), a down payment, fees, or be a loan. Each financed operation stores one immutable `financing_plans` row plus its transaction rows with principal/interest portions; calculations live in `lib/finance/financing.ts`. See [interest-bearing debt architecture](decisions/interest-bearing-debt-architecture.md).
+- Any expense can be funded fully or partly from the saved total (`savings_funded_amount`), which lowers the saved total instead of the month's available balance.
 - Installment deletion supports single, selected-and-following, and full-group scopes. Installment prepayment preserves the original transaction dates and writes `advanced_to_month` metadata so payment/invoice views move the obligation without changing purchase competence.
 - Monthly subscriptions are represented by future transaction rows whose `notes` start with `subscription`. There is no explicit paid/unpaid column, so scoped subscription deletion removes the selected occurrence and matching future rows while preserving earlier history.
 - Paused subscription rows use `subscription paused` notes and are hidden from transaction/payment views while remaining available to subscription overview logic.

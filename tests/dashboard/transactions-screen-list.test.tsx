@@ -196,6 +196,7 @@ function renderScreen(overrides: Partial<ScreenProps> = {}) {
         totalIncome: 2500,
         totalExpenses: 440,
         totalSavings: 200,
+        totalSavingsFunded: 0,
       }}
       nextInvoiceTransactions={[]}
       paymentMethods={paymentMethods}
@@ -379,6 +380,7 @@ describe("TransactionsScreen list rendering", () => {
           totalIncome: 2500,
           totalExpenses: 440,
           totalSavings: 200,
+          totalSavingsFunded: 0,
         }}
         nextInvoiceTransactions={[]}
         paymentMethods={paymentMethods}
@@ -401,11 +403,26 @@ describe("TransactionsScreen list rendering", () => {
         totalIncome: 100,
         totalExpenses: 500,
         totalSavings: 0,
+        totalSavingsFunded: 0,
       },
     });
 
     // balance = 100 - 500 - 0 = -400
     expect(screen.getByText("$-400.00")).toBeInTheDocument();
+  });
+
+  it("keeps the savings-funded part of expenses out of the current balance", () => {
+    renderScreen({
+      monthlySummary: {
+        totalIncome: 100,
+        totalExpenses: 500,
+        totalSavings: 0,
+        totalSavingsFunded: 450,
+      },
+    });
+
+    // balance = 100 - (500 - 450) - 0 = 50
+    expect(screen.getByText("$50.00")).toBeInTheDocument();
   });
 
   it("falls back to the current month when the URL has no 'month' param", () => {

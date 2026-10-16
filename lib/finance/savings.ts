@@ -4,6 +4,7 @@ type TransactionLike = {
   amount: number;
   date: string;
   group?: TransactionGroup;
+  savingsFundedAmount?: number;
   type: TransactionType;
 };
 
@@ -40,11 +41,18 @@ export function calculateTotalSaved({
       isSavingsTransaction(transaction) &&
       getTransactionMonth(transaction) <= selectedMonth,
   );
+  // Savings-funded expense parts are paid by the saved total, not the month.
+  const savingsFundedTotal = validTransactions
+    .filter((transaction) => getTransactionMonth(transaction) <= selectedMonth)
+    .reduce(
+      (sum, transaction) => sum + (transaction.savingsFundedAmount ?? 0),
+      0,
+    );
   const totalInvested = toMoneyValue(
     investedTransactions.reduce(
       (sum, transaction) => sum + Math.abs(transaction.amount),
       0,
-    ),
+    ) - savingsFundedTotal,
   );
   const earliestMonth = validTransactions
     .map(getTransactionMonth)
@@ -131,7 +139,13 @@ function sumExpenses(transactions: TransactionLike[]) {
         (transaction) =>
           transaction.type === "expense" && !isSavingsTransaction(transaction),
       )
-      .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0),
+      .reduce(
+        (sum, transaction) =>
+          sum +
+          Math.abs(transaction.amount) -
+          (transaction.savingsFundedAmount ?? 0),
+        0,
+      ),
   );
 }
 

@@ -72,6 +72,7 @@ function qb(response: { data?: unknown; error?: unknown }) {
     lte: chain,
     maybeSingle: chain,
     neq: chain,
+    not: chain,
     order: chain,
     range: chain,
     select: chain,
@@ -696,7 +697,7 @@ describe("listGoals", () => {
   };
 
   it("returns mapped goals on success", async () => {
-    setup([qb({ data: [goalRow], error: null })]);
+    setup([qb({ data: [goalRow], error: null }), qb({ data: [], error: null })]);
 
     await expect(listGoals()).resolves.toEqual([
       {
@@ -714,6 +715,38 @@ describe("listGoals", () => {
   it("defaults to an empty array when data is null", async () => {
     setup([qb({ data: null, error: null })]);
     await expect(listGoals()).resolves.toEqual([]);
+  });
+
+  it("adds linked payments (principal only when financed) and caps at the target", async () => {
+    const other = { ...goalRow, id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", target_amount: 300 };
+    setup([
+      qb({ data: [goalRow, other], error: null }),
+      qb({
+        data: [
+          { goal_id: goalRow.id, amount: 100, principal_portion: null },
+          { goal_id: goalRow.id, amount: 120, principal_portion: 100 },
+          { goal_id: other.id, amount: 500, principal_portion: null },
+        ],
+        error: null,
+      }),
+    ]);
+
+    const result = await listGoals();
+    expect(result.map((goal) => goal.currentAmount)).toEqual([450, 300]);
+  });
+
+  it("throws when linked payments cannot be loaded", async () => {
+    setup([
+      qb({ data: [goalRow], error: null }),
+      qb({ data: null, error: { message: "boom" } }),
+    ]);
+    await expect(listGoals()).rejects.toThrow("Unable to load goal payments: boom");
+  });
+
+  it("treats a null payments result as no linked payments", async () => {
+    setup([qb({ data: [goalRow], error: null }), qb({ data: null, error: null })]);
+    const [goal] = await listGoals();
+    expect(goal.currentAmount).toBe(250);
   });
 
   it("returns an empty array when the goals table does not exist yet", async () => {

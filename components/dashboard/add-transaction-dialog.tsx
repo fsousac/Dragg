@@ -14,6 +14,7 @@ import type {
   TransactionFormCategory,
   TransactionFormPaymentMethod,
 } from "@/lib/finance/transactions";
+import type { AdvancedOptionsState } from "./transaction-advanced-options";
 import { useI18n } from "@/lib/i18n";
 
 interface AddTransactionDialogProps {
@@ -24,6 +25,7 @@ interface AddTransactionDialogProps {
   createCategoryAction?: (data: CreateCategoryInput) => Promise<void>;
   createPaymentMethodAction?: (data: CreatePaymentMethodInput) => Promise<void>;
   onSubmit: (data: TransactionFormData) => Promise<void>;
+  initialAdvanced?: AdvancedOptionsState;
 }
 
 export function AddTransactionDialog({
@@ -34,6 +36,7 @@ export function AddTransactionDialog({
   createCategoryAction,
   createPaymentMethodAction,
   onSubmit,
+  initialAdvanced,
 }: AddTransactionDialogProps) {
   const { t } = useI18n();
 
@@ -52,6 +55,7 @@ export function AddTransactionDialog({
             paymentMethods={paymentMethods}
             createCategoryAction={createCategoryAction}
             createPaymentMethodAction={createPaymentMethodAction}
+            initialAdvanced={initialAdvanced}
             onSubmit={async (data) => {
               await onSubmit(data);
               onOpenChange(false);

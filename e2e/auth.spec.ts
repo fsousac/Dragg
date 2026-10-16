@@ -4,6 +4,7 @@ import { createTestUser } from "./fixtures/test-user";
 
 test("signs up, signs out is not required, then signs back in with the same credentials", async ({
   page,
+  isMobile,
 }) => {
   const user = createTestUser();
 
@@ -20,7 +21,12 @@ test("signs up, signs out is not required, then signs back in with the same cred
 
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
 
-  await page.getByRole("button", { name: "Logout" }).click();
+  if (isMobile) {
+    await page.getByRole("button", { name: "More" }).click();
+    await page.getByRole("menuitem", { name: "Logout" }).click();
+  } else {
+    await page.getByRole("button", { name: "Logout" }).click();
+  }
   await expect(page).toHaveURL(/\/$/);
 
   await page.getByLabel("Email", { exact: true }).fill(user.email);

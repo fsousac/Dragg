@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test("creates a credit card payment method and uses it in a transaction", async ({
   page,
+  isMobile,
 }) => {
   const cardName = `E2E Credit Card ${Date.now()}`;
   const description = `E2E credit card purchase ${Date.now()}`;
@@ -45,7 +46,10 @@ test("creates a credit card payment method and uses it in a transaction", async 
     name: `Payment details: ${cardName}`,
     exact: true,
   });
-  await expect(cardEntry.getByText(/Limit:/)).toBeVisible();
+  // ponytail: the mobile row only shows the amount spent, not the limit.
+  if (!isMobile) {
+    await expect(cardEntry.getByText(/Limit:/)).toBeVisible();
+  }
 
   // Use the new credit card in a transaction
   await page.goto("/transactions");
