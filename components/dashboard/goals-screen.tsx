@@ -914,12 +914,14 @@ function DeleteGoalDialog({
   isOpen,
   onOpenChange,
   isPending,
+  hasLinkedPayments,
   onConfirm,
   t,
 }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   isPending: boolean;
+  hasLinkedPayments: boolean;
   onConfirm: () => void;
   t: (key: string) => string;
 }) {
@@ -928,7 +930,10 @@ function DeleteGoalDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{t("goals.deleteTitle")}</AlertDialogTitle>
-          <AlertDialogDescription>{t("goals.deleteDescription")}</AlertDialogDescription>
+          <AlertDialogDescription>
+            {t("goals.deleteDescription")}
+            {hasLinkedPayments ? ` ${t("goals.deleteLinkedWarning")}` : ""}
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isPending}>{t("common.cancel")}</AlertDialogCancel>
@@ -1011,6 +1016,7 @@ function GoalFundsAndDeleteDialogs({
           if (!open) setDeletingGoal(null);
         }}
         isPending={isPending}
+        hasLinkedPayments={Boolean(deletingGoal?.hasLinkedPayments)}
         onConfirm={handleDeleteGoal}
         t={t}
       />

@@ -3532,7 +3532,8 @@ function buildUpdateTransactionInput(
     category: formData.category,
     date: formData.date,
     description: formData.description,
-    goalId: formData.advanced.goalId,
+    // Turning advanced options off also drops the goal link.
+    goalId: formData.advanced.enabled ? formData.advanced.goalId : null,
     id: selectedTransaction.id,
     notes: formData.notes,
     paymentMethod: formData.paymentMethod,

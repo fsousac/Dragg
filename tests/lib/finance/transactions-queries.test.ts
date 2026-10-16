@@ -704,6 +704,7 @@ describe("listGoals", () => {
         color: "#ff0000",
         currentAmount: 250,
         deadline: "2026-12-01",
+        hasLinkedPayments: false,
         icon: "🎯",
         id: goalRow.id,
         name: "Trip",
@@ -733,6 +734,7 @@ describe("listGoals", () => {
 
     const result = await listGoals();
     expect(result.map((goal) => goal.currentAmount)).toEqual([450, 300]);
+    expect(result.map((goal) => goal.hasLinkedPayments)).toEqual([true, true]);
   });
 
   it("throws when linked payments cannot be loaded", async () => {

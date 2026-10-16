@@ -104,8 +104,39 @@ function makeSupabase(
 
 function setup(fromResponses: unknown[] = [], opts: { createdAt?: string | null } = {}) {
   const supabase = makeSupabase(fromResponses, opts);
+  captureBatch(supabase);
   vi.mocked(createClient).mockResolvedValue(supabase as never);
   return supabase;
+}
+
+type BatchCall = {
+  plan: Record<string, unknown> | null;
+  rows: Record<string, unknown>[];
+  deleteIds: string[] | null;
+};
+
+// Routes the atomic save_transaction_batch rpc to a recorder; any other rpc
+// answers with the saved total.
+let batchCalls: BatchCall[] = [];
+
+function captureBatch(
+  supabase: ReturnType<typeof makeSupabase>,
+  opts: { error?: unknown; savedTotal?: number } = {},
+) {
+  const calls: BatchCall[] = [];
+  batchCalls = calls;
+  supabase.rpc.mockImplementation(async (name: string, args: Record<string, unknown>) => {
+    if (name !== "save_transaction_batch") {
+      return { data: opts.savedTotal ?? 0, error: null };
+    }
+    calls.push({
+      plan: args.p_plan as BatchCall["plan"],
+      rows: args.p_rows as BatchCall["rows"],
+      deleteIds: args.p_delete_ids as BatchCall["deleteIds"],
+    });
+    return { error: opts.error ?? null };
+  });
+  return calls;
 }
 
 beforeEach(() => {
@@ -1082,14 +1113,10 @@ describe("createTransaction — savings funding and financing", () => {
     });
 
     it("stamps goal_id on financed purchase rows", async () => {
-      let captured: Row[] = [];
-      setup([
-        qb({ data: { id: GOAL_ID }, error: null }),
-        qb({ error: null }),
-        qb({ error: null }, { onInsert: (rows) => (captured = rows as Row[]) }),
-      ]);
+      const supabase = setup([qb({ data: { id: GOAL_ID }, error: null })]);
+      const calls = captureBatch(supabase);
       await createTransaction({ ...expense, goalId: GOAL_ID, financing });
-      expect(captured.every((row) => row.goal_id === GOAL_ID)).toBe(true);
+      expect(calls[0].rows.every((row) => row.goal_id === GOAL_ID)).toBe(true);
     });
 
     it("rejects an invalid goal id", async () => {
@@ -1145,12 +1172,11 @@ describe("createTransaction — savings funding and financing", () => {
   });
 
   it("accepts a non-savings category", async () => {
-    setup([
+    const supabase = setup([
       qb({ data: { id: CATEGORY_ID }, error: null }),
       qb({ data: { group_type: "needs" }, error: null }),
-      qb({ error: null }),
-      qb({ error: null }),
     ]);
+    captureBatch(supabase);
     await expect(createTransaction({ ...expense, category: CATEGORY_ID, financing })).resolves.toBeUndefined();
   });
 
@@ -1161,14 +1187,13 @@ describe("createTransaction — savings funding and financing", () => {
     );
   });
 
-  it("writes the plan, then Price rows with portions, first installment on the purchase date", async () => {
-    let plan: Row = {};
-    let rows: Row[] = [];
-    setup([
-      qb({ error: null }, { onInsert: (value) => (plan = value as Row) }),
-      qb({ error: null }, { onInsert: (value) => (rows = value as Row[]) }),
-    ]);
+  it("writes the plan and the Price rows in one batch, first installment on the purchase date", async () => {
+    const calls = captureBatch(setup([]));
     await createTransaction({ ...expense, financing });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].deleteIds).toBeNull();
+    const plan = calls[0].plan as Row;
+    const rows = calls[0].rows;
     expect(plan).toMatchObject({
       operation_type: "purchase", interest_system: "price", rate_input_mode: "rate",
       rate: 2, rate_period: "monthly", principal: 1000, down_payment: 0, fees: 0,
@@ -1184,13 +1209,10 @@ describe("createTransaction — savings funding and financing", () => {
   });
 
   it("adds a down-payment row on the date and shifts installments one month", async () => {
-    let rows: Row[] = [];
-    let plan: Row = {};
-    setup([
-      qb({ error: null }, { onInsert: (value) => (plan = value as Row) }),
-      qb({ error: null }, { onInsert: (value) => (rows = value as Row[]) }),
-    ]);
+    const calls = captureBatch(setup([]));
     await createTransaction({ ...expense, financing: { ...financing, downPayment: 200, fees: 50 } });
+    const rows = calls[0].rows;
+    const plan = calls[0].plan as Row;
     expect(rows).toHaveLength(13);
     expect(rows[0]).toMatchObject({
       amount: 200, date: "2030-01-15", description: "Notebook", installment_group_id: null,
@@ -1200,56 +1222,44 @@ describe("createTransaction — savings funding and financing", () => {
   });
 
   it("creates a loan income row and starts installments next month", async () => {
-    let rows: Row[] = [];
-    setup([qb({ error: null }), qb({ error: null }, { onInsert: (value) => (rows = value as Row[]) })]);
+    const calls = captureBatch(setup([]));
     await createTransaction({ ...expense, financing: { ...financing, operationType: "loan" } });
+    const rows = calls[0].rows;
     const income = rows.find((row) => row.kind === "income");
     expect(income).toMatchObject({ amount: 1000, category_id: null, date: "2030-01-15", savings_funded_amount: 0 });
     expect(rows.filter((row) => row.kind === "expense")[0]).toMatchObject({ date: "2030-02-15" });
   });
 
   it("stores the solved monthly rate in installment mode", async () => {
-    let plan: Row = {};
-    setup([qb({ error: null }, { onInsert: (value) => (plan = value as Row) }), qb({ error: null })]);
+    const calls = captureBatch(setup([]));
     await createTransaction({
       ...expense,
       financing: { ...financing, rateInputMode: "installment", rate: undefined, installmentAmount: 94.56 },
     });
+    const plan = calls[0].plan as Row;
     expect(plan.rate_period).toBe("monthly");
     expect(plan.interest_system).toBe("price");
     expect(Number(plan.rate)).toBeCloseTo(2, 3);
   });
 
   it("spreads savings over financed expense rows only", async () => {
-    let rows: Row[] = [];
-    let plan: Row = {};
-    const supabase = setup([
-      qb({ data: [], error: null }),
-      qb({ error: null }, { onInsert: (value) => (plan = value as Row) }),
-      qb({ error: null }, { onInsert: (value) => (rows = value as Row[]) }),
-    ]);
-    supabase.rpc.mockResolvedValue({ data: 5000, error: null });
+    const supabase = setup([qb({ data: [], error: null })]);
+    const calls = captureBatch(supabase, { savedTotal: 5000 });
     await createTransaction({ ...expense, savingsFundedAmount: 100, financing: { ...financing, operationType: "loan" } });
+    const rows = calls[0].rows;
+    const plan = calls[0].plan as Row;
     expect(plan.savings_funded_amount).toBe(100);
     expect(rows.find((row) => row.kind === "income")?.savings_funded_amount).toBe(0);
     expect(rows.filter((row) => row.kind === "expense").map((row) => row.savings_funded_amount).slice(0, 2)).toEqual([8.33, 8.33]);
   });
 
-  it("throws when the plan insert fails", async () => {
-    setup([qb({ error: { message: "plan boom" } })]);
+  it("throws when the atomic batch fails, with nothing to compensate", async () => {
+    const supabase = setup([]);
+    captureBatch(supabase, { error: { message: "batch boom" } });
     await expect(createTransaction({ ...expense, financing })).rejects.toThrow(
-      "Unable to save financing plan: plan boom",
+      "Unable to save transaction: batch boom",
     );
-  });
-
-  it("deletes the plan (compensation) when the rows insert fails", async () => {
-    const deletePlan = qb({ error: null });
-    const deleteSpy = vi.spyOn(deletePlan as { delete: () => unknown }, "delete");
-    setup([qb({ error: null }), qb({ error: { message: "rows boom" } }), deletePlan]);
-    await expect(createTransaction({ ...expense, financing })).rejects.toThrow(
-      "Unable to save transaction: rows boom",
-    );
-    expect(deleteSpy).toHaveBeenCalled();
+    expect(supabase.from).not.toHaveBeenCalledWith("financing_plans");
   });
 
   it("propagates the saved-total RPC error", async () => {
@@ -1549,19 +1559,17 @@ describe("amortizeDebt", () => {
     description: `Notebook (${number}/2)`, notes: `${number}/2`, goal_id: null as string | null,
   });
   const input = { planId: PLAN_ID, amount: 400, source: "balance" as const, mode: "installment" as const, description: "Notebook (amortization)" };
-  type Row = Record<string, unknown>;
 
-  it("inserts the extra payment and smaller installments, then removes the old ones", async () => {
-    let inserted: Row[] = [];
-    const remove = qb({ error: null });
-    const deleteSpy = vi.spyOn(remove as { delete: () => unknown }, "delete");
+  it("sends the extra payment and smaller installments, replacing the old ones atomically", async () => {
     setup([
       qb({ data: planRow, error: null }),
       qb({ data: [future(1), future(2)], error: null }),
-      qb({ data: [{ id: "n0" }], error: null }, { onInsert: (rows) => (inserted = rows as Row[]) }),
-      remove,
     ]);
     await amortizeDebt(input);
+    expect(batchCalls).toHaveLength(1);
+    expect(batchCalls[0].plan).toBeNull();
+    expect(batchCalls[0].deleteIds).toEqual(["f1", "f2"]);
+    const inserted = batchCalls[0].rows;
     expect(inserted[0]).toMatchObject({
       amount: 400, kind: "expense", is_amortization: true, principal_portion: 400, interest_portion: 0,
       savings_funded_amount: 0, installment_number: null, installment_group_id: null,
@@ -1572,61 +1580,48 @@ describe("amortizeDebt", () => {
       { installment_number: 2, date: "2999-02-10", description: "Notebook (2/2)" },
     ]);
     expect(inserted.slice(1).reduce((sum, row) => sum + Number(row.principal_portion), 0)).toBeCloseTo(600, 2);
-    expect(deleteSpy).toHaveBeenCalled();
   });
 
   it("keeps the goal link on the extra payment and the new installments", async () => {
-    let inserted: Row[] = [];
     setup([
       qb({ data: planRow, error: null }),
       qb({ data: [{ ...future(1), goal_id: GOAL_ID }, { ...future(2), goal_id: GOAL_ID }], error: null }),
-      qb({ data: [], error: null }, { onInsert: (rows) => (inserted = rows as Row[]) }),
-      qb({ error: null }),
     ]);
     await amortizeDebt(input);
-    expect(inserted.map((row) => row.goal_id)).toEqual([GOAL_ID, GOAL_ID, GOAL_ID]);
+    expect(batchCalls[0].rows.map((row) => row.goal_id)).toEqual([GOAL_ID, GOAL_ID, GOAL_ID]);
   });
 
   it("sends every row with the same columns, so a bulk insert never writes NULL flags", async () => {
-    let inserted: Row[] = [];
     setup([
       qb({ data: planRow, error: null }),
       qb({ data: [future(1), future(2)], error: null }),
-      qb({ data: [], error: null }, { onInsert: (rows) => (inserted = rows as Row[]) }),
-      qb({ error: null }),
     ]);
     await amortizeDebt(input);
-    const columns = Object.keys(inserted[0]).sort();
-    inserted.forEach((row) => expect(Object.keys(row).sort()).toEqual(columns));
-    expect(inserted.map((row) => row.is_amortization)).toEqual([true, false, false]);
+    const columns = Object.keys(batchCalls[0].rows[0]).sort();
+    batchCalls[0].rows.forEach((row) => expect(Object.keys(row).sort()).toEqual(columns));
+    expect(batchCalls[0].rows.map((row) => row.is_amortization)).toEqual([true, false, false]);
   });
 
   it("paying the whole principal leaves only the extra payment", async () => {
-    let inserted: Row[] = [];
     setup([
       qb({ data: planRow, error: null }),
       qb({ data: [future(1), future(2)], error: null }),
-      qb({ data: [], error: null }, { onInsert: (rows) => (inserted = rows as Row[]) }),
-      qb({ error: null }),
     ]);
     await amortizeDebt({ ...input, amount: 1000 });
-    expect(inserted).toHaveLength(1);
+    expect(batchCalls[0].rows).toHaveLength(1);
   });
 
   it("funds from savings and keeps each installment's savings share", async () => {
-    let inserted: Row[] = [];
     const supabase = setup([
       qb({ data: planRow, error: null }),
       qb({ data: [future(1, "260"), future(2)], error: null }),
       qb({ data: [], error: null }),
-      qb({ data: [], error: null }, { onInsert: (rows) => (inserted = rows as Row[]) }),
-      qb({ error: null }),
     ]);
-    supabase.rpc.mockResolvedValue({ data: 500, error: null });
+    captureBatch(supabase, { savedTotal: 500 });
     await amortizeDebt({ ...input, source: "savings" });
-    expect(inserted[0].savings_funded_amount).toBe(400);
-    expect(Number(inserted[1].savings_funded_amount)).toBeGreaterThan(0);
-    expect(inserted[2].savings_funded_amount).toBe(0);
+    expect(batchCalls[0].rows[0].savings_funded_amount).toBe(400);
+    expect(Number(batchCalls[0].rows[1].savings_funded_amount)).toBeGreaterThan(0);
+    expect(batchCalls[0].rows[2].savings_funded_amount).toBe(0);
   });
 
   it("rejects savings above what is available", async () => {
@@ -1649,59 +1644,47 @@ describe("amortizeDebt", () => {
   });
 
   it("falls back to the amount when a row has no principal portion", async () => {
-    let inserted: Row[] = [];
     setup([
       qb({ data: planRow, error: null }),
       qb({ data: [{ ...future(1), principal_portion: null, amount: "500" }], error: null }),
-      qb({ data: [], error: null }, { onInsert: (rows) => (inserted = rows as Row[]) }),
-      qb({ error: null }),
     ]);
     await amortizeDebt({ ...input, amount: 100 });
-    expect(inserted).toHaveLength(2);
+    expect(batchCalls[0].rows).toHaveLength(2);
   });
 
   it("charges accrued interest on the extra payment", async () => {
-    let inserted: Row[] = [];
     const fifteenDaysAgo = new Date(Date.now() - 15 * 86_400_000).toISOString().slice(0, 10);
     const past = { ...future(1), id: "p1", date: fifteenDaysAgo, principal_portion: "0", amount: "0" };
     setup([
       qb({ data: planRow, error: null }),
       qb({ data: [past, future(2)], error: null }),
-      qb({ data: [], error: null }, { onInsert: (rows) => (inserted = rows as Row[]) }),
-      qb({ error: null }),
     ]);
     await amortizeDebt({ ...input, amount: 100 });
-    expect(Number(inserted[0].interest_portion)).toBeGreaterThan(0);
-    expect(Number(inserted[0].principal_portion) + Number(inserted[0].interest_portion)).toBeCloseTo(100, 2);
-    expect(inserted).toHaveLength(2);
+    expect(Number(batchCalls[0].rows[0].interest_portion)).toBeGreaterThan(0);
+    expect(Number(batchCalls[0].rows[0].principal_portion) + Number(batchCalls[0].rows[0].interest_portion)).toBeCloseTo(100, 2);
+    expect(batchCalls[0].rows).toHaveLength(2);
   });
 
   it("shortens the term, dropping the last installments", async () => {
-    let inserted: Row[] = [];
     const rows = [1, 2, 3, 4].map((n) => ({
       ...future(n), amount: "270", principal_portion: "250", installment_total: 4, date: `2999-0${n}-10`,
     }));
     setup([
       qb({ data: planRow, error: null }),
       qb({ data: rows, error: null }),
-      qb({ data: [], error: null }, { onInsert: (value) => (inserted = value as Row[]) }),
-      qb({ error: null }),
     ]);
     await amortizeDebt({ ...input, mode: "term", amount: 500 });
-    expect(inserted.length - 1).toBeLessThan(4);
-    expect(inserted.length - 1).toBeGreaterThan(0);
+    expect(batchCalls[0].rows.length - 1).toBeLessThan(4);
+    expect(batchCalls[0].rows.length - 1).toBeGreaterThan(0);
   });
 
   it("gives a zero-amount row no savings share", async () => {
-    let inserted: Row[] = [];
     setup([
       qb({ data: planRow, error: null }),
       qb({ data: [{ ...future(1), amount: "0" }], error: null }),
-      qb({ data: [], error: null }, { onInsert: (rows) => (inserted = rows as Row[]) }),
-      qb({ error: null }),
     ]);
     await amortizeDebt({ ...input, amount: 100 });
-    expect(inserted[1].savings_funded_amount).toBe(0);
+    expect(batchCalls[0].rows[1].savings_funded_amount).toBe(0);
   });
 
   it("validates the plan id and reports load, insert and delete errors", async () => {
@@ -1712,36 +1695,22 @@ describe("amortizeDebt", () => {
     await expect(amortizeDebt(input)).rejects.toThrow("Financing plan not found.");
     setup([qb({ data: planRow, error: null }), qb({ data: null, error: { message: "r" } })]);
     await expect(amortizeDebt(input)).rejects.toThrow("Unable to load financing rows: r");
-    setup([
-      qb({ data: planRow, error: null }),
-      qb({ data: [future(1), future(2)], error: null }),
-      qb({ data: null, error: { message: "ins" } }),
-    ]);
+    captureBatch(
+      setup([
+        qb({ data: planRow, error: null }),
+        qb({ data: [future(1), future(2)], error: null }),
+      ]),
+      { error: { message: "ins" } },
+    );
     await expect(amortizeDebt(input)).rejects.toThrow("Unable to save amortization: ins");
   });
 
-  it("drops the new rows when removing the old installments fails", async () => {
-    const compensation = qb({ error: null });
-    const deleteSpy = vi.spyOn(compensation as { delete: () => unknown }, "delete");
-    setup([
+  it("reports a failed atomic replace without touching anything else", async () => {
+    const supabase = setup([
       qb({ data: planRow, error: null }),
       qb({ data: [future(1), future(2)], error: null }),
-      qb({ data: [{ id: "n0" }], error: null }),
-      qb({ error: { message: "del" } }),
-      compensation,
     ]);
-    await expect(amortizeDebt(input)).rejects.toThrow("Unable to replace installments: del");
-    expect(deleteSpy).toHaveBeenCalled();
-  });
-
-  it("tolerates an insert that returns no rows when compensating", async () => {
-    setup([
-      qb({ data: planRow, error: null }),
-      qb({ data: [future(1), future(2)], error: null }),
-      qb({ data: null, error: null }),
-      qb({ error: { message: "del" } }),
-      qb({ error: null }),
-    ]);
-    await expect(amortizeDebt(input)).rejects.toThrow("Unable to replace installments: del");
+    captureBatch(supabase, { error: { message: "del" } });
+    await expect(amortizeDebt(input)).rejects.toThrow("Unable to save amortization: del");
   });
 });

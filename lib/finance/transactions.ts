@@ -157,6 +157,8 @@ export type GoalOverviewItem = {
   color: string;
   currentAmount: number;
   deadline: string;
+  // Paid expenses are linked to it; deleting the goal drops that progress.
+  hasLinkedPayments?: boolean;
   icon: string;
   id: string;
   name: string;
@@ -1624,6 +1626,7 @@ export async function listGoals(): Promise<GoalOverviewItem[]> {
       Number(goal.target_amount),
     ),
     deadline: goal.deadline,
+    hasLinkedPayments: linked.has(goal.id),
     icon: goal.icon,
     id: goal.id,
     name: goal.name,
@@ -2138,7 +2141,7 @@ function buildFinancedTransactionRows(context: FinancedRowsContext) {
   };
 }
 
-async function insertFinancingPlan({
+function buildFinancingPlanRow({
   ctx,
   resolved,
   financing,
@@ -2154,7 +2157,7 @@ async function insertFinancingPlan({
   savingsFundedAmount: number;
 }) {
   const isInstallmentMode = financing.rateInputMode === "installment";
-  const { error } = await ctx.supabase.from("financing_plans").insert({
+  return {
     id: planId,
     user_id: ctx.userId,
     operation_type: financing.operationType,
@@ -2170,11 +2173,7 @@ async function insertFinancingPlan({
     fees: financing.fees,
     installment_count: resolved.installmentCount,
     savings_funded_amount: savingsFundedAmount,
-  });
-
-  if (error) {
-    throw new Error(`Unable to save financing plan: ${error.message}`);
-  }
+  };
 }
 
 type FinancedTransactionInput = {
@@ -2207,24 +2206,21 @@ async function createFinancedTransaction(input: FinancedTransactionInput) {
     ...incomeRows,
   ];
 
-  await insertFinancingPlan({
-    ctx,
-    resolved,
-    financing,
-    planId,
-    resolution,
-    savingsFundedAmount,
+  // One atomic call: the plan and its rows are saved together or not at all.
+  const { error } = await ctx.supabase.rpc("save_transaction_batch", {
+    p_plan: buildFinancingPlanRow({
+      ctx,
+      resolved,
+      financing,
+      planId,
+      resolution,
+      savingsFundedAmount,
+    }),
+    p_rows: rows,
+    p_delete_ids: null,
   });
 
-  const { error } = await ctx.supabase.from("transactions").insert(rows);
-
   if (error) {
-    // Compensation: supabase-js has no multi-statement transaction here.
-    await ctx.supabase
-      .from("financing_plans")
-      .delete()
-      .eq("id", planId)
-      .eq("user_id", ctx.userId);
     throw new Error(`Unable to save transaction: ${error.message}`);
   }
 }
@@ -3643,33 +3639,19 @@ function buildAmortizationRows({
 
 async function replaceFutureInstallments(
   supabase: SupabaseClient,
-  userId: string,
   { oldIds, rows }: { oldIds: string[]; rows: object[] },
 ) {
-  const { data: inserted, error: insertError } = await supabase
-    .from("transactions")
-    .insert(rows)
-    .select("id");
+  // Insert and delete run in one transaction, so the original schedule is
+  // never lost nor duplicated.
+  const { error } = await supabase.rpc("save_transaction_batch", {
+    p_plan: null,
+    p_rows: rows,
+    p_delete_ids: oldIds,
+  });
 
-  if (insertError) {
-    throw new Error(`Unable to save amortization: ${insertError.message}`);
+  if (error) {
+    throw new Error(`Unable to save amortization: ${error.message}`);
   }
-
-  const { error: deleteError } = await supabase
-    .from("transactions")
-    .delete()
-    .eq("user_id", userId)
-    .in("id", oldIds);
-
-  if (!deleteError) return;
-
-  // Compensation: drop the new rows so the original schedule stays intact.
-  await supabase
-    .from("transactions")
-    .delete()
-    .eq("user_id", userId)
-    .in("id", (inserted ?? []).map((row: { id: string }) => row.id));
-  throw new Error(`Unable to replace installments: ${deleteError.message}`);
 }
 
 // Pays part of a financed debt today. The remaining installments are
@@ -3708,7 +3690,7 @@ export async function amortizeDebt(rawInput: AmortizeDebtInput) {
     await assertAmortizationSavings(ctx, { amount: input.amount, slices, future });
   }
 
-  await replaceFutureInstallments(supabase, userId, {
+  await replaceFutureInstallments(supabase, {
     oldIds: future.map((row) => row.id),
     rows: buildAmortizationRows({ userId, input, future, paid, schedule, slices }),
   });

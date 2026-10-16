@@ -286,6 +286,8 @@ const messages = {
     "goals.deleteDescription":
       "This goal will be permanently removed from your account.",
     "goals.deleteError": "Failed to delete goal.",
+    "goals.deleteLinkedWarning":
+      "Payments linked to it stop counting toward any goal.",
     "goals.deleteSuccess": "Goal deleted successfully.",
     "goals.deleteTitle": "Delete goal?",
     "goals.emptyDescription":
@@ -1033,6 +1035,8 @@ const messages = {
     "goals.deleteDescription":
       "Esta meta será removida permanentemente da sua conta.",
     "goals.deleteError": "Não foi possível excluir a meta.",
+    "goals.deleteLinkedWarning":
+      "Os pagamentos vinculados a ela deixam de contar para qualquer meta.",
     "goals.deleteSuccess": "Meta excluída com sucesso.",
     "goals.deleteTitle": "Excluir meta?",
     "goals.emptyDescription":
