@@ -15,6 +15,7 @@ export const sidebarRoutes = [
   "/categories",
   "/budgets",
   "/payments",
+  "/debts",
   "/reports",
   "/goals",
   "/settings",

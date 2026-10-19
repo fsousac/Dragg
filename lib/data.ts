@@ -28,6 +28,12 @@ export interface Transaction {
   installmentTotal?: number | null;
   advancedToMonth?: string | null;
   advancedAt?: string | null;
+  // Part of this expense paid from the saved total instead of the month's balance.
+  savingsFundedAmount?: number;
+  // financing_plans.id when this row belongs to an interest-bearing operation.
+  financingGroupId?: string | null;
+  // goals.id this expense pays into, when linked.
+  goalId?: string | null;
   invoice?: CreditCardInvoiceDetails;
 }
 

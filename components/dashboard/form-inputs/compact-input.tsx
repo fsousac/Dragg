@@ -19,6 +19,7 @@ interface CompactInputProps {
   readonly inputMode: React.HTMLAttributes<HTMLInputElement>["inputMode"];
   readonly pattern?: string;
   readonly inputClassName?: string;
+  readonly disabled?: boolean;
 }
 
 function getCompactInputClassName(
@@ -60,6 +61,7 @@ export function CompactInput({
   inputMode,
   pattern,
   inputClassName,
+  disabled,
 }: CompactInputProps) {
   return (
     <div className="w-full min-w-0 space-y-1.5">
@@ -82,6 +84,7 @@ export function CompactInput({
           max={max}
           inputMode={inputMode}
           pattern={pattern}
+          disabled={disabled}
           className={getCompactInputClassName(icon, error, inputClassName)}
         />
       </div>

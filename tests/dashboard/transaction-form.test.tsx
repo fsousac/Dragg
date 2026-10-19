@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -30,6 +31,13 @@ const { pushMock, refreshMock } = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock, replace: vi.fn(), refresh: refreshMock }),
   useSearchParams: () => new URLSearchParams("month=2026-07"),
+}));
+
+vi.mock("@/app/transactions/actions", () => ({
+  getFundingContextAction: vi
+    .fn()
+    .mockResolvedValue({ totalSaved: 5000, availableBalance: 5000 }),
+  getGoalOptionsAction: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("sonner", () => ({
@@ -337,7 +345,7 @@ describe("handlePaymentMethodChange defensive fallback", () => {
 
     fireEvent.click(creditButton);
 
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Number of installments")).toBeDisabled();
   });
 });
 
@@ -345,14 +353,17 @@ describe("installment eligibility across payment method types", () => {
   const installmentInput = () =>
     screen.getByLabelText("Number of installments") as HTMLInputElement;
 
-  it("shows the installment input for credit/boleto/label-contains-boleto methods and hides it for debit, resetting the count on non-installment methods", () => {
+  it("enables the installment input for credit/boleto/label-contains-boleto methods and disables it for debit, resetting the count on non-installment methods", () => {
     render(<TransactionForm {...baseProps({ paymentMethods: paymentMethodsAllTypes })} />);
 
-    // Default payment method is debit -> no installment input.
-    expect(screen.queryByLabelText("Number of installments")).not.toBeInTheDocument();
+    // Default payment method is debit -> input stays visible but disabled, with the reason.
+    expect(installmentInput()).toBeDisabled();
+    expect(screen.getByText("transaction.installmentUnavailable")).toBeInTheDocument();
 
-    // Switch to credit -> input appears (type === "credit" branch).
+    // Switch to credit -> input is enabled (type === "credit" branch).
     fireEvent.click(screen.getByText("Credit Card"));
+    expect(installmentInput()).toBeEnabled();
+    expect(screen.queryByText("transaction.installmentUnavailable")).not.toBeInTheDocument();
     expect(installmentInput().value).toBe("1");
 
     // Bump installment count to 3 while on the credit method.
@@ -367,9 +378,10 @@ describe("installment eligibility across payment method types", () => {
     fireEvent.click(screen.getByText("Store Boleto Plan"));
     expect(installmentInput().value).toBe("3");
 
-    // Switching to a non-installment method hides the input and resets the count.
+    // Switching to a non-installment method disables the input and resets the count.
     fireEvent.click(screen.getByText("Debit Card"));
-    expect(screen.queryByLabelText("Number of installments")).not.toBeInTheDocument();
+    expect(installmentInput()).toBeDisabled();
+    expect(installmentInput().value).toBe("1");
 
     // Switching back to credit confirms the count was reset to 1 (lump sum).
     fireEvent.click(screen.getByText("Credit Card"));
@@ -605,5 +617,61 @@ describe("add category / add payment method chips", () => {
 
     fireEvent.click(screen.getByText("Add payment method"));
     expect(pushMock).toHaveBeenCalledWith("/payments?month=2026-07");
+  });
+});
+
+describe("advanced options", () => {
+  it("is hidden by default and does not change the plain payload", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<TransactionForm {...baseProps({ onSubmit })} />);
+    expect(screen.queryByText("transaction.advanced.payWith")).toBeNull();
+    fillRequiredFields();
+    submit();
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty("financing");
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty("savingsFundedAmount");
+  });
+
+  it("submits a savings-funded expense", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<TransactionForm {...baseProps({ onSubmit })} />);
+    fillRequiredFields();
+    await userEvent.click(screen.getByRole("switch", { name: "transaction.advanced.toggle" }));
+    await userEvent.click(screen.getByRole("radio", { name: "transaction.advanced.fundingSavings" }));
+    submit();
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ amount: 100, savingsFundedAmount: 100 });
+  });
+
+  it("enables the installment count on a debit method when interest is on, and submits financing", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<TransactionForm {...baseProps({ onSubmit })} />);
+    fillRequiredFields();
+    expect(screen.getByLabelText("Number of installments")).toBeDisabled();
+    await userEvent.click(screen.getByRole("switch", { name: "transaction.advanced.toggle" }));
+    await userEvent.click(screen.getByRole("switch", { name: "transaction.advanced.interestToggle" }));
+    expect(screen.getByLabelText("Number of installments")).toBeEnabled();
+    fireEvent.change(screen.getByLabelText("transaction.advanced.rate"), { target: { value: "2" } });
+    submit();
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0].financing).toMatchObject({ rate: 2, rateInputMode: "rate" });
+  });
+
+  it("submits a single installment on a debit method once interest is turned off again", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<TransactionForm {...baseProps({ onSubmit })} />);
+    fillRequiredFields();
+    await user.click(screen.getByRole("switch", { name: "transaction.advanced.toggle" }));
+    const interestToggle = screen.getByRole("switch", { name: "transaction.advanced.interestToggle" });
+    await user.click(interestToggle);
+    fireEvent.change(screen.getByLabelText("Number of installments"), { target: { value: "3" } });
+    await user.click(interestToggle);
+    expect(screen.getByLabelText("Number of installments")).toBeDisabled();
+    expect((screen.getByLabelText("Number of installments") as HTMLInputElement).value).toBe("1");
+    submit();
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ installmentCount: 1 });
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty("financing");
   });
 });

@@ -5,6 +5,7 @@ vi.mock("next/cache", () => ({ revalidatePath }));
 
 const {
   advanceInstallments,
+  amortizeDebt,
   createCategory,
   createInvoiceAdvancePayment,
   createPaymentMethod,
@@ -16,7 +17,11 @@ const {
   deleteSubscription,
   deleteSubscriptionOccurrences,
   deleteTransaction,
+  getFinancingBreakdown,
+  getFundingContext,
+  listGoals,
   previewInstallmentPrepayment,
+  replaceTransaction,
   setSubscriptionPaused,
   updateCategory,
   updatePaymentMethod,
@@ -24,6 +29,7 @@ const {
   updateTransaction,
 } = vi.hoisted(() => ({
   advanceInstallments: vi.fn().mockResolvedValue(undefined),
+  amortizeDebt: vi.fn().mockResolvedValue(undefined),
   createCategory: vi.fn().mockResolvedValue(undefined),
   createInvoiceAdvancePayment: vi.fn().mockResolvedValue(undefined),
   createPaymentMethod: vi.fn().mockResolvedValue(undefined),
@@ -35,12 +41,18 @@ const {
   deleteSubscription: vi.fn().mockResolvedValue(undefined),
   deleteSubscriptionOccurrences: vi.fn().mockResolvedValue(undefined),
   deleteTransaction: vi.fn().mockResolvedValue(undefined),
+  getFinancingBreakdown: vi.fn().mockResolvedValue(null),
+  getFundingContext: vi.fn().mockResolvedValue({ totalSaved: 10, availableBalance: 5 }),
+  listGoals: vi.fn().mockResolvedValue([
+    { id: "g1", name: "Trip", icon: "✈️", color: "#fff", currentAmount: 1, targetAmount: 2, deadline: "2030-01-01" },
+  ]),
   previewInstallmentPrepayment: vi.fn().mockResolvedValue({
     count: 1,
     installments: [],
     targetMonth: "2026-07",
     totalAmount: 0,
   }),
+  replaceTransaction: vi.fn().mockResolvedValue(undefined),
   setSubscriptionPaused: vi.fn().mockResolvedValue(undefined),
   updateCategory: vi.fn().mockResolvedValue(undefined),
   updatePaymentMethod: vi.fn().mockResolvedValue(undefined),
@@ -50,6 +62,7 @@ const {
 
 vi.mock("@/lib/finance/transactions", () => ({
   advanceInstallments,
+  amortizeDebt,
   createCategory,
   createInvoiceAdvancePayment,
   createPaymentMethod,
@@ -61,7 +74,11 @@ vi.mock("@/lib/finance/transactions", () => ({
   deleteSubscription,
   deleteSubscriptionOccurrences,
   deleteTransaction,
+  getFinancingBreakdown,
+  getFundingContext,
+  listGoals,
   previewInstallmentPrepayment,
+  replaceTransaction,
   setSubscriptionPaused,
   updateCategory,
   updatePaymentMethod,
@@ -71,12 +88,16 @@ vi.mock("@/lib/finance/transactions", () => ({
 
 import {
   advanceInstallmentsAction,
+  amortizeDebtAction,
   createCategoryAction,
   createInvoiceAdvancePaymentAction,
   createPaymentMethodAction,
   createSubscriptionAction,
   createTransactionAction,
   deleteCategoryAction,
+  getFinancingBreakdownAction,
+  getFundingContextAction,
+  getGoalOptionsAction,
   deleteInstallmentsAction,
   deletePaymentMethodAction,
   deleteSubscriptionAction,
@@ -89,6 +110,7 @@ import {
   updatePaymentMethodAction,
   updateSubscriptionAction,
   updateTransactionAction,
+  replaceTransactionAction,
 } from "@/app/transactions/actions";
 
 const uuid = "11111111-1111-4111-8111-111111111111";
@@ -326,6 +348,18 @@ describe("updateTransactionAction / deleteTransactionAction", () => {
     );
   });
 
+  it("passes the goal link (or its removal) through on update", async () => {
+    const base = {
+      id: uuid, amount: 100, category: "", date: "2026-07-07",
+      description: "Updated", paymentMethod: "", type: "expense" as const,
+    };
+    const goalId = "11111111-1111-4111-8111-111111111111";
+    await updateTransactionAction({ ...base, goalId });
+    expect(updateTransaction).toHaveBeenLastCalledWith(expect.objectContaining({ goalId }));
+    await updateTransactionAction({ ...base, goalId: null });
+    expect(updateTransaction).toHaveBeenLastCalledWith(expect.objectContaining({ goalId: null }));
+  });
+
   it("updates a transaction falling back to 'none' when blank", async () => {
     await updateTransactionAction({
       id: uuid,
@@ -399,5 +433,150 @@ describe("deleteSubscriptionOccurrencesAction", () => {
       scope: "single",
       transactionId: uuid,
     });
+  });
+});
+
+describe("createTransactionAction — goal link", () => {
+  const goalId = "11111111-1111-4111-8111-111111111111";
+  const base = {
+    amount: 100, category: "", date: "2030-01-15", description: "Aporte",
+    installmentCount: 1, paymentMethod: "",
+  };
+
+  it("passes the goal through for an expense", async () => {
+    await createTransactionAction({ ...base, type: "expense", goalId });
+    expect(createTransaction).toHaveBeenLastCalledWith(expect.objectContaining({ goalId }));
+  });
+
+  it("rejects a goal on an income", async () => {
+    await expect(createTransactionAction({ ...base, type: "income", goalId })).rejects.toThrow();
+  });
+
+  it("lists goal options without amounts", async () => {
+    await expect(getGoalOptionsAction()).resolves.toEqual([{ id: "g1", name: "Trip", icon: "✈️" }]);
+  });
+});
+
+describe("createTransactionAction — financing and savings", () => {
+  const base = {
+    amount: 1000, category: "", date: "2030-01-15", description: "Notebook",
+    installmentCount: 12, paymentMethod: "", type: "expense" as const,
+  };
+  const financing = {
+    operationType: "purchase" as const, interestSystem: "price" as const,
+    rateInputMode: "rate" as const, rate: 2, ratePeriod: "monthly" as const,
+    downPayment: 0, fees: 0,
+  };
+
+  it("lets savings exceed the price when financing adds interest", async () => {
+    await createTransactionAction({ ...base, savingsFundedAmount: 1134.7, financing });
+    expect(createTransaction).toHaveBeenLastCalledWith(
+      expect.objectContaining({ savingsFundedAmount: 1134.7 }),
+    );
+  });
+
+  it("passes financing and savings through", async () => {
+    await createTransactionAction({ ...base, savingsFundedAmount: 100, financing });
+    expect(createTransaction).toHaveBeenLastCalledWith(
+      expect.objectContaining({ savingsFundedAmount: 100, financing }),
+    );
+  });
+
+  it("defaults downPayment and fees to 0", async () => {
+    const partial = { ...financing, downPayment: undefined, fees: undefined };
+    await createTransactionAction({ ...base, financing: partial as never });
+    expect(createTransaction).toHaveBeenLastCalledWith(
+      expect.objectContaining({ financing: expect.objectContaining({ downPayment: 0, fees: 0 }) }),
+    );
+  });
+
+  it.each([
+    ["financing on income", { type: "income" as const, financing }],
+    ["down payment ≥ amount", { financing: { ...financing, downPayment: 1000 } }],
+    ["installment mode with SAC", { financing: { ...financing, interestSystem: "sac" as const, rateInputMode: "installment" as const, installmentAmount: 100 } }],
+    ["installment mode without amount", { financing: { ...financing, rateInputMode: "installment" as const } }],
+    ["rate mode without rate", { financing: { ...financing, rate: undefined } }],
+    ["loan with down payment", { financing: { ...financing, operationType: "loan" as const, downPayment: 10 } }],
+    ["savings above amount", { savingsFundedAmount: 1001 }],
+    ["unknown financing key", { financing: { ...financing, extra: 1 } }],
+  ])("rejects %s", async (_label, override) => {
+    await expect(createTransactionAction({ ...base, ...override } as never)).rejects.toThrow();
+  });
+});
+
+describe("financing read actions", () => {
+  it("validates the plan id and returns the breakdown", async () => {
+    await expect(getFinancingBreakdownAction("bad")).rejects.toThrow();
+    await expect(
+      getFinancingBreakdownAction("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+    ).resolves.toBeNull();
+    expect(getFinancingBreakdown).toHaveBeenCalledWith("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+  });
+
+  it("returns the funding context", async () => {
+    await expect(getFundingContextAction()).resolves.toEqual({ totalSaved: 10, availableBalance: 5 });
+  });
+});
+
+describe("replaceTransactionAction", () => {
+  const transaction = {
+    amount: 1000, category: "", date: "2030-01-15", description: "Notebook",
+    installmentCount: 1, paymentMethod: "", type: "expense" as const,
+  };
+
+  it("validates the id and the new definition, defaulting blank ids to 'none'", async () => {
+    await replaceTransactionAction({ id: uuid, transaction });
+    expect(replaceTransaction).toHaveBeenCalledWith(
+      uuid,
+      expect.objectContaining({ category: "none", paymentMethod: "none", amount: 1000 }),
+    );
+    expect(revalidatePath).toHaveBeenCalledWith("/transactions");
+  });
+
+  it("keeps real ids", async () => {
+    await replaceTransactionAction({
+      id: uuid,
+      transaction: { ...transaction, category: "cat", paymentMethod: "pm" },
+    });
+    expect(replaceTransaction).toHaveBeenLastCalledWith(
+      uuid,
+      expect.objectContaining({ category: "cat", paymentMethod: "pm" }),
+    );
+  });
+
+  it.each([
+    ["a bad id", { id: "bad", transaction }],
+    ["an invalid definition", { id: uuid, transaction: { ...transaction, amount: -1 } }],
+    ["unknown keys", { id: uuid, transaction, extra: 1 }],
+  ])("rejects %s", async (_label, input) => {
+    await expect(replaceTransactionAction(input as never)).rejects.toThrow();
+  });
+});
+
+describe("amortizeDebtAction", () => {
+  const valid = {
+    amount: 250,
+    description: "Notebook (amortization)",
+    mode: "term" as const,
+    planId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    source: "savings" as const,
+  };
+
+  it("validates the payload, amortizes and refreshes the debt pages", async () => {
+    await amortizeDebtAction(valid);
+    expect(amortizeDebt).toHaveBeenCalledWith(valid);
+    expect(revalidatePath).toHaveBeenCalledWith("/debts");
+  });
+
+  it.each([
+    { ...valid, planId: "bad" },
+    { ...valid, amount: 0 },
+    { ...valid, source: "card" },
+    { ...valid, mode: "never" },
+    { ...valid, extra: true },
+  ])("rejects an invalid payload %#", async (payload) => {
+    amortizeDebt.mockClear();
+    await expect(amortizeDebtAction(payload as never)).rejects.toThrow();
+    expect(amortizeDebt).not.toHaveBeenCalled();
   });
 });

@@ -13,6 +13,7 @@ describe("currency input helpers", () => {
     ["0,025", 0.25],
     ["0,250", 2.5],
     ["2,500", 25],
+    ["3.000,00", 3000],
   ])("moves typed digits through cents for %s", (rawValue, amount) => {
     expect(getCurrencyInputValueFromRawValue(rawValue)).toBe(amount);
   });
@@ -20,6 +21,12 @@ describe("currency input helpers", () => {
   it("formats amount with two decimal places and comma separator", () => {
     expect(formatCurrencyInputValue(0)).toBe("0,00");
     expect(formatCurrencyInputValue(25)).toBe("25,00");
+  });
+
+  it("groups thousands with a dot for display", () => {
+    expect(formatCurrencyInputValue(3000)).toBe("3.000,00");
+    expect(formatCurrencyInputValue(1234567.89)).toBe("1.234.567,89");
+    expect(formatCurrencyInputValue(999.9)).toBe("999,90");
   });
 
   it("treats an empty raw input as zero", () => {

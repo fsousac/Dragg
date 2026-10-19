@@ -7,7 +7,9 @@ import {
   BarChart3,
   CreditCard,
   Folder,
+  Landmark,
   LayoutDashboard,
+  LogOut,
   MoreHorizontal,
   PieChart,
   Settings,
@@ -18,6 +20,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { withSelectedMonth } from "@/components/dashboard/month-route";
@@ -32,6 +35,7 @@ const mobileNavItems = [
 ];
 
 const moreNavItems = [
+  { nameKey: "nav.debts", icon: Landmark, href: "/debts" },
   { nameKey: "nav.categories", icon: Folder, href: "/categories" },
   { nameKey: "nav.goals", icon: Target, href: "/goals" },
   { nameKey: "nav.reports", icon: BarChart3, href: "/reports" },
@@ -72,14 +76,35 @@ function MobileNavLink({
   );
 }
 
+function MoreNavLinkItem({ item, isActive, href, onTouchStart, t }: MobileNavLinkProps) {
+  const Icon = item.icon;
+  return (
+    <DropdownMenuItem asChild>
+      <Link
+        href={href}
+        prefetch
+        onTouchStart={onTouchStart}
+        className={cn(
+          "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm",
+          isActive && "bg-primary/10 text-primary",
+        )}
+      >
+        <Icon className="h-4 w-4" />
+        {t(item.nameKey)}
+      </Link>
+    </DropdownMenuItem>
+  );
+}
+
 interface MoreNavMenuProps {
   readonly pathname: string;
   readonly router: ReturnType<typeof useRouter>;
   readonly searchParams: URLSearchParams;
+  readonly signOutAction: () => Promise<void>;
   readonly t: (key: string) => string;
 }
 
-function MoreNavMenu({ pathname, router, searchParams, t }: MoreNavMenuProps) {
+function MoreNavMenu({ pathname, router, searchParams, signOutAction, t }: MoreNavMenuProps) {
   const isMoreActive = moreNavItems.some((item) => item.href === pathname);
 
   return (
@@ -105,34 +130,35 @@ function MoreNavMenu({ pathname, router, searchParams, t }: MoreNavMenuProps) {
         side="top"
         sideOffset={10}
       >
-        {moreNavItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href;
-          const href = withSelectedMonth(item.href, searchParams);
-
-          return (
-            <DropdownMenuItem key={item.nameKey} asChild>
-              <Link
-                href={href}
-                prefetch
-                onTouchStart={() => router.prefetch(href)}
-                className={cn(
-                  "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm",
-                  isActive && "bg-primary/10 text-primary",
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {t(item.nameKey)}
-              </Link>
-            </DropdownMenuItem>
-          );
-        })}
+        {moreNavItems.map((item) => (
+          <MoreNavLinkItem
+            key={item.nameKey}
+            item={item}
+            isActive={pathname === item.href}
+            href={withSelectedMonth(item.href, searchParams)}
+            onTouchStart={() => router.prefetch(withSelectedMonth(item.href, searchParams))}
+            t={t}
+          />
+        ))}
+        <DropdownMenuSeparator />
+        {/* The desktop sidebar (with its logout) is hidden below lg. */}
+        <DropdownMenuItem
+          className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm"
+          onSelect={() => void signOutAction()}
+        >
+          <LogOut className="h-4 w-4" />
+          {t("user.logout")}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
 
-export function MobileNav() {
+export function MobileNav({
+  signOutAction,
+}: {
+  readonly signOutAction: () => Promise<void>;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -159,6 +185,7 @@ export function MobileNav() {
           pathname={pathname}
           router={router}
           searchParams={searchParams}
+          signOutAction={signOutAction}
           t={t}
         />
       </div>

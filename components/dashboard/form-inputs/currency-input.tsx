@@ -18,9 +18,14 @@ type CurrencyInputProps = {
   readonly value: number;
 };
 
+// Display only: "." groups thousands, "," starts the cents. The stored and
+// submitted value stays a plain number.
+function formatGrouped(value: number) {
+  return value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export function formatCurrencyInputValue(value: number) {
-  const safeValue = Number.isFinite(value) ? Math.max(value, 0) : 0;
-  return safeValue.toFixed(2).replace(".", ",");
+  return formatGrouped(Number.isFinite(value) ? Math.max(value, 0) : 0);
 }
 
 export function getCurrencyInputValueFromRawValue(value: string) {
@@ -52,7 +57,7 @@ function digitsFromValue(value: number): string {
 
 function formatDigits(digits: string): string {
   if (!digits) return "";
-  return (Number.parseInt(digits, 10) / 100).toFixed(2).replace(".", ",");
+  return formatGrouped(Number.parseInt(digits, 10) / 100);
 }
 
 const BLOCKED_KEYS = new Set([

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -22,6 +22,16 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { getFinancingBreakdownAction } from "@/app/transactions/actions";
+import { FinancingBreakdown } from "@/components/dashboard/financing-breakdown";
+import {
+  advancedFromBreakdown,
+  advancedFromSavings,
+  buildTransactionSubmitData,
+  TransactionAdvancedOptions,
+  withGoal,
+  type AdvancedOptionsState,
+} from "@/components/dashboard/transaction-advanced-options";
 import { AddTransactionDialog } from "@/components/dashboard/add-transaction-dialog";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { type TransactionFormData } from "@/components/dashboard/transaction-form";
@@ -97,6 +107,8 @@ type EditableTransaction = {
   notes: string;
   paymentMethod: string;
   type: TransactionType;
+  installmentCount: number;
+  advanced: AdvancedOptionsState;
 };
 
 type InstallmentDeleteRequest = {
@@ -140,6 +152,7 @@ type TransactionsScreenProps = {
     totalIncome: number;
     totalExpenses: number;
     totalSavings: number;
+    totalSavingsFunded: number;
   };
   readonly nextInvoiceTransactions: Transaction[];
   readonly paymentMethods: TransactionFormPaymentMethod[];
@@ -152,6 +165,10 @@ type TransactionsScreenProps = {
   readonly updateTransactionAction: (
     data: UpdateTransactionInput,
   ) => Promise<void>;
+  readonly replaceTransactionAction: (data: {
+    id: string;
+    transaction: NewTransactionInput;
+  }) => Promise<void>;
 };
 
 type Translate = (key: string) => string;
@@ -242,6 +259,41 @@ function getInitialFormState(
     notes: transaction.notes ?? "",
     paymentMethod: transaction.paymentMethodId ?? "none",
     type: transaction.type,
+    installmentCount: 1,
+    advanced: withGoal(
+      advancedFromSavings(
+        transaction.savingsFundedAmount ?? 0,
+        Math.abs(transaction.amount),
+      ),
+      transaction.goalId,
+    ),
+  };
+}
+
+// Single rows and financed operations can be recreated with advanced
+// options; plain installment groups and subscriptions keep the per-row edit.
+function canEditAdvanced(transaction: Transaction) {
+  if (transaction.financingGroupId) return true;
+  return (
+    !transaction.isCreditCardInvoice &&
+    !isInstallmentTransaction(transaction) &&
+    !isSubscriptionTransaction(transaction)
+  );
+}
+
+// A financed row is edited as the whole operation it belongs to.
+function getFinancedFormState(
+  base: EditableTransaction,
+  breakdown: NonNullable<Awaited<ReturnType<typeof getFinancingBreakdownAction>>>,
+): EditableTransaction {
+  return {
+    ...base,
+    type: "expense",
+    amount: breakdown.plan.principal,
+    date: breakdown.startDate,
+    description: base.description.replace(/ \(\d+\/\d+\)$/, ""),
+    installmentCount: breakdown.plan.installmentCount,
+    advanced: withGoal(advancedFromBreakdown(breakdown), base.advanced.goalId),
   };
 }
 
@@ -1376,6 +1428,7 @@ function InvoiceDetailsSection({
 }
 
 type TransactionEditFormProps = {
+  readonly showAdvanced: boolean;
   readonly formData: EditableTransaction;
   readonly setFormData: (data: EditableTransaction) => void;
   readonly categoryOptions: CategoryOption[];
@@ -1584,7 +1637,79 @@ function TransactionDateCategoryPaymentFields({
   );
 }
 
+type EditFieldProps = Pick<
+  TransactionEditFormProps,
+  "formData" | "setFormData" | "t"
+>;
+
+function TransactionDescriptionField({
+  formData,
+  setFormData,
+  t,
+}: EditFieldProps) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="transaction-description">
+        {t("transaction.description")}
+      </Label>
+      <Input
+        id="transaction-description"
+        value={formData.description}
+        onChange={(event) =>
+          setFormData({ ...formData, description: event.target.value })
+        }
+      />
+    </div>
+  );
+}
+
+const EDIT_ADVANCED_LABEL_CLASS =
+  "text-sm normal-case tracking-normal text-foreground";
+
+function TransactionEditAdvancedFields({
+  formData,
+  setFormData,
+  t,
+}: EditFieldProps) {
+  const { advanced } = formData;
+
+  return (
+    <TransactionAdvancedOptions
+      amount={formData.amount}
+      installmentCount={formData.installmentCount}
+      value={advanced}
+      onChange={(next) => setFormData({ ...formData, advanced: next })}
+      labelClassName={EDIT_ADVANCED_LABEL_CLASS}
+      installmentsField={
+        <div className="space-y-2">
+          <Label htmlFor="transaction-installments">
+            {t("transaction.installmentFrequency")}
+          </Label>
+          <Input
+            id="transaction-installments"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={120}
+            value={formData.installmentCount}
+            onChange={(event) =>
+              setFormData({
+                ...formData,
+                installmentCount: Math.min(
+                  Math.max(Number.parseInt(event.target.value, 10) || 1, 1),
+                  120,
+                ),
+              })
+            }
+          />
+        </div>
+      }
+    />
+  );
+}
+
 function TransactionEditForm({
+  showAdvanced,
   formData,
   setFormData,
   categoryOptions,
@@ -1593,27 +1718,18 @@ function TransactionEditForm({
   t,
   resolveCategoryForType,
 }: TransactionEditFormProps) {
+  const fieldProps = { formData, setFormData, t };
+
   return (
     <div className="grid gap-4">
       <TransactionTypeAmountFields
-        formData={formData}
-        setFormData={setFormData}
-        t={t}
+        {...fieldProps}
         resolveCategoryForType={resolveCategoryForType}
       />
-
-      <div className="space-y-2">
-        <Label htmlFor="transaction-description">
-          {t("transaction.description")}
-        </Label>
-        <Input
-          id="transaction-description"
-          value={formData.description}
-          onChange={(event) =>
-            setFormData({ ...formData, description: event.target.value })
-          }
-        />
-      </div>
+      <TransactionDescriptionField {...fieldProps} />
+      {showAdvanced && formData.type === "expense" ? (
+        <TransactionEditAdvancedFields {...fieldProps} />
+      ) : null}
 
       <TransactionDateCategoryPaymentFields
         formData={formData}
@@ -1910,8 +2026,13 @@ function TransactionDetailsDialogMainContent({
           />
         )}
 
+      {selectedTransaction?.financingGroupId ? (
+        <FinancingBreakdown planId={selectedTransaction.financingGroupId} />
+      ) : null}
+
       {selectedTransaction && formData && (
         <TransactionEditForm
+          showAdvanced={canEditAdvanced(selectedTransaction)}
           formData={formData}
           setFormData={setFormData}
           categoryOptions={categoryOptions}
@@ -3062,6 +3183,38 @@ function closeTransactionDialogState(options: {
   setFormData(null);
 }
 
+// A financed row has no editable state until its plan is loaded, so a save
+// can never replace the whole operation with one installment.
+function useEditFormLoader(
+  setFormData: TransactionDialogsState["setFormData"],
+  incomeCategoryId: string,
+) {
+  const loadingPlanId = useRef<string | null>(null);
+
+  return (transaction: Transaction) => {
+    const planId = transaction.financingGroupId ?? null;
+    loadingPlanId.current = planId;
+    setFormData(
+      transaction.isCreditCardInvoice || planId
+        ? null
+        : getInitialFormState(transaction, incomeCategoryId),
+    );
+    if (!planId) return;
+    getFinancingBreakdownAction(planId)
+      .then((breakdown) => {
+        // Ignore a late answer for a dialog that was closed or switched.
+        if (!breakdown || loadingPlanId.current !== planId) return;
+        setFormData(
+          getFinancedFormState(
+            getInitialFormState(transaction, incomeCategoryId),
+            breakdown,
+          ),
+        );
+      })
+      .catch((error) => console.error("Error loading financing plan:", error));
+  };
+}
+
 function useTransactionDialogNavigation({
   dialogsState,
   incomeCategoryId,
@@ -3080,13 +3233,11 @@ function useTransactionDialogNavigation({
     isPending,
   } = dialogsState;
 
+  const loadEditForm = useEditFormLoader(setFormData, incomeCategoryId);
+
   const openTransactionDialog = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
-    setFormData(
-      transaction.isCreditCardInvoice
-        ? null
-        : getInitialFormState(transaction, incomeCategoryId),
-    );
+    loadEditForm(transaction);
   };
 
   const closeTransactionDialog = () =>
@@ -3352,7 +3503,7 @@ function useTransactionConfirmHandlers({
   return { confirmDeleteInstallments, confirmAction };
 }
 
-function buildNewTransactionInput(
+export function buildNewTransactionInput(
   data: TransactionFormData,
 ): NewTransactionInput {
   return {
@@ -3364,6 +3515,11 @@ function buildNewTransactionInput(
     notes: data.notes?.trim() || undefined,
     paymentMethod: data.paymentMethod === "none" ? "" : data.paymentMethod,
     type: data.type,
+    ...(data.savingsFundedAmount
+      ? { savingsFundedAmount: data.savingsFundedAmount }
+      : {}),
+    ...(data.financing ? { financing: data.financing } : {}),
+    ...(data.goalId ? { goalId: data.goalId } : {}),
   };
 }
 
@@ -3376,6 +3532,8 @@ function buildUpdateTransactionInput(
     category: formData.category,
     date: formData.date,
     description: formData.description,
+    // Turning advanced options off also drops the goal link.
+    goalId: formData.advanced.enabled ? formData.advanced.goalId : null,
     id: selectedTransaction.id,
     notes: formData.notes,
     paymentMethod: formData.paymentMethod,
@@ -3383,16 +3541,57 @@ function buildUpdateTransactionInput(
   };
 }
 
+function buildReplaceTransactionInput(
+  selectedTransaction: Transaction,
+  formData: EditableTransaction,
+) {
+  const { advanced, installmentCount, ...fields } = formData;
+  const interestOn = advanced.enabled && advanced.interestEnabled;
+  const data = buildTransactionSubmitData(
+    { ...fields, installmentCount: interestOn ? installmentCount : 1 },
+    advanced,
+  );
+
+  return {
+    id: selectedTransaction.id,
+    transaction: buildNewTransactionInput(data),
+  };
+}
+
+function saveEditedTransaction(
+  selectedTransaction: Transaction,
+  formData: EditableTransaction,
+  actions: Pick<
+    TransactionsScreenProps,
+    "replaceTransactionAction" | "updateTransactionAction"
+  >,
+) {
+  const shouldReplace =
+    Boolean(selectedTransaction.financingGroupId) ||
+    (formData.advanced.enabled && canEditAdvanced(selectedTransaction));
+
+  return shouldReplace
+    ? actions.replaceTransactionAction(
+        buildReplaceTransactionInput(selectedTransaction, formData),
+      )
+    : actions.updateTransactionAction(
+        buildUpdateTransactionInput(selectedTransaction, formData),
+      );
+}
+
 function useTransactionSubmitHandlers({
   createTransactionAction,
-  updateTransactionAction,
+  editActions,
   dialogsState,
   closeTransactionDialog,
   router,
   t,
 }: {
   createTransactionAction: TransactionsScreenProps["createTransactionAction"];
-  updateTransactionAction: TransactionsScreenProps["updateTransactionAction"];
+  editActions: Pick<
+    TransactionsScreenProps,
+    "replaceTransactionAction" | "updateTransactionAction"
+  >;
   dialogsState: TransactionDialogsState;
   closeTransactionDialog: () => void;
   router: ReturnType<typeof useRouter>;
@@ -3416,10 +3615,7 @@ function useTransactionSubmitHandlers({
     setPendingTransactionId(selectedTransaction.id);
     startTransition(() =>
       runTransactionMutation(
-        () =>
-          updateTransactionAction(
-            buildUpdateTransactionInput(selectedTransaction, formData),
-          ),
+        () => saveEditedTransaction(selectedTransaction, formData, editActions),
         {
           successMessage: t("transaction.updateSuccess"),
           errorLogLabel: "Error updating transaction:",
@@ -3522,7 +3718,10 @@ function useTransactionsScreenBaseState({
     const income = monthlySummaryTotals.totalIncome;
     const expenses = monthlySummaryTotals.totalExpenses;
     const savings = monthlySummaryTotals.totalSavings;
-    return { income, expenses, savings, balance: income - expenses - savings };
+    // Same as the dashboard: the savings-funded part is paid by the saved total.
+    const balance =
+      income - (expenses - monthlySummaryTotals.totalSavingsFunded) - savings;
+    return { income, expenses, savings, balance };
   }, [monthlySummaryTotals]);
 
   const options = useTransactionOptionsData({ categories, paymentMethods, t });
@@ -3578,7 +3777,7 @@ function useTransactionMutationOnlyHandlers({
 
   const submitHandlers = useTransactionSubmitHandlers({
     createTransactionAction: props.createTransactionAction,
-    updateTransactionAction: props.updateTransactionAction,
+    editActions: props,
     dialogsState: base.dialogsState,
     closeTransactionDialog,
     router: base.router,

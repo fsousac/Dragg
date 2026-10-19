@@ -232,7 +232,7 @@ export async function AppShell({
         </div>
       </main>
 
-      <MobileNav />
+      <MobileNav signOutAction={signOut} />
     </div>
   );
 }

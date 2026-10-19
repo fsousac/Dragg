@@ -13,6 +13,7 @@ The current committed schema defines these Supabase tables:
 - `monthly_budgets`
 - `goals`
 - `privacy_requests`
+- `financing_plans`
 
 ## Current migrations
 
@@ -21,6 +22,9 @@ The current committed schema defines these Supabase tables:
 - `005_add_installment_group_metadata.sql`: adds stable installment grouping metadata and an authenticated-user scoped installment group index.
 - `006_add_installment_prepayment_metadata.sql`: adds installment prepayment metadata and an authenticated-user scoped prepayment month index.
 - `010_stop_writing_plaintext_profile_pii.sql`: stops the signup trigger from writing plaintext `profiles.name`/`email` (application-layer encryption now owns these fields, see `lib/crypto/field-encryption.ts`), and drops the now-unused `transactions_user_id_notes_idx` partial index.
+- `011_add_financing_plans.sql`: adds the immutable, RLS-scoped `financing_plans` table and the transaction columns `financing_plan_id` (on delete cascade), `principal_portion`, `interest_portion`, and `savings_funded_amount`. It also extends the owner-refs trigger to financing plans, adds an update trigger that keeps `savings_funded_amount` and financed rows consistent on edit, and makes `calculate_total_saved` take savings-funded expenses out of the saved total.
+- `012_add_debt_amortization.sql`: adds `transactions.is_amortization`, which flags the extra payment row of a financing plan (no installment number, whole amount is principal). Amortizing pays the interest accrued since the last payment first, then replaces the plan's future installments with smaller ones over the same term, or with as many as the old payment needs (shorter term).
+- `013_add_transaction_goal_link.sql`: adds nullable `transactions.goal_id` (on delete set null, expenses only) and extends the owner-refs trigger to goals. A linked row counts toward the goal once its date is reached; `listGoals` adds `principal_portion` (or `amount`) of those rows to `goals.current_amount`, capped at the target.
 
 ## What belongs in the repository
 
@@ -95,6 +99,10 @@ The application has backward-compatible fallbacks for older environments that do
 - `installment_total`
 - `advanced_to_month`
 - `advanced_at`
+- `financing_plan_id`
+- `principal_portion`
+- `interest_portion`
+- `savings_funded_amount`
 - `notes` — application-layer encrypted (`lib/crypto/field-encryption.ts`), random IV; never plaintext at rest.
 - `payment_method_id`
 - `created_at`
@@ -104,6 +112,8 @@ The application has backward-compatible fallbacks for older environments that do
 Installments and subscriptions are modeled as multiple transaction rows. Installment rows from the same original purchase share `installment_group_id`, use 1-based `installment_number`, and store the original purchase count in `installment_total`. Installment groups are still user-owned transaction rows and must always be queried with the authenticated user's scope.
 
 Installment prepayment uses `advanced_to_month` and `advanced_at`. The original transaction `date`, category, payment method, and installment metadata are preserved for auditability. Payment and invoice views use `advanced_to_month` as the payment context so advanced installments appear in the target month and no longer appear as future obligations.
+
+Rows of a financed operation (interest-bearing purchase or loan) share `financing_plan_id`. Installment rows also use the plan id as `installment_group_id`. The down-payment and loan-income rows have no installment number, because check `transactions_installment_fields_consistent` forbids a group id without one. `principal_portion` and `interest_portion` split each installment. `savings_funded_amount` is the part of an expense paid from the saved total, and it is always ≤ `amount`. Deleting the plan cascades to all of its rows.
 
 Subscription rows use `notes` values beginning with `subscription`; paused subscriptions use `subscription paused`. Since `notes` is stored encrypted, this prefix check happens in application code against the decrypted value (`lib/finance/transactions.ts`), not as a SQL `LIKE` predicate.
 
@@ -156,7 +166,8 @@ The table supports LGPD workflows for access, export, correction, deletion, cons
 
 - `private.handle_new_user()` creates a profile, default categories, and default payment methods after Supabase Auth user creation.
 - `private.touch_updated_at()` keeps `updated_at` current on updates.
-- `private.validate_transaction_owner_refs()` prevents transactions from referencing categories or payment methods owned by another user.
+- `private.validate_transaction_owner_refs()` prevents transactions from referencing categories, payment methods, or financing plans owned by another user.
+- `private.normalize_transaction_update()` clamps `savings_funded_amount` to the edited amount, resets it to 0 when a row stops being an expense or moves to a savings category, and rejects amount/kind changes on financed rows.
 - `on_auth_user_created` runs after inserts on `auth.users`.
 
 Email/password signups and Google OAuth signups both insert users into `auth.users`, so both flows use the same `on_auth_user_created` onboarding trigger. Do not duplicate default profile, category, or payment-method setup in frontend code.

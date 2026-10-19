@@ -28,9 +28,20 @@ export default defineConfig({
       dependencies: ["setup"],
     },
     {
+      name: "mobile-chrome",
+      testIgnore: /(landing|auth)\.spec\.ts/,
+      use: { ...devices["Pixel 7"], storageState: "e2e/.auth/user.json" },
+      dependencies: ["setup"],
+    },
+    {
       name: "chromium-unauthenticated",
       testMatch: /(landing|auth)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "mobile-chrome-unauthenticated",
+      testMatch: /(landing|auth)\.spec\.ts/,
+      use: { ...devices["Pixel 7"] },
     },
   ],
   webServer: {

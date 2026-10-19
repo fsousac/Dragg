@@ -14,6 +14,7 @@ import {
   deleteSubscriptionOccurrencesAction,
   deleteTransactionAction,
   previewInstallmentPrepaymentAction,
+  replaceTransactionAction,
   updateTransactionAction,
   createPaymentMethodAction,
 } from "@/app/transactions/actions";
@@ -133,6 +134,7 @@ export default async function TransactionsPage({
         showNextInvoice={showNextInvoice}
         transactions={transactions}
         updateTransactionAction={updateTransactionAction}
+        replaceTransactionAction={replaceTransactionAction}
       />
     </AppShell>
   );
