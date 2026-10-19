@@ -41,9 +41,8 @@ async function startFinancedExpense(page: Page, cents: string, description: stri
   return dialog;
 }
 
-async function pickInstallments(page: Page, dialog: Locator, count: string) {
-  await dialog.getByRole("combobox").click();
-  await page.getByRole("listbox").getByText(count, { exact: true }).click();
+async function pickInstallments(dialog: Locator, count: string) {
+  await dialog.locator("#installment").fill(count);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -71,7 +70,7 @@ test("records a financed purchase and shows its breakdown", async ({ page }) => 
   const description = `E2E notebook ${Date.now()}`;
   const dialog = await startFinancedExpense(page, "120000", description);
   await dialog.getByLabel("Interest rate (%)").fill("2");
-  await pickInstallments(page, dialog, "12x");
+  await pickInstallments(dialog, "12");
 
   // Live preview: Price at 2% p.m. over 12x on 1,200.00.
   await expect(dialog.getByText("First installment")).toBeVisible();
@@ -91,7 +90,7 @@ test("records a loan with the income on the operation date", async ({ page }) =>
   await dialog.getByRole("radio", { name: "Loan" }).click();
   await dialog.getByRole("button", { name: "Don't know the rate? Enter the installment amount" }).click();
   await dialog.locator("#financing-installment").pressSequentially("18000");
-  await pickInstallments(page, dialog, "6x");
+  await pickInstallments(dialog, "6");
   await expect(dialog.getByText("Implied rate")).toBeVisible();
   await saveTransaction(page, dialog);
 
@@ -103,7 +102,7 @@ test("splits every installment between balance and savings with the slider", asy
   const description = `E2E split ${Date.now()}`;
   const dialog = await startFinancedExpense(page, "30000", description);
   await dialog.getByLabel("Interest rate (%)").fill("2");
-  await pickInstallments(page, dialog, "3x");
+  await pickInstallments(dialog, "3");
   await dialog.getByRole("radio", { name: "Balance + savings" }).click();
 
   // Price at 2% p.m. over 3x on 300.00 → 104.03 per installment.
@@ -158,7 +157,7 @@ test("edits a financed purchase as the whole operation", async ({ page }) => {
   const description = `E2E tv ${Date.now()}`;
   const dialog = await startFinancedExpense(page, "120000", description);
   await dialog.getByLabel("Interest rate (%)").fill("2");
-  await pickInstallments(page, dialog, "12x");
+  await pickInstallments(dialog, "12");
   await saveTransaction(page, dialog);
 
   await page.getByText(`${description} (1/12)`, { exact: true }).click();
@@ -185,9 +184,9 @@ test("keeps interest-free card installments outside the advanced options", async
   await dialog.locator("#description").fill(description);
   // Visible but locked until the payment method allows installments.
   await dialog.getByRole("button", { name: "Cash", exact: true }).click();
-  await expect(dialog.getByRole("combobox")).toBeDisabled();
+  await expect(dialog.locator("#installment")).toBeDisabled();
   await dialog.getByRole("button", { name: "Credit Card", exact: true }).click();
-  await pickInstallments(page, dialog, "3x");
+  await pickInstallments(dialog, "3");
   await saveTransaction(page, dialog);
 
   await expect(page.getByText(`${description} (1/3)`, { exact: true })).toBeVisible();
@@ -197,7 +196,7 @@ test("tracks a financed purchase on the debts page", async ({ page }) => {
   const description = `E2E debt ${Date.now()}`;
   const dialog = await startFinancedExpense(page, "120000", description);
   await dialog.getByLabel("Interest rate (%)").fill("2");
-  await pickInstallments(page, dialog, "12x");
+  await pickInstallments(dialog, "12");
   await saveTransaction(page, dialog);
 
   await page.goto("/debts");
