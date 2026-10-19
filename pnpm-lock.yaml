@@ -5,9 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  postcss: ^8.5.23
+  postcss: ^8.5.30
   lodash: '>=4.18.0'
-  vite: ^8.0.16
+  vite: ^8.3.4
   brace-expansion@1: ^1.1.21
   brace-expansion@5: ^5.0.12
   js-yaml: ^4.3.0
@@ -2072,7 +2072,7 @@ packages:
     resolution: {integrity: sha512-fKShNpKZzupWZuY0z7egydvL0sqW4INEZBEExMBMAa6izlENEVHwoXgdaTCaBZ5fwlr4xf2o1wXC83n9RpO+NA==}
     peerDependencies:
       msw: ^2.4.9
-      vite: ^8.0.16
+      vite: ^8.3.4
     peerDependenciesMeta:
       msw:
         optional: true
@@ -2177,7 +2177,7 @@ packages:
     engines: {node: ^10 || ^12 || >=14}
     hasBin: true
     peerDependencies:
-      postcss: ^8.5.23
+      postcss: ^8.5.30
 
   available-typed-arrays@1.0.7:
     resolution: {integrity: sha512-wvUjBtSGN7+7SjNpq/9M2Tg350UZD3q62IFZLbRAR1bSMlCo1ZaeW+BJ+D090e4hIIZLBcTDWe4Mh4jvUDajzQ==}
@@ -3952,7 +3952,7 @@ packages:
       '@vitest/ui': 4.1.12
       happy-dom: '*'
       jsdom: '*'
-      vite: ^8.0.16
+      vite: ^8.3.4
     peerDependenciesMeta:
       '@edge-runtime/vm':
         optional: true
