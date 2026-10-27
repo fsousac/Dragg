@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import {
   advanceInstallments,
+  amortizeDebt,
   createCategory,
   createInvoiceAdvancePayment,
   createPaymentMethod,
@@ -16,13 +17,18 @@ import {
   deleteSubscription,
   deleteSubscriptionOccurrences,
   deleteTransaction,
+  getFinancingBreakdown,
+  getFundingContext,
+  listGoals,
   previewInstallmentPrepayment,
+  replaceTransaction,
   setSubscriptionPaused,
   type CreateCategoryInput,
   type CreateInvoiceAdvancePaymentInput,
   type CreatePaymentMethodInput,
   type CreateSubscriptionInput,
   type AdvanceInstallmentsInput,
+  type AmortizeDebtInput,
   type DeleteInstallmentsInput,
   type DeleteSubscriptionOccurrencesInput,
   type NewTransactionInput,
@@ -76,16 +82,91 @@ const createCategoryActionSchema = z
   })
   .strict();
 
+const financingSchema = z
+  .object({
+    downPayment: z.number().finite().min(0).max(1_000_000_000).default(0),
+    fees: z.number().finite().min(0).max(1_000_000_000).default(0),
+    installmentAmount: z.number().finite().positive().max(1_000_000_000).optional(),
+    interestSystem: z.enum(["simple", "price", "sac"]),
+    operationType: z.enum(["purchase", "loan"]),
+    rate: z.number().finite().min(0).max(1000).optional(),
+    rateInputMode: z.enum(["rate", "installment"]),
+    ratePeriod: z.enum(["monthly", "annual"]),
+  })
+  .strict();
+
+type FinancingActionInput = z.infer<typeof financingSchema>;
+
+// Cross-field rules the per-field schema cannot express.
+function getFinancingIssues(
+  financing: FinancingActionInput,
+  data: { amount: number; type: string },
+) {
+  const issues: string[] = [];
+
+  if (data.type !== "expense") issues.push("Financing requires an expense");
+  if (financing.downPayment >= data.amount) issues.push("Down payment too high");
+  if (financing.operationType === "loan" && financing.downPayment > 0) {
+    issues.push("Loans have no down payment");
+  }
+  if (financing.rateInputMode === "rate") {
+    if (financing.rate == null) issues.push("Rate required");
+    return issues;
+  }
+  if (financing.interestSystem !== "price") {
+    issues.push("Installment mode requires Price");
+  }
+  if (financing.installmentAmount == null) {
+    issues.push("Installment amount required");
+  }
+  return issues;
+}
+
 const createTransactionActionSchema = z
   .object({
     amount: z.number().finite().positive().max(1_000_000_000),
     category: z.string().trim().min(0).max(64),
     date: dateSchema,
     description: safeShortTextSchema,
+    financing: financingSchema.optional(),
+    goalId: uuidSchema.optional(),
     installmentCount: z.number().int().min(1).max(120),
     notes: safeOptionalNotesSchema,
     paymentMethod: z.string().trim().min(0).max(64),
+    savingsFundedAmount: z.number().finite().min(0).max(1_000_000_000).optional(),
     type: z.enum(["income", "expense", "saving"]),
+  })
+  .strict()
+  .superRefine((data, context) => {
+    const issues = data.financing
+      ? getFinancingIssues(data.financing, data)
+      : [];
+
+    // With interest the rows sum past the amount; the allocation checks that.
+    if (
+      !data.financing &&
+      data.savingsFundedAmount != null &&
+      data.savingsFundedAmount > data.amount
+    ) {
+      issues.push("Savings funded amount exceeds the amount");
+    }
+
+    if (
+      data.goalId &&
+      (data.type !== "expense" || data.financing?.operationType === "loan")
+    ) {
+      issues.push("Only expenses can be linked to a goal");
+    }
+
+    for (const message of issues) {
+      context.addIssue({ code: "custom", message });
+    }
+  });
+
+const replaceTransactionActionSchema = z
+  .object({
+    id: uuidSchema,
+    transaction: createTransactionActionSchema,
   })
   .strict();
 
@@ -147,6 +228,7 @@ const updateTransactionActionSchema = z
     category: z.string().trim().min(0).max(64),
     date: dateSchema,
     description: safeShortTextSchema,
+    goalId: uuidSchema.nullable().optional(),
     id: uuidSchema,
     notes: safeOptionalNotesSchema,
     paymentMethod: z.string().trim().min(0).max(64),
@@ -346,6 +428,22 @@ export async function updateTransactionAction(data: UpdateTransactionInput) {
   revalidatePath("/transactions");
 }
 
+export async function replaceTransactionAction(data: {
+  id: string;
+  transaction: NewTransactionInput;
+}) {
+  const { id, transaction } = replaceTransactionActionSchema.parse(data);
+
+  await replaceTransaction(id, {
+    ...transaction,
+    category: transaction.category || "none",
+    paymentMethod: transaction.paymentMethod || "none",
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/transactions");
+}
+
 export async function deleteTransactionAction(transactionId: string) {
   const parsedTransactionId = uuidSchema.parse(transactionId);
 
@@ -393,4 +491,37 @@ export async function deleteSubscriptionOccurrencesAction(
   revalidatePath("/dashboard");
   revalidatePath("/payments");
   revalidatePath("/transactions");
+}
+
+const amortizeDebtActionSchema = z
+  .object({
+    amount: z.number().finite().positive().max(1_000_000_000),
+    description: safeShortTextSchema,
+    mode: z.enum(["installment", "term"]),
+    planId: uuidSchema,
+    source: z.enum(["savings", "balance"]),
+  })
+  .strict();
+
+export async function amortizeDebtAction(data: AmortizeDebtInput) {
+  await amortizeDebt(amortizeDebtActionSchema.parse(data));
+
+  revalidatePath("/dashboard");
+  revalidatePath("/debts");
+  revalidatePath("/transactions");
+}
+
+export async function getFinancingBreakdownAction(planId: string) {
+  return getFinancingBreakdown(uuidSchema.parse(planId));
+}
+
+export async function getFundingContextAction() {
+  return getFundingContext();
+}
+
+// Goals the advanced options can link an expense to; ownership is enforced
+// again by createTransaction.
+export async function getGoalOptionsAction() {
+  const goals = await listGoals();
+  return goals.map(({ id, name, icon }) => ({ id, name, icon }));
 }

@@ -12,6 +12,7 @@ import {
   getBudgetOverviewData,
   getDashboardData,
   getMonthlySummary,
+  getFundingContext,
   getReportsData,
   listTransactions,
 } from "@/lib/finance/transactions";
@@ -27,6 +28,7 @@ function qb(response: { data?: unknown; error?: unknown }) {
   Object.assign(builder, {
     delete: chain,
     eq: chain,
+    gt: chain,
     gte: chain,
     in: chain,
     insert: chain,
@@ -537,6 +539,7 @@ describe("getMonthlySummary", () => {
       totalExpenses: 0,
       totalIncome: 0,
       totalSavings: 0,
+      totalSavingsFunded: 0,
     });
   });
 
@@ -557,7 +560,22 @@ describe("getMonthlySummary", () => {
       totalExpenses: 150,
       totalIncome: 1000,
       totalSavings: 200,
+      totalSavingsFunded: 0,
     });
+  });
+
+  it("reports the savings-funded part of the month's expenses", async () => {
+    setup([
+      qb({
+        data: [
+          row({ id: "exp-1", amount: 100, savings_funded_amount: 40 }),
+          row({ id: "exp-2", amount: 50 }),
+        ],
+        error: null,
+      }),
+    ]);
+    const result = await getMonthlySummary("2026-07");
+    expect(result.totalSavingsFunded).toBe(40);
   });
 
   it("falls back to the current month when no/invalid month is passed", async () => {
@@ -1004,5 +1022,64 @@ describe("getBudgetOverviewData", () => {
     expect(result.budgetSplitData).toEqual(dashboard.budgetSplitData);
     expect(Array.isArray(result.categories)).toBe(true);
     expect(result.categories.length).toBeGreaterThan(0);
+  });
+});
+
+const PLAN_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+describe("savings-funded rows", () => {
+  it("maps savings_funded_amount and financing_plan_id onto Transaction", async () => {
+    setup([
+      qb({
+        data: [
+          row({ id: "f", savings_funded_amount: "40", financing_plan_id: PLAN_ID }),
+        ],
+        error: null,
+      }),
+    ]);
+
+    const [transaction] = await listTransactions();
+
+    expect(transaction.savingsFundedAmount).toBe(40);
+    expect(transaction.financingGroupId).toBe(PLAN_ID);
+  });
+
+  it("defaults savingsFundedAmount to 0 and financingGroupId to null for legacy rows", async () => {
+    setup([qb({ data: [row({ id: "legacy" })], error: null })]);
+
+    const [transaction] = await listTransactions();
+
+    expect(transaction.savingsFundedAmount).toBe(0);
+    expect(transaction.financingGroupId).toBeNull();
+  });
+});
+
+describe("getFundingContext", () => {
+  it("returns the savings still available to fund and the month's available balance net of savings-funded expenses", async () => {
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const supabase = makeTableSupabase({
+      categories: [{ data: [], error: null }],
+      payment_methods: [{ data: [], error: null }],
+      transactions: [
+        {
+          data: [
+            row({ id: "inc", amount: 1000, kind: "income", date }),
+            row({ id: "exp", amount: 300, date, savings_funded_amount: 100 }),
+            row({ id: "sav", amount: 200, kind: "saving", date }),
+          ],
+          error: null,
+        },
+        // Funded slices dated after this month are already committed.
+        { data: [{ savings_funded_amount: "900" }], error: null },
+      ],
+    });
+    supabase.rpc.mockResolvedValue({ data: 5000, error: null });
+    vi.mocked(createClient).mockResolvedValue(supabase as never);
+
+    await expect(getFundingContext()).resolves.toEqual({
+      availableBalance: 600,
+      totalSaved: 4100,
+    });
   });
 });

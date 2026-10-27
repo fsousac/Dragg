@@ -140,7 +140,7 @@ function baseProps(
     deleteInstallmentsAction: vi.fn().mockResolvedValue(undefined),
     deleteSubscriptionOccurrencesAction: vi.fn().mockResolvedValue(undefined),
     deleteTransactionAction: vi.fn().mockResolvedValue(undefined),
-    monthlySummary: { totalIncome: 0, totalExpenses: 0, totalSavings: 0 },
+    monthlySummary: { totalIncome: 0, totalExpenses: 0, totalSavings: 0, totalSavingsFunded: 0 },
     nextInvoiceTransactions: [] as Transaction[],
     paymentMethods,
     previewInstallmentPrepaymentAction: vi.fn(),

@@ -28,6 +28,19 @@ import {
   type ExpensesByCategoryItem,
 } from "@/lib/finance/category-aggregation";
 import {
+  allocateSavingsFunding,
+  buildAmortization,
+  buildFinancingBreakdown,
+  getAccrual,
+  resolveFinancingSchedule,
+  toCents,
+  type AmortizationMode,
+  type FinancingBreakdown,
+  type FinancingPlanRecord,
+  type FinancingSchedule,
+  type TransactionFinancingInput,
+} from "@/lib/finance/financing";
+import {
   getInvoiceAdvancePaymentInvoiceId,
   getInvoiceAdvancePaymentNote,
   withCreditCardInvoiceTransactions,
@@ -57,6 +70,11 @@ export {
   type SubscriptionOverviewItem,
 } from "@/lib/finance/subscriptions";
 import { GROUP_COLORS } from "@/lib/finance/group-colors";
+import {
+  buildDebtOverview,
+  stripInstallmentSuffix,
+  type DebtOverview,
+} from "@/lib/finance/debts";
 import { createClient } from "@/lib/supabase/server";
 
 export { buildExpensesByCategoryData };
@@ -107,6 +125,9 @@ type TransactionRow = {
   installment_group_id?: string | null;
   installment_number?: number | string | null;
   installment_total?: number | string | null;
+  financing_plan_id?: string | null;
+  goal_id?: string | null;
+  savings_funded_amount?: number | string | null;
   notes: string | null;
   categories: CategoryRow | null;
   category_id: string | null;
@@ -136,6 +157,8 @@ export type GoalOverviewItem = {
   color: string;
   currentAmount: number;
   deadline: string;
+  // Paid expenses are linked to it; deleting the goal drops that progress.
+  hasLinkedPayments?: boolean;
   icon: string;
   id: string;
   name: string;
@@ -197,6 +220,10 @@ export type NewTransactionInput = {
   installmentCount: number;
   description: string;
   notes?: string;
+  savingsFundedAmount?: number;
+  financing?: TransactionFinancingInput;
+  // Goal that receives this expense's amount once each row's date is reached.
+  goalId?: string;
 };
 
 export type CreateSubscriptionInput = {
@@ -235,6 +262,8 @@ export type UpdateTransactionInput = {
   paymentMethod: string;
   description: string;
   notes?: string;
+  // undefined keeps the current link, null removes it.
+  goalId?: string | null;
 };
 
 export type DeleteInstallmentsInput = {
@@ -472,6 +501,9 @@ const transactionSelect = `
   installment_group_id,
   installment_number,
   installment_total,
+  financing_plan_id,
+  goal_id,
+  savings_funded_amount,
   notes,
   category_id,
   payment_method_id,
@@ -803,6 +835,29 @@ async function assertUserCategory(
   }
 }
 
+async function assertUserGoal(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  goalId: string | null,
+) {
+  if (!goalId) return;
+
+  const { data, error } = await supabase
+    .from("goals")
+    .select("id")
+    .eq("id", goalId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Unable to validate goal: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error("Goal is invalid.");
+  }
+}
+
 async function assertUserPaymentMethod(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
@@ -1019,6 +1074,9 @@ function toTransaction(row: TransactionRow): Transaction {
     installmentGroupId: row.installment_group_id ?? null,
     installmentNumber: resolveInstallmentNumber(row),
     installmentTotal: resolveInstallmentTotal(row),
+    financingGroupId: row.financing_plan_id ?? null,
+    goalId: row.goal_id ?? null,
+    savingsFundedAmount: Number(row.savings_funded_amount ?? 0),
     notes,
     paymentMethodId: row.payment_method_id,
     paymentMethodClosingDay: resolveTransactionPaymentMethodClosingDay(row),
@@ -1509,6 +1567,36 @@ export async function getPaymentsDueData(
   };
 }
 
+// Expenses linked to a goal count once their date is reached, so editing or
+// deleting the transaction is reflected without touching goals.current_amount.
+async function sumLinkedGoalPayments(
+  supabase: SupabaseClient,
+  userId: string,
+) {
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("goal_id, amount, principal_portion")
+    .eq("user_id", userId)
+    .not("goal_id", "is", null)
+    .lte("date", getTodayValue());
+
+  if (error) {
+    throw new Error(`Unable to load goal payments: ${error.message}`);
+  }
+
+  const totals = new Map<string, number>();
+  for (const row of (data ?? []) as {
+    goal_id: string;
+    amount: number | string;
+    principal_portion: number | string | null;
+  }[]) {
+    // A financed installment only moves its principal; interest is the bank's.
+    const paid = Number(row.principal_portion ?? row.amount);
+    totals.set(row.goal_id, (totals.get(row.goal_id) ?? 0) + paid);
+  }
+  return totals;
+}
+
 export async function listGoals(): Promise<GoalOverviewItem[]> {
   const { supabase, userId } = await getUserContext();
   const { data, error } = await supabase
@@ -1526,10 +1614,19 @@ export async function listGoals(): Promise<GoalOverviewItem[]> {
     throw new Error(`Unable to load goals: ${error.message}`);
   }
 
-  return ((data ?? []) as GoalRow[]).map((goal) => ({
+  const goals = (data ?? []) as GoalRow[];
+  const linked = goals.length
+    ? await sumLinkedGoalPayments(supabase, userId)
+    : new Map<string, number>();
+
+  return goals.map((goal) => ({
     color: goal.color,
-    currentAmount: Number(goal.current_amount),
+    currentAmount: Math.min(
+      toCents(Number(goal.current_amount) + (linked.get(goal.id) ?? 0)),
+      Number(goal.target_amount),
+    ),
     deadline: goal.deadline,
+    hasLinkedPayments: linked.has(goal.id),
     icon: goal.icon,
     id: goal.id,
     name: goal.name,
@@ -1655,6 +1752,7 @@ type ResolvedNewTransactionInput = {
   paymentMethodId: string | null;
   date: string;
   installmentCount: number;
+  goalId: string | null;
 };
 
 function resolveNewTransactionInput(
@@ -1673,6 +1771,14 @@ function resolveNewTransactionInput(
   const date = toIsoDate(input.date);
   const installmentCount = Number(input.installmentCount);
   assertValidIsoDate(date);
+  const goalId = input.goalId ?? null;
+
+  if (goalId) {
+    assertUuid(goalId, "Goal");
+    if (kind !== "expense" || input.financing?.operationType === "loan") {
+      throw new Error("Only expenses can be linked to a goal.");
+    }
+  }
 
   return {
     description,
@@ -1682,6 +1788,7 @@ function resolveNewTransactionInput(
     paymentMethodId,
     date,
     installmentCount,
+    goalId,
   };
 }
 
@@ -1812,6 +1919,7 @@ function buildInstallmentRow(index: number, context: InstallmentRowContext) {
     notes: encryptField(resolveOccurrenceNotes(installmentMetadata, notes)),
     payment_method_id: paymentMethodId,
     user_id: userId,
+    ...(resolved.goalId ? { goal_id: resolved.goalId } : {}),
   };
 }
 
@@ -1847,7 +1955,7 @@ function filterRowsByUserCreatedMonth<T extends { date: string }>(
 
 async function insertTransactionRows(
   supabase: SupabaseClient,
-  rows: ReturnType<typeof buildInstallmentTransactionRows>,
+  rows: Record<string, unknown>[],
 ) {
   if (rows.length === 0) {
     throw new Error(
@@ -1862,33 +1970,342 @@ async function insertTransactionRows(
   }
 }
 
-export async function createTransaction(input: NewTransactionInput) {
-  const { createdAt, supabase, userId } = await getUserContext();
-  const resolved = resolveNewTransactionInput(input);
-  await Promise.all([
-    assertUserCategory(supabase, userId, resolved.categoryId),
-    assertUserPaymentMethod(supabase, userId, resolved.paymentMethodId),
-  ]);
-  assertValidInstallmentCount(resolved.installmentCount);
+function resolveSavingsFundedAmount(value: number | undefined) {
+  if (value == null) return 0;
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error("Savings funded amount is invalid.");
+  }
+  return toCents(value);
+}
 
+async function assertNonSavingsCategory(
+  supabase: SupabaseClient,
+  userId: string,
+  categoryId: string | null,
+) {
+  if (!categoryId) return;
+
+  const { data, error } = await supabase
+    .from("categories")
+    .select("group_type")
+    .eq("id", categoryId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Unable to validate category: ${error.message}`);
+  }
+
+  if (data?.group_type === "savings") {
+    throw new Error(
+      "Savings categories cannot be financed or funded from savings.",
+    );
+  }
+}
+
+async function assertSavingsFundingOrFinancingAllowed(
+  ctx: AuthenticatedUserContext,
+  resolved: ResolvedNewTransactionInput,
+  funding: { amount: number; released: number },
+) {
+  if (resolved.kind !== "expense") {
+    throw new Error(
+      "Savings funding and financing are only available for expenses.",
+    );
+  }
+
+  await assertNonSavingsCategory(ctx.supabase, ctx.userId, resolved.categoryId);
+
+  if (funding.amount === 0) return;
+
+  const totalSaved = await getSavingsAvailableToFund(ctx);
+
+  if (funding.amount > toCents(totalSaved + funding.released)) {
+    throw new Error("Savings funded amount exceeds the saved total.");
+  }
+}
+
+function applySavingsFunding<T extends { amount: number }>(
+  rows: T[],
+  savingsFundedAmount: number,
+): (T | (T & { savings_funded_amount: number }))[] {
+  // ponytail: no savings → untouched rows, so legacy payloads stay identical.
+  if (savingsFundedAmount === 0 || rows.length === 0) return rows;
+
+  return applySavingsFundingToAll(rows, savingsFundedAmount);
+}
+
+type FinancedRowsContext = {
+  resolved: ResolvedNewTransactionInput;
+  notes: string | null;
+  userId: string;
+  planId: string;
+  financing: TransactionFinancingInput;
+  schedule: FinancingSchedule;
+};
+
+function buildFinancedRowBase({ resolved, userId, planId }: FinancedRowsContext) {
+  return {
+    category_id: resolved.categoryId,
+    financing_plan_id: planId,
+    payment_method_id: resolved.paymentMethodId,
+    user_id: userId,
+    ...(resolved.goalId ? { goal_id: resolved.goalId } : {}),
+  };
+}
+
+// Down payment and loan income: one row on the operation date, outside the
+// installment numbering (see transactions_installment_fields_consistent).
+function buildFinancedPlainRow(
+  context: FinancedRowsContext,
+  amount: number,
+  kind: DbTransactionKind,
+) {
+  return {
+    ...buildFinancedRowBase(context),
+    amount,
+    date: context.resolved.date,
+    description: encryptDescription(context.resolved.description),
+    installment_group_id: null,
+    installment_number: null,
+    installment_total: null,
+    kind,
+    notes: encryptField(context.notes),
+  };
+}
+
+function buildFinancedInstallmentRows(context: FinancedRowsContext) {
+  const { resolved, notes, planId, financing, schedule } = context;
+  const [year, month, day] = resolved.date.split("-").map(Number);
+  const baseDate = new Date(year, month - 1, day);
+  // A loan or a purchase with a down payment starts paying next month;
+  // otherwise the first installment falls on the purchase date, as today.
+  const firstOffset =
+    financing.operationType === "loan" || schedule.totals.downPayment > 0
+      ? 1
+      : 0;
+  const count = schedule.rows.length;
+
+  return schedule.rows.map((row, index) => {
+    const metadata = createInstallmentMetadata({
+      groupId: planId,
+      installmentNumber: row.number,
+      installmentTotal: count,
+    });
+    return {
+      ...buildFinancedRowBase(context),
+      amount: row.payment,
+      date: formatOccurrenceDate(baseDate, index + firstOffset),
+      description: encryptDescription(
+        `${resolved.description} (${row.number}/${count})`,
+      ),
+      installment_group_id: planId,
+      installment_number: row.number,
+      installment_total: count,
+      interest_portion: row.interest,
+      kind: "expense" as DbTransactionKind,
+      notes: encryptField(resolveOccurrenceNotes(metadata, notes)),
+      principal_portion: row.principal,
+    };
+  });
+}
+
+function buildFinancedTransactionRows(context: FinancedRowsContext) {
+  const downPayment = context.schedule.totals.downPayment;
+  const downPaymentRows =
+    downPayment > 0
+      ? [
+          {
+            ...buildFinancedPlainRow(context, downPayment, "expense"),
+            principal_portion: downPayment,
+            interest_portion: 0,
+          },
+        ]
+      : [];
+  const incomeRows =
+    context.financing.operationType === "loan"
+      ? [
+          {
+            ...buildFinancedPlainRow(context, context.resolved.amount, "income"),
+            category_id: null,
+            principal_portion: null,
+            interest_portion: null,
+            savings_funded_amount: 0,
+          },
+        ]
+      : [];
+
+  return {
+    expenseRows: [...downPaymentRows, ...buildFinancedInstallmentRows(context)],
+    incomeRows,
+  };
+}
+
+function buildFinancingPlanRow({
+  ctx,
+  resolved,
+  financing,
+  planId,
+  resolution,
+  savingsFundedAmount,
+}: {
+  ctx: AuthenticatedUserContext;
+  resolved: ResolvedNewTransactionInput;
+  financing: TransactionFinancingInput;
+  planId: string;
+  resolution: ReturnType<typeof resolveFinancingSchedule>;
+  savingsFundedAmount: number;
+}) {
+  const isInstallmentMode = financing.rateInputMode === "installment";
+  return {
+    id: planId,
+    user_id: ctx.userId,
+    operation_type: financing.operationType,
+    interest_system: resolution.system,
+    rate_input_mode: financing.rateInputMode,
+    // Installment mode stores the solved rate, always per month.
+    rate: isInstallmentMode
+      ? Number((resolution.monthlyRate * 100).toFixed(6))
+      : Number(financing.rate),
+    rate_period: isInstallmentMode ? "monthly" : financing.ratePeriod,
+    principal: resolved.amount,
+    down_payment: resolution.schedule.totals.downPayment,
+    fees: financing.fees,
+    installment_count: resolved.installmentCount,
+    savings_funded_amount: savingsFundedAmount,
+  };
+}
+
+type FinancedTransactionInput = {
+  ctx: AuthenticatedUserContext;
+  resolved: ResolvedNewTransactionInput;
+  notes: string | null;
+  financing: TransactionFinancingInput;
+  savingsFundedAmount: number;
+};
+
+async function createFinancedTransaction(input: FinancedTransactionInput) {
+  const { ctx, resolved, notes, financing, savingsFundedAmount } = input;
+  const resolution = resolveFinancingSchedule({
+    principal: resolved.amount,
+    installmentCount: resolved.installmentCount,
+    financing,
+  });
+  const planId = crypto.randomUUID();
+  const { expenseRows, incomeRows } = buildFinancedTransactionRows({
+    resolved,
+    notes,
+    userId: ctx.userId,
+    planId,
+    financing,
+    schedule: resolution.schedule,
+  });
+  // Validates the split before anything is written.
+  const rows = [
+    ...applySavingsFundingToAll(expenseRows, savingsFundedAmount),
+    ...incomeRows,
+  ];
+
+  // One atomic call: the plan and its rows are saved together or not at all.
+  const { error } = await ctx.supabase.rpc("save_transaction_batch", {
+    p_plan: buildFinancingPlanRow({
+      ctx,
+      resolved,
+      financing,
+      planId,
+      resolution,
+      savingsFundedAmount,
+    }),
+    p_rows: rows,
+    p_delete_ids: null,
+  });
+
+  if (error) {
+    throw new Error(`Unable to save transaction: ${error.message}`);
+  }
+}
+
+function applySavingsFundingToAll<T extends { amount: number }>(
+  rows: T[],
+  savingsFundedAmount: number,
+) {
+  const slices = allocateSavingsFunding(
+    rows.map((row) => row.amount),
+    savingsFundedAmount,
+  );
+  return rows.map((row, index) => ({
+    ...row,
+    savings_funded_amount: slices[index],
+  }));
+}
+
+async function createPlainTransaction({
+  ctx,
+  resolved,
+  notes,
+  savingsFundedAmount,
+}: Omit<FinancedTransactionInput, "financing">) {
   const plan = computeInstallmentPlan(
     resolved.kind,
     resolved.amount,
     resolved.installmentCount,
   );
-  const notes = normalizeOptionalString(input.notes);
   const rows = buildInstallmentTransactionRows({
     resolved,
     plan,
     notes,
-    userId,
+    userId: ctx.userId,
   });
   const filteredRows = filterRowsByUserCreatedMonth(
     rows,
-    getUserCreatedMonth(createdAt),
+    getUserCreatedMonth(ctx.createdAt),
   );
 
-  await insertTransactionRows(supabase, filteredRows);
+  await insertTransactionRows(
+    ctx.supabase,
+    applySavingsFunding(filteredRows, savingsFundedAmount),
+  );
+}
+
+// releasedSavings: savings held by rows a replacement is about to delete.
+export async function createTransaction(
+  input: NewTransactionInput,
+  releasedSavings = 0,
+) {
+  const ctx = await getUserContext();
+  const resolved = resolveNewTransactionInput(input);
+  await Promise.all([
+    assertUserCategory(ctx.supabase, ctx.userId, resolved.categoryId),
+    assertUserPaymentMethod(ctx.supabase, ctx.userId, resolved.paymentMethodId),
+    assertUserGoal(ctx.supabase, ctx.userId, resolved.goalId),
+  ]);
+  assertValidInstallmentCount(resolved.installmentCount);
+  const savingsFundedAmount = resolveSavingsFundedAmount(
+    input.savingsFundedAmount,
+  );
+
+  if (input.financing || savingsFundedAmount > 0) {
+    await assertSavingsFundingOrFinancingAllowed(ctx, resolved, {
+      amount: savingsFundedAmount,
+      released: releasedSavings,
+    });
+  }
+
+  const notes = normalizeOptionalString(input.notes);
+
+  if (!input.financing) {
+    await createPlainTransaction({ ctx, resolved, notes, savingsFundedAmount });
+    return;
+  }
+
+  assertDateNotBeforeUserCreated(resolved.date, ctx.createdAt);
+  await createFinancedTransaction({
+    ctx,
+    resolved,
+    notes,
+    financing: input.financing,
+    savingsFundedAmount,
+  });
 }
 
 function parseCreditCardInvoiceId(invoiceId: string) {
@@ -2659,18 +3076,26 @@ function resolveUpdateTransactionInput(
     categoryId,
     paymentMethodId,
     kind: input.type,
+    goalId: input.goalId,
   };
+}
+
+// Only expenses can feed a goal, so any other kind drops the link.
+function resolveGoalLinkUpdate(kind: DbTransactionKind, goalId?: string | null) {
+  if (kind !== "expense") return { goal_id: null };
+  return goalId === undefined ? {} : { goal_id: goalId };
 }
 
 export async function updateTransaction(input: UpdateTransactionInput) {
   const { createdAt, supabase, userId } = await getUserContext();
   assertUuid(input.id, "Transaction");
-  const { amount, date, description, categoryId, paymentMethodId, kind } =
+  const { amount, date, description, categoryId, paymentMethodId, kind, goalId } =
     resolveUpdateTransactionInput(input, createdAt);
 
   await Promise.all([
     assertUserCategory(supabase, userId, categoryId),
     assertUserPaymentMethod(supabase, userId, paymentMethodId),
+    assertUserGoal(supabase, userId, kind === "expense" ? (goalId ?? null) : null),
   ]);
 
   const { error } = await supabase
@@ -2683,6 +3108,7 @@ export async function updateTransaction(input: UpdateTransactionInput) {
       kind,
       notes: encryptField(input.notes?.trim() || null),
       payment_method_id: paymentMethodId,
+      ...resolveGoalLinkUpdate(kind, goalId),
     })
     .eq("id", input.id)
     .eq("user_id", userId);
@@ -2796,6 +3222,480 @@ async function deleteInstallmentsByIds({
   }
 }
 
+type FinancingPlanDbRow = {
+  operation_type: FinancingPlanRecord["operationType"];
+  interest_system: FinancingPlanRecord["interestSystem"];
+  rate_input_mode: FinancingPlanRecord["rateInputMode"];
+  rate: number | string;
+  rate_period: FinancingPlanRecord["ratePeriod"];
+  principal: number | string;
+  down_payment: number | string;
+  fees: number | string;
+  installment_count: number;
+  savings_funded_amount: number | string;
+};
+
+type FinancingDbRow = {
+  id: string;
+  date: string;
+  amount: number | string;
+  kind: DbTransactionKind;
+  installment_number: number | null;
+  principal_portion: number | string | null;
+  interest_portion: number | string | null;
+  savings_funded_amount: number | string;
+  is_amortization: boolean;
+};
+
+function toNullableNumber(value: number | string | null) {
+  return value == null ? null : Number(value);
+}
+
+function toFinancingPlanRecord(plan: FinancingPlanDbRow): FinancingPlanRecord {
+  return {
+    operationType: plan.operation_type,
+    interestSystem: plan.interest_system,
+    rateInputMode: plan.rate_input_mode,
+    rate: Number(plan.rate),
+    ratePeriod: plan.rate_period,
+    principal: Number(plan.principal),
+    downPayment: Number(plan.down_payment),
+    fees: Number(plan.fees),
+    installmentCount: plan.installment_count,
+    savingsFundedAmount: Number(plan.savings_funded_amount),
+  };
+}
+
+function toFinancingRowRecord(row: FinancingDbRow) {
+  return {
+    id: row.id,
+    date: row.date,
+    amount: Number(row.amount),
+    kind: row.kind,
+    installmentNumber: row.installment_number,
+    principalPortion: toNullableNumber(row.principal_portion),
+    interestPortion: toNullableNumber(row.interest_portion),
+    savingsFundedAmount: Number(row.savings_funded_amount),
+    isAmortization: row.is_amortization,
+  };
+}
+
+export async function getFinancingBreakdown(
+  planId: string,
+): Promise<FinancingBreakdown | null> {
+  assertUuid(planId, "Financing plan");
+  const { supabase, userId } = await getUserContext();
+
+  const { data: plan, error: planError } = await supabase
+    .from("financing_plans")
+    .select(
+      "operation_type, interest_system, rate_input_mode, rate, rate_period, principal, down_payment, fees, installment_count, savings_funded_amount",
+    )
+    .eq("id", planId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (planError) {
+    throw new Error(`Unable to load financing plan: ${planError.message}`);
+  }
+
+  if (!plan) return null;
+
+  const { data: rows, error } = await supabase
+    .from("transactions")
+    .select(
+      "id, date, amount, kind, installment_number, principal_portion, interest_portion, savings_funded_amount, is_amortization",
+    )
+    .eq("user_id", userId)
+    .eq("financing_plan_id", planId);
+
+  if (error) {
+    throw new Error(`Unable to load financing rows: ${error.message}`);
+  }
+
+  return buildFinancingBreakdown(
+    toFinancingPlanRecord(plan as FinancingPlanDbRow),
+    ((rows ?? []) as FinancingDbRow[]).map(toFinancingRowRecord),
+    getTodayValue(),
+  );
+}
+
+type DebtPlanDbRow = FinancingPlanDbRow & { id: string };
+type DebtDbRow = FinancingDbRow & {
+  financing_plan_id: string;
+  description: string;
+  payment_method_id: string | null;
+};
+
+// Missing table/column: the financing migration (011) is not applied yet.
+function isMissingFinancingSchema(error: { code?: string } | null) {
+  return error?.code === "42P01" || error?.code === "42703";
+}
+
+function toDebtPlanInput(plan: DebtPlanDbRow, rows: DebtDbRow[]) {
+  const first = rows.find((row) => row.installment_number === 1) ?? rows[0];
+
+  return {
+    id: plan.id,
+    description: first ? stripInstallmentSuffix(decryptDescription(first.description) ?? "") : "",
+    paymentMethodId: first?.payment_method_id ?? null,
+    plan: toFinancingPlanRecord(plan),
+    rows: rows.map(toFinancingRowRecord),
+  };
+}
+
+export async function listDebtOverview(selectedMonth: string): Promise<DebtOverview> {
+  const { supabase, userId } = await getUserContext();
+  const empty = buildDebtOverview([], selectedMonth, getTodayValue());
+
+  const { data: plans, error: planError } = await supabase
+    .from("financing_plans")
+    .select(
+      "id, operation_type, interest_system, rate_input_mode, rate, rate_period, principal, down_payment, fees, installment_count, savings_funded_amount",
+    )
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (isMissingFinancingSchema(planError)) return empty;
+  if (planError) {
+    throw new Error(`Unable to load financing plans: ${planError.message}`);
+  }
+  if (!plans?.length) return empty;
+
+  const { data: rows, error } = await supabase
+    .from("transactions")
+    .select(
+      "id, date, amount, kind, installment_number, principal_portion, interest_portion, savings_funded_amount, is_amortization, financing_plan_id, description, payment_method_id",
+    )
+    .eq("user_id", userId)
+    .not("financing_plan_id", "is", null);
+
+  if (error) {
+    throw new Error(`Unable to load financing rows: ${error.message}`);
+  }
+
+  const rowsByPlan = Map.groupBy((rows ?? []) as DebtDbRow[], (row) => row.financing_plan_id);
+
+  return buildDebtOverview(
+    (plans as DebtPlanDbRow[]).map((plan) => toDebtPlanInput(plan, rowsByPlan.get(plan.id) ?? [])),
+    selectedMonth,
+    getTodayValue(),
+  );
+}
+
+async function deleteFinancingPlan(
+  supabase: SupabaseClient,
+  userId: string,
+  planId: string,
+) {
+  // transactions.financing_plan_id is ON DELETE CASCADE: this removes the
+  // down payment, installments and loan income of the operation too.
+  const { error } = await supabase
+    .from("financing_plans")
+    .delete()
+    .eq("id", planId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(`Unable to delete financing plan: ${error.message}`);
+  }
+}
+
+// Savings held by the plan's rows, released by a replacement. An amortized
+// plan cannot be replaced: recreating it would drop the extra payments.
+async function getPlanSavingsToRelease(
+  supabase: SupabaseClient,
+  userId: string,
+  planId: string,
+) {
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("savings_funded_amount, is_amortization")
+    .eq("user_id", userId)
+    .eq("financing_plan_id", planId);
+
+  if (error) {
+    throw new Error(`Unable to load financing rows: ${error.message}`);
+  }
+
+  const rows = (data ?? []) as {
+    savings_funded_amount: number | string;
+    is_amortization?: boolean;
+  }[];
+
+  if (rows.some((row) => row.is_amortization)) {
+    throw new Error("A debt with amortizations cannot be edited as a whole.");
+  }
+
+  return toCents(
+    rows.reduce((sum, row) => sum + Number(row.savings_funded_amount), 0),
+  );
+}
+
+// Turns a single transaction or a whole financed operation into a new
+// definition. Plans are immutable, so this recreates instead of updating;
+// the new rows are written first so a failure never loses the original.
+export async function replaceTransaction(
+  transactionId: string,
+  input: NewTransactionInput,
+) {
+  assertUuid(transactionId, "Transaction");
+  const { supabase, userId } = await getUserContext();
+  const current = await getUserTransactionById(supabase, userId, transactionId);
+  const planId = current.financingGroupId;
+
+  if (!planId && isInstallmentTransaction(current)) {
+    throw new Error("Plain installment groups cannot be replaced.");
+  }
+
+  // toTransaction always sets savingsFundedAmount; the fallback only
+  // satisfies the optional field type.
+  /* c8 ignore next */
+  const rowSavings = current.savingsFundedAmount ?? 0;
+  const releasedSavings = planId
+    ? await getPlanSavingsToRelease(supabase, userId, planId)
+    : rowSavings;
+
+  await createTransaction(input, releasedSavings);
+
+  if (planId) {
+    await deleteFinancingPlan(supabase, userId, planId);
+    return;
+  }
+  await deleteTransaction(transactionId);
+}
+
+export type AmortizeDebtInput = {
+  planId: string;
+  amount: number;
+  source: "savings" | "balance";
+  mode: AmortizationMode;
+  description: string;
+};
+
+type PlanRowDb = FinancingDbRow & {
+  goal_id: string | null;
+  installment_group_id: string | null;
+  installment_total: number | null;
+  category_id: string | null;
+  payment_method_id: string | null;
+  description: string;
+  notes: string | null;
+};
+
+type FutureInstallment = PlanRowDb & { installment_number: number };
+
+async function loadFinancingPlanRecord(
+  supabase: SupabaseClient,
+  userId: string,
+  planId: string,
+) {
+  const { data, error } = await supabase
+    .from("financing_plans")
+    .select(
+      "operation_type, interest_system, rate_input_mode, rate, rate_period, principal, down_payment, fees, installment_count, savings_funded_amount",
+    )
+    .eq("id", planId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Unable to load financing plan: ${error.message}`);
+  }
+  if (!data) throw new Error("Financing plan not found.");
+
+  return toFinancingPlanRecord(data as FinancingPlanDbRow);
+}
+
+async function loadPlanRows(
+  supabase: SupabaseClient,
+  userId: string,
+  planId: string,
+) {
+  const { data, error } = await supabase
+    .from("transactions")
+    .select(
+      "id, date, amount, kind, installment_number, installment_group_id, installment_total, principal_portion, interest_portion, savings_funded_amount, is_amortization, category_id, payment_method_id, goal_id, description, notes",
+    )
+    .eq("user_id", userId)
+    .eq("financing_plan_id", planId);
+
+  if (error) {
+    throw new Error(`Unable to load financing rows: ${error.message}`);
+  }
+
+  return (data ?? []) as PlanRowDb[];
+}
+
+function pickFutureInstallments(rows: PlanRowDb[], today: string) {
+  const future = rows
+    .filter(
+      (row): row is FutureInstallment =>
+        row.kind === "expense" && row.installment_number != null && row.date > today,
+    )
+    .sort((left, right) => left.installment_number - right.installment_number);
+
+  if (!future.length) throw new Error("This debt has no installments left.");
+
+  return future;
+}
+
+function sumNumbers(values: number[]) {
+  return toCents(values.reduce((sum, value) => sum + value, 0));
+}
+
+// Each new installment keeps the share its predecessor had on savings.
+function carrySavingsShare(
+  future: FutureInstallment[],
+  schedule: { payment: number }[],
+) {
+  return future.map((row, index) => {
+    const old = Number(row.amount);
+    const share = old > 0 ? Number(row.savings_funded_amount) / old : 0;
+    return schedule[index] ? toCents(schedule[index].payment * share) : 0;
+  });
+}
+
+// The old installments release their savings; the extra payment and the
+// reshaped installments take theirs.
+async function assertAmortizationSavings(
+  ctx: AuthenticatedUserContext,
+  { amount, slices, future }: { amount: number; slices: number[]; future: FutureInstallment[] },
+) {
+  const released = sumNumbers(future.map((row) => Number(row.savings_funded_amount)));
+  const available = await getSavingsAvailableToFund(ctx);
+
+  if (sumNumbers([amount, ...slices]) > toCents(available + released)) {
+    throw new Error("Savings funded amount exceeds the saved total.");
+  }
+}
+
+// A reshaped installment keeps the slot (number, date, labels) of the one it replaces.
+function pickInstallmentIdentity(old: FutureInstallment) {
+  return {
+    date: old.date,
+    description: old.description,
+    notes: old.notes,
+    installment_group_id: old.installment_group_id,
+    installment_number: old.installment_number,
+    installment_total: old.installment_total,
+  };
+}
+
+function buildAmortizationRows({
+  userId,
+  input,
+  future,
+  paid,
+  schedule,
+  slices,
+}: {
+  userId: string;
+  input: AmortizeDebtInput;
+  future: FutureInstallment[];
+  paid: { interest: number; principal: number };
+  schedule: { payment: number; principal: number; interest: number }[];
+  slices: number[];
+}) {
+  const base = {
+    user_id: userId,
+    financing_plan_id: input.planId,
+    kind: "expense" as DbTransactionKind,
+    category_id: future[0].category_id,
+    payment_method_id: future[0].payment_method_id,
+    // Keeps the goal link of the schedule being replaced.
+    goal_id: future[0].goal_id,
+  };
+  const extraPayment = {
+    ...base,
+    amount: input.amount,
+    date: getTodayValue(),
+    description: encryptDescription(input.description.trim()),
+    notes: null,
+    installment_group_id: null,
+    installment_number: null,
+    installment_total: null,
+    principal_portion: paid.principal,
+    interest_portion: paid.interest,
+    savings_funded_amount: input.source === "savings" ? input.amount : 0,
+    is_amortization: true,
+  };
+
+  return [
+    extraPayment,
+    ...schedule.map((row, index) => ({
+      ...base,
+      ...pickInstallmentIdentity(future[index]),
+      amount: row.payment,
+      principal_portion: row.principal,
+      interest_portion: row.interest,
+      savings_funded_amount: slices[index],
+      // A bulk insert fills a column missing from some rows with NULL, which
+      // would break the NOT NULL default, so every row names it.
+      is_amortization: false,
+    })),
+  ];
+}
+
+async function replaceFutureInstallments(
+  supabase: SupabaseClient,
+  { oldIds, rows }: { oldIds: string[]; rows: object[] },
+) {
+  // Insert and delete run in one transaction, so the original schedule is
+  // never lost nor duplicated.
+  const { error } = await supabase.rpc("save_transaction_batch", {
+    p_plan: null,
+    p_rows: rows,
+    p_delete_ids: oldIds,
+  });
+
+  if (error) {
+    throw new Error(`Unable to save amortization: ${error.message}`);
+  }
+}
+
+// Pays part of a financed debt today. The remaining installments are
+// regenerated (see buildAmortization); plans are immutable, so the
+// future rows are replaced, and the new ones are written first so a failure
+// never loses the originals.
+export async function amortizeDebt(rawInput: AmortizeDebtInput) {
+  assertUuid(rawInput.planId, "Financing plan");
+  const ctx = await getUserContext();
+  const { supabase, userId } = ctx;
+  const today = getTodayValue();
+  const input = { ...rawInput, amount: toCents(rawInput.amount) };
+  const plan = await loadFinancingPlanRecord(supabase, userId, input.planId);
+  const planRows = await loadPlanRows(supabase, userId, input.planId);
+  const future = pickFutureInstallments(planRows, today);
+  const breakdown = buildFinancingBreakdown(plan, planRows.map(toFinancingRowRecord), today);
+  const accrual = getAccrual(breakdown, today);
+  const { rows: schedule, ...paid } = buildAmortization({
+    plan,
+    outstandingPrincipal: breakdown.outstanding.principal,
+    accruedInterest: accrual.interest,
+    elapsedDays: accrual.days,
+    amount: input.amount,
+    mode: input.mode,
+    installments: {
+      count: future.length,
+      next: {
+        payment: Number(future[0].amount),
+        principal: Number(future[0].principal_portion ?? future[0].amount),
+      },
+    },
+  });
+  const slices = carrySavingsShare(future, schedule);
+
+  if (input.source === "savings") {
+    await assertAmortizationSavings(ctx, { amount: input.amount, slices, future });
+  }
+
+  await replaceFutureInstallments(supabase, {
+    oldIds: future.map((row) => row.id),
+    rows: buildAmortizationRows({ userId, input, future, paid, schedule, slices }),
+  });
+}
+
 export async function deleteInstallments(input: DeleteInstallmentsInput) {
   assertUuid(input.transactionId, "Transaction");
   const { supabase, userId } = await getUserContext();
@@ -2810,6 +3710,14 @@ export async function deleteInstallments(input: DeleteInstallmentsInput) {
     userId,
     input.transactionId,
   );
+
+  if (input.scope === "all" && selectedTransaction.financingGroupId) {
+    return deleteFinancingPlan(
+      supabase,
+      userId,
+      selectedTransaction.financingGroupId,
+    );
+  }
 
   if (!isInstallmentTransaction(selectedTransaction)) {
     await deleteTransaction(input.transactionId);
@@ -3351,6 +4259,30 @@ async function getTotalSavedForMonth(
   return Number(data ?? 0);
 }
 
+// The saved total only subtracts funded slices dated up to the selected
+// month; slices already allocated to later months are committed too.
+async function getSavingsAvailableToFund(ctx: AuthenticatedUserContext) {
+  const { month, end } = getMonthRange(getCurrentMonthValue());
+  const [totalSaved, { data, error }] = await Promise.all([
+    getTotalSavedForMonth(month, ctx),
+    ctx.supabase
+      .from("transactions")
+      .select("savings_funded_amount")
+      .eq("user_id", ctx.userId)
+      .gt("date", end)
+      .gt("savings_funded_amount", 0),
+  ]);
+
+  if (error) {
+    throw new Error(`Unable to load committed savings: ${error.message}`);
+  }
+
+  const committed = ((data ?? []) as { savings_funded_amount: number | string }[])
+    .reduce((sum, row) => sum + Number(row.savings_funded_amount), 0);
+
+  return toCents(totalSaved - committed);
+}
+
 function sumTransactionsByType(
   transactions: Transaction[],
   type: TransactionType,
@@ -3360,6 +4292,44 @@ function sumTransactionsByType(
     .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
 }
 
+function sumSavingsFunded(transactions: Transaction[]) {
+  // Synthesized credit-card invoices carry no savingsFundedAmount.
+  return transactions.reduce(
+    (sum, { savingsFundedAmount = 0 }) => sum + savingsFundedAmount,
+    0,
+  );
+}
+
+// Month balance after spending, where the savings-funded part of an expense
+// is paid by the saved total instead of this month's income.
+function computeAvailableBalance(transactions: Transaction[]) {
+  return (
+    sumTransactionsByType(transactions, "income") -
+    (sumTransactionsByType(transactions, "expense") -
+      sumSavingsFunded(transactions)) -
+    sumTransactionsByType(transactions, "saving")
+  );
+}
+
+export type FundingContext = {
+  availableBalance: number;
+  totalSaved: number;
+};
+
+export async function getFundingContext(): Promise<FundingContext> {
+  const ctx = await getUserContext();
+  const month = getCurrentMonthValue();
+  const [transactions, totalSaved] = await Promise.all([
+    listTransactions({ month, userContext: ctx }),
+    getSavingsAvailableToFund(ctx),
+  ]);
+
+  return {
+    availableBalance: computeAvailableBalance(transactions),
+    totalSaved,
+  };
+}
+
 export async function getMonthlySummary(
   month?: string,
   userContext?: Awaited<ReturnType<typeof getUserContext>>,
@@ -3367,6 +4337,7 @@ export async function getMonthlySummary(
   totalIncome: number;
   totalExpenses: number;
   totalSavings: number;
+  totalSavingsFunded: number;
 }> {
   const selectedMonth = normalizeMonthValue(month);
   const ctx = userContext ?? (await getUserContext());
@@ -3379,6 +4350,7 @@ export async function getMonthlySummary(
     totalIncome: sumTransactionsByType(transactions, "income"),
     totalExpenses: sumTransactionsByType(transactions, "expense"),
     totalSavings: sumTransactionsByType(transactions, "saving"),
+    totalSavingsFunded: sumSavingsFunded(transactions),
   };
 }
 
@@ -3504,7 +4476,6 @@ function buildDashboardSummaryData({
 }) {
   const totalIncome = sumTransactionsByType(transactions, "income");
   const totalExpenses = sumTransactionsByType(transactions, "expense");
-  const totalMonthSavings = sumTransactionsByType(transactions, "saving");
   const previousTotalIncome = sumTransactionsByType(
     previousTransactions,
     "income",
@@ -3519,7 +4490,7 @@ function buildDashboardSummaryData({
   );
 
   return {
-    currentBalance: totalIncome - totalExpenses - totalMonthSavings,
+    currentBalance: computeAvailableBalance(transactions),
     predictedExpenses,
     totalExpenses,
     totalIncome,

@@ -264,3 +264,30 @@ describe("calculateTotalSaved", () => {
     ]);
   });
 });
+
+describe("calculateTotalSaved with savings-funded expenses", () => {
+  it("removes the funded part from the saved total and from the month's expenses", () => {
+    const result = calculateTotalSaved({
+      selectedMonth: "2026-03",
+      transactions: [
+        { amount: 1000, date: "2026-01-05", type: "saving" },
+        { amount: 2000, date: "2026-02-01", type: "income" },
+        {
+          amount: 500,
+          date: "2026-02-10",
+          type: "expense",
+          group: "wants",
+          savingsFundedAmount: 500,
+        },
+      ],
+    });
+
+    // Jan: invested 1000, no leftover. Feb: income 2000, expense fully funded
+    // by savings → balance-side expense 0, leftover 2000. Invested drops by 500.
+    expect(result.totalInvested).toBe(500);
+    expect(
+      result.closedMonths.find((month) => month.month === "2026-02")?.expenses,
+    ).toBe(0);
+    expect(result.totalSaved).toBe(2500);
+  });
+});

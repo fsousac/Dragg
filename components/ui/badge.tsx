@@ -27,6 +27,8 @@ const badgeVariants = cva(
           'rounded-full bg-needs-bg text-needs border-needs/20',
         wants:
           'rounded-full bg-wants-bg text-wants border-wants/20',
+        warning:
+          'rounded-full bg-warning-bg text-warning border-warning/20',
       },
     },
     defaultVariants: {

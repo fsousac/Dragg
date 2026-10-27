@@ -8,8 +8,12 @@ import { toast } from "sonner";
 
 import { NewCategoryDialog } from "@/components/dashboard/new-category-dialog";
 import { CompactInput } from "@/components/dashboard/form-inputs/compact-input";
-import { CompactSelect } from "@/components/dashboard/form-inputs/compact-select";
 import { CompactTextarea } from "@/components/dashboard/form-inputs/compact-textarea";
+import {
+  CHIP_BASE_CLASS,
+  CHIP_IDLE_CLASS,
+  CHIP_SELECTED_CLASS,
+} from "@/components/dashboard/form-inputs/choice-chips";
 import { CurrencyInput } from "@/components/dashboard/form-inputs/currency-input";
 import { withSelectedMonth } from "@/components/dashboard/month-route";
 import { Button } from "@/components/ui/button";
@@ -20,6 +24,13 @@ import {
   type CreatePaymentMethodInput,
 } from "@/lib/finance/transactions";
 import { NewPaymentMethodDialog } from "@/components/dashboard/new-payment-method-dialog";
+import {
+  buildTransactionSubmitData,
+  DEFAULT_ADVANCED_OPTIONS,
+  TransactionAdvancedOptions,
+  type AdvancedOptionsState,
+} from "@/components/dashboard/transaction-advanced-options";
+import { type TransactionFinancingInput } from "@/lib/finance/financing";
 import { useI18n } from "@/lib/i18n";
 
 export interface TransactionFormData {
@@ -31,6 +42,9 @@ export interface TransactionFormData {
   installmentCount: number;
   description: string;
   notes?: string;
+  savingsFundedAmount?: number;
+  goalId?: string;
+  financing?: TransactionFinancingInput;
 }
 
 type TransactionFormProps = {
@@ -41,11 +55,12 @@ type TransactionFormProps = {
   ) => Promise<void>;
   readonly onSubmit: (data: TransactionFormData) => Promise<void>;
   readonly paymentMethods: TransactionFormPaymentMethod[];
+  // Opens with the advanced options preset (e.g. interest on, from the debts page).
+  readonly initialAdvanced?: AdvancedOptionsState;
 };
 
 function getCategoryChipClass(group: string | undefined, isSelected: boolean) {
-  if (!isSelected)
-    return "border-border/40 text-foreground/70 hover:border-border/60 hover:bg-foreground/5";
+  if (!isSelected) return CHIP_IDLE_CLASS;
   switch (group) {
     case "needs":
       return "border-blue-500/40 bg-blue-500/15 text-blue-400";
@@ -254,6 +269,9 @@ type TransactionFormSubmitHandlersParams = {
   setIsLoading: (value: boolean) => void;
   router: ReturnType<typeof useRouter>;
   t: (key: string) => string;
+  advanced: AdvancedOptionsState;
+  setAdvanced: React.Dispatch<React.SetStateAction<AdvancedOptionsState>>;
+  canInstallment: boolean;
 };
 
 function useTransactionFormSubmitHandlers({
@@ -267,8 +285,12 @@ function useTransactionFormSubmitHandlers({
   setIsLoading,
   router,
   t,
+  advanced,
+  setAdvanced,
+  canInstallment,
 }: TransactionFormSubmitHandlersParams) {
   const resetForm = () => {
+    setAdvanced(DEFAULT_ADVANCED_OPTIONS);
     setFormData({
       type: "expense",
       date: today,
@@ -289,7 +311,10 @@ function useTransactionFormSubmitHandlers({
 
     setIsLoading(true);
     try {
-      await onSubmit(formData);
+      // A count picked while the select was shown (e.g. with interest on)
+      // must not survive once the select is hidden again.
+      const submitted = canInstallment ? formData : { ...formData, installmentCount: 1 };
+      await onSubmit(buildTransactionSubmitData(submitted, advanced));
       toast.success(t("transaction.recordSuccess"));
       resetForm();
       router.refresh();
@@ -309,16 +334,21 @@ function usePaymentMethodInstallmentEligibility({
   setFormData,
   paymentMethods,
   t,
+  advanced,
 }: {
   formData: TransactionFormData;
   setFormData: React.Dispatch<React.SetStateAction<TransactionFormData>>;
   paymentMethods: TransactionFormPaymentMethod[];
   t: (key: string) => string;
+  advanced: AdvancedOptionsState;
 }) {
   const selectedPaymentMethod = paymentMethods.find((pm) => pm.id === formData.paymentMethod);
   const selectedPaymentMethodLabel = selectedPaymentMethod ? t(selectedPaymentMethod.label).toLowerCase() : "";
+  // Financed operations have installments whatever the payment method.
+  const interestOn = advanced.enabled && advanced.interestEnabled;
   const canInstallment =
-    formData.type === "expense" && canUseInstallments(selectedPaymentMethod, selectedPaymentMethodLabel);
+    formData.type === "expense" &&
+    (interestOn || canUseInstallments(selectedPaymentMethod, selectedPaymentMethodLabel));
 
   const handlePaymentMethodChange = (value: string) => {
     const nextPaymentMethod = paymentMethods.find((pm) => pm.id === value);
@@ -327,7 +357,7 @@ function usePaymentMethodInstallmentEligibility({
 
     setFormData({
       ...formData,
-      installmentCount: nextCanInstallment ? formData.installmentCount : 1,
+      installmentCount: nextCanInstallment || interestOn ? formData.installmentCount : 1,
       paymentMethod: value,
     });
   };
@@ -335,17 +365,15 @@ function usePaymentMethodInstallmentEligibility({
   return { canInstallment, handlePaymentMethodChange };
 }
 
-const INSTALLMENT_COUNTS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 24];
-
 const SECTION_LABEL_CLASS = "mb-2.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground";
-const CHIP_BASE_CLASS = "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all duration-200 cursor-pointer max-w-full";
 const CHIP_ADD_ACTION_CLASS = "border-dashed border-border/40 text-foreground/50 hover:border-border/60 hover:text-foreground/70";
 
-function getInstallmentOptions(t: (key: string) => string) {
-  return [
-    { value: "1", label: t("transaction.installmentOption.full") },
-    ...INSTALLMENT_COUNTS.map((count) => ({ value: String(count), label: `${count}x` })),
-  ];
+const MAX_INSTALLMENT_COUNT = 120;
+
+function clampInstallmentCount(rawValue: string) {
+  const parsed = Number.parseInt(rawValue, 10);
+  if (Number.isNaN(parsed)) return 1;
+  return Math.min(MAX_INSTALLMENT_COUNT, Math.max(1, parsed));
 }
 
 function getDisplayedCategoryOptions({
@@ -557,9 +585,7 @@ function TransactionPaymentMethodChips({
             type="button"
             onClick={() => handlePaymentMethodChange(pm.id)}
             className={`${CHIP_BASE_CLASS} ${
-              formData.paymentMethod === pm.id
-                ? "border-green-500 bg-green-500/20 text-green-400 font-semibold"
-                : "border-border/40 text-foreground/70 hover:border-border/60 hover:bg-foreground/5"
+              formData.paymentMethod === pm.id ? CHIP_SELECTED_CLASS : CHIP_IDLE_CLASS
             }`}
           >
             {t(pm.label)}
@@ -583,46 +609,63 @@ function TransactionPaymentMethodChips({
   );
 }
 
-type TransactionDateAndInstallmentsProps = TransactionFormFieldProps & {
+type TransactionDateFieldProps = TransactionFormFieldProps & {
   readonly error: string | undefined;
-  readonly canInstallment: boolean;
-  readonly installmentOptions: ReturnType<typeof getInstallmentOptions>;
   readonly todayDateInputValue: string;
   readonly t: (key: string) => string;
 };
 
-function TransactionDateAndInstallments({
+function TransactionDateField({ formData, setFormData, error, todayDateInputValue, t }: TransactionDateFieldProps) {
+  return (
+    <CompactInput
+      label={t("transaction.date")}
+      id="date"
+      type="date"
+      inputMode="text"
+      placeholder="dd/MM/yyyy"
+      value={toDateInputValue(formData.date) || todayDateInputValue}
+      onChange={(event) => setFormData({ ...formData, date: fromDateInputValue(event.target.value) })}
+      icon={<Calendar className="w-4 h-4" />}
+      error={error}
+      inputClassName="w-full max-w-full min-w-0 appearance-none overflow-hidden pr-3 text-left [&::-webkit-calendar-picker-indicator]:shrink-0 [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:overflow-hidden [&::-webkit-date-and-time-value]:text-left"
+    />
+  );
+}
+
+type TransactionInstallmentsFieldProps = TransactionFormFieldProps & {
+  readonly canInstallment: boolean;
+  readonly t: (key: string) => string;
+};
+
+// Always on screen for expenses, so it never vanishes when the payment method
+// changes; disabled with the reason instead.
+function TransactionInstallmentsField({
   formData,
   setFormData,
-  error,
   canInstallment,
-  installmentOptions,
-  todayDateInputValue,
   t,
-}: TransactionDateAndInstallmentsProps) {
+}: TransactionInstallmentsFieldProps) {
   return (
-    <div className="grid gap-5 lg:grid-cols-2 lg:gap-6 min-w-0">
+    <div className="space-y-1.5">
       <CompactInput
-        label={t("transaction.date")}
-        id="date"
-        type="date"
-        inputMode="text"
-        placeholder="dd/MM/yyyy"
-        value={toDateInputValue(formData.date) || todayDateInputValue}
-        onChange={(event) => setFormData({ ...formData, date: fromDateInputValue(event.target.value) })}
-        icon={<Calendar className="w-4 h-4" />}
-        error={error}
-        inputClassName="w-full max-w-full min-w-0 appearance-none overflow-hidden pr-3 text-left [&::-webkit-calendar-picker-indicator]:shrink-0 [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:overflow-hidden [&::-webkit-date-and-time-value]:text-left"
+        label={t("transaction.installmentCount")}
+        id="installment"
+        type="number"
+        inputMode="numeric"
+        min="1"
+        max={MAX_INSTALLMENT_COUNT.toString()}
+        value={canInstallment ? formData.installmentCount : 1}
+        disabled={!canInstallment}
+        onChange={(event) =>
+          setFormData({
+            ...formData,
+            installmentCount: clampInstallmentCount(event.target.value),
+          })
+        }
       />
-      {canInstallment ? (
-        <CompactSelect
-          label={t("transaction.installmentFrequency")}
-          id="installment"
-          value={formData.installmentCount.toString()}
-          onChange={(value) => setFormData({ ...formData, installmentCount: Number.parseInt(value, 10) })}
-          options={installmentOptions}
-        />
-      ) : null}
+      {canInstallment ? null : (
+        <p className="text-xs text-muted-foreground">{t("transaction.installmentUnavailable")}</p>
+      )}
     </div>
   );
 }
@@ -726,7 +769,8 @@ function useTransactionFormUiState() {
 function useTransactionFormBaseState({
   categories,
   paymentMethods,
-}: Pick<TransactionFormProps, "categories" | "paymentMethods">) {
+  initialAdvanced = DEFAULT_ADVANCED_OPTIONS,
+}: Pick<TransactionFormProps, "categories" | "paymentMethods" | "initialAdvanced">) {
   const { t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -743,6 +787,7 @@ function useTransactionFormBaseState({
     description: "",
     notes: "",
   });
+  const [advanced, setAdvanced] = useState<AdvancedOptionsState>(initialAdvanced);
   const uiState = useTransactionFormUiState();
   const categoryData = useTransactionFormCategoryData({ categories, t });
 
@@ -764,6 +809,8 @@ function useTransactionFormBaseState({
     setErrors,
     formData,
     setFormData,
+    advanced,
+    setAdvanced,
     ...uiState,
     ...categoryData,
     displayedCategoryOptions,
@@ -793,6 +840,14 @@ function useTransactionFormHandlers({
     paymentMethods,
   });
 
+  const { canInstallment, handlePaymentMethodChange } = usePaymentMethodInstallmentEligibility({
+    formData,
+    setFormData,
+    paymentMethods,
+    t,
+    advanced: base.advanced,
+  });
+
   const { handleSubmit } = useTransactionFormSubmitHandlers({
     formData,
     setFormData,
@@ -804,24 +859,21 @@ function useTransactionFormHandlers({
     setIsLoading,
     router,
     t,
+    advanced: base.advanced,
+    setAdvanced: base.setAdvanced,
+    canInstallment,
   });
 
-  const { canInstallment, handlePaymentMethodChange } = usePaymentMethodInstallmentEligibility({
-    formData,
-    setFormData,
-    paymentMethods,
-    t,
-  });
-
-  return { handleSubmit, canInstallment, handlePaymentMethodChange, installmentOptions: getInstallmentOptions(t) };
+  return { handleSubmit, canInstallment, handlePaymentMethodChange };
 }
 
 function useTransactionFormState({
   categories,
   paymentMethods,
   onSubmit,
-}: Pick<TransactionFormProps, "categories" | "paymentMethods" | "onSubmit">) {
-  const base = useTransactionFormBaseState({ categories, paymentMethods });
+  initialAdvanced,
+}: Pick<TransactionFormProps, "categories" | "paymentMethods" | "onSubmit" | "initialAdvanced">) {
+  const base = useTransactionFormBaseState({ categories, paymentMethods, initialAdvanced });
   const handlers = useTransactionFormHandlers({ base, paymentMethods, onSubmit });
 
   return { ...base, ...handlers, paymentMethods };
@@ -873,14 +925,26 @@ function TransactionFormView(props: TransactionFormProps & TransactionFormState)
         <TransactionAmountSection {...props} error={errors.amount} />
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-x-6 lg:gap-y-5 min-w-0">
+          {/* How it is paid: each field depends on the one above it. */}
           <div className="flex flex-col gap-5 min-w-0">
-            <TransactionCategoryChips {...props} displayedCategoryOptions={displayedCategoryOptions} />
+            <TransactionPaymentMethodChips {...props} error={errors.paymentMethod} />
+            {formData.type === "expense" ? (
+              <>
+                <TransactionInstallmentsField {...props} />
+                <TransactionAdvancedOptions
+                  amount={formData.amount}
+                  installmentCount={formData.installmentCount}
+                  value={props.advanced}
+                  onChange={props.setAdvanced}
+                />
+              </>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-5 min-w-0">
+            <TransactionCategoryChips {...props} displayedCategoryOptions={displayedCategoryOptions} />
             <TransactionDescriptionAndNotesFields formData={formData} setFormData={setFormData} errors={errors} t={t} />
-            <TransactionPaymentMethodChips {...props} error={errors.paymentMethod} />
-            <TransactionDateAndInstallments {...props} error={errors.date} />
+            <TransactionDateField {...props} error={errors.date} />
           </div>
         </div>
 
