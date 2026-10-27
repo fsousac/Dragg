@@ -51,7 +51,15 @@ jobs:
           version: latest
 
       - name: Start local Supabase and apply migrations
-        run: supabase start
+        # Skip unused services (fewer ghcr pulls) and retry on registry rate limits.
+        run: |
+          for attempt in 1 2 3; do
+            supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor && exit 0
+            echo "supabase start failed (attempt $attempt), retrying..."
+            supabase stop --no-backup || true
+            sleep $((attempt * 20))
+          done
+          exit 1
 
       - name: Export local Supabase connection details
         run: |
